@@ -5,14 +5,15 @@ if (!(timeIndex % 2))
     scalar dtSave = runTime.deltaT().value();
     runTime.setDeltaT(dtSave * 2);
 
-    start = std::clock();
+    start = std::chrono::steady_clock::now();
     combustion->correct();
 
     label flag_mpi_init;
     MPI_Initialized(&flag_mpi_init);
     if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-    end = std::clock();
-    time_monitor_chem += double(end - start) / double(CLOCKS_PER_SEC);
+    end = std::chrono::steady_clock::now();
+    std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    time_monitor_chem += processingTime.count();
 
     forAll(Y, i)
     {
