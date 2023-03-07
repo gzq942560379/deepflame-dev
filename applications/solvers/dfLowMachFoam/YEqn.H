@@ -1,4 +1,4 @@
-start = std::clock();
+start = std::chrono::steady_clock::now();
 
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
@@ -25,25 +25,26 @@ const surfaceScalarField phiUc = linearInterpolate(sumYDiffError) & mesh.Sf();
 label flag_mpi_init;
 MPI_Initialized(&flag_mpi_init);
 if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-end = std::clock();
-time_monitor_corrDiff += double(end - start) / double(CLOCKS_PER_SEC);
+end = std::chrono::steady_clock::now();
+processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+time_monitor_corrDiff += processingTime.count();
 
 {
     if (!splitting)
     {
-        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        start = std::chrono::steady_clock::now();
         combustion->correct();
         //label flag_mpi_init;
         //MPI_Initialized(&flag_mpi_init);
         if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-        std::chrono::steady_clock::time_point stop = std::chrono::steady_clock::now();
-        std::chrono::duration<double> processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start);
+        end = std::chrono::steady_clock::now();
+        processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
         time_monitor_chem += processingTime.count();
     }
 
     volScalarField Yt(0.0*Y[0]);
 
-    start = std::clock();
+    start = std::chrono::steady_clock::now();
     forAll(Y, i)
     {
         volScalarField& Yi = Y[i];
@@ -78,6 +79,7 @@ time_monitor_corrDiff += double(end - start) / double(CLOCKS_PER_SEC);
     Y[inertIndex] = scalar(1) - Yt;
     Y[inertIndex].max(0.0);
 
-    end = std::clock();
-    time_monitor_Y += double(end - start) / double(CLOCKS_PER_SEC);
+    end = std::chrono::steady_clock::now();
+    processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    time_monitor_Y += processingTime.count();
 }

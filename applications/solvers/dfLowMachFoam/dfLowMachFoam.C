@@ -87,7 +87,8 @@ int main(int argc, char *argv[])
     double time_monitor_corrThermo=0;
     double time_monitor_corrDiff=0;
     label timeIndex = 0;
-    clock_t start, end;
+    std::chrono::steady_clock::time_point start, end;
+    std::chrono::duration<double> processingTime;
 
     turbulence->validate();
 
@@ -143,24 +144,27 @@ int main(int argc, char *argv[])
                 #include "rhoEqn.H"
             }
 
-            start = std::clock();
+            start = std::chrono::steady_clock::now();
             #include "UEqn.H"
-            end = std::clock();
-            time_monitor_flow += double(end - start) / double(CLOCKS_PER_SEC);
+            end = std::chrono::steady_clock::now();
+            processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+            time_monitor_flow += processingTime.count();
 
             if(combModelName!="ESF" && combModelName!="flareFGM" )
             {
                 #include "YEqn.H"
 
-                start = std::clock();
+                start = std::chrono::steady_clock::now();
                 #include "EEqn.H"
-                end = std::clock();
-                time_monitor_E += double(end - start) / double(CLOCKS_PER_SEC);
+                end = std::chrono::steady_clock::now();
+                processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+                time_monitor_E += processingTime.count();
 
-                start = std::clock();
+                start = std::chrono::steady_clock::now();
                 chemistry->correctThermo();
-                end = std::clock();
-                time_monitor_corrThermo += double(end - start) / double(CLOCKS_PER_SEC);
+                end = std::chrono::steady_clock::now();
+                processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+                time_monitor_corrThermo += processingTime.count();
             }
             else
             {
@@ -171,7 +175,7 @@ int main(int argc, char *argv[])
 
             // --- Pressure corrector loop
 
-            start = std::clock();
+            start = std::chrono::steady_clock::now();
             while (pimple.correct())
             {
                 if (pimple.consistent())
@@ -183,8 +187,9 @@ int main(int argc, char *argv[])
                     #include "pEqn.H"
                 }
             }
-            end = std::clock();
-            time_monitor_flow += double(end - start) / double(CLOCKS_PER_SEC);
+            end = std::chrono::steady_clock::now();
+            processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+            time_monitor_flow += processingTime.count();
 
             if (pimple.turbCorr())
             {

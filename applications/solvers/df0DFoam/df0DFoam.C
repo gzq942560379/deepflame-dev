@@ -78,7 +78,8 @@ int main(int argc, char *argv[])
     double time_monitor_chem=0;
     double time_monitor_Y=0;
     double time_monitor_corrThermo=0;
-    clock_t start, end;
+    std::chrono::steady_clock::time_point start, stop;
+    std::chrono::duration<double> processingTime;
 
     turbulence->validate();
 
