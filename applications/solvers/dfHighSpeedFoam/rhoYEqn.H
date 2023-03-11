@@ -49,7 +49,7 @@ tmp<fv::convectionScheme<scalar>> mvConvection
 
             if (!inviscid)
             {
-                const surfaceScalarField phiUc = linearInterpolate(sumYDiffError) & mesh.Sf();
+                const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
 
                 hDiffCorrFlux += chemistry->hai(i)*(chemistry->rhoD(i)*fvc::grad(Yi) - Yi*sumYDiffError);
                 diffAlphaD += fvc::laplacian(thermo.alpha()*chemistry->hai(i), Yi);

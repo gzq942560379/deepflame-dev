@@ -34,6 +34,8 @@ lnInclude
 linux*Clang*/
 linux*Gcc*/
 linux*Icc*/
+linux*Fujitsu*/
+
 solaris*Gcc*/
 SunOS*Gcc*/
 platforms/
@@ -54,6 +56,7 @@ log.*
 dynamicCode/
 postProcessing/
 *.out
+output.*
 
 processor*/
 chemkin/
@@ -70,3 +73,7 @@ __pycache__/
 lib/
 bin/
 .vscode/
+
+applications/utilities/decomposeFieldsPar/
+/examples
+/mechanisms

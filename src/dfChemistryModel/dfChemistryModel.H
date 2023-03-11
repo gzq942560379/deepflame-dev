@@ -147,6 +147,8 @@ public IOdictionary
         double time_DNNinference_;
         double time_updateSolutionBuffer_;
         double time_getProblems_;
+        double time_cvode_;
+        double time_update_RR_;
 #endif
 
 #ifdef USE_LIBTORCH
@@ -165,6 +167,8 @@ public IOdictionary
         // profiling
         double time_vec2ndarray_;
         double time_python_;
+        double time_python_import_module_;
+        double time_python_inference_;
 #endif
 
         // Load balancing object
@@ -315,10 +319,14 @@ public:
     double time_getDNNinputs() {return time_getDNNinputs_;}
     double time_DNNinference() {return time_DNNinference_;}
     double time_updateSolutionBuffer() {return time_updateSolutionBuffer_;}
+    double time_cvode() {return time_cvode_;}
+    double time_update_RR() {return time_update_RR_;}
 #endif
 #ifdef USE_PYTORCH
     double time_vec2ndarray() {return time_vec2ndarray_;}
     double time_python() {return time_python_;}
+    double time_python_import_module() {return time_python_import_module_;}
+    double time_python_inference() {return time_python_inference_;}
 #endif
 
 };
