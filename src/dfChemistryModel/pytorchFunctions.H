@@ -9,7 +9,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         return deltaTMin;
     }
 
-    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    double start = MPI_Wtime();
     Info << "=== begin solve_DNN === " << endl;
     if (gpu_)
     {
@@ -22,21 +22,20 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
 
 
     /*=============================gather problems=============================*/
-    std::chrono::steady_clock::time_point start10 = std::chrono::steady_clock::now();
+    double start10 = MPI_Wtime();
     DynamicList<GpuProblem> GPUproblemList; //single core TODO:rename it
     DynamicList<ChemistryProblem> CPUproblemList;
     getGPUProblems(deltaT, GPUproblemList, CPUproblemList);
     label flag_mpi_init;
     MPI_Initialized(&flag_mpi_init);
     if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-    std::chrono::steady_clock::time_point stop10 = std::chrono::steady_clock::now();
-    std::chrono::duration<double> processingTime10 = std::chrono::duration_cast<std::chrono::duration<double>>(stop10 - start10);
-    time_getProblems_ += processingTime10.count();
+    double end10 = MPI_Wtime();
+    time_getProblems_ += end10-start10;
 
     if (gpu_)
     {
         /*==============================send problems==============================*/
-        std::chrono::steady_clock::time_point start2 = std::chrono::steady_clock::now();
+        double start2 = MPI_Wtime();
 
         PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
         if (Pstream::myProcNo() % cores_) //for slave
@@ -66,16 +65,15 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
 
         DynamicBuffer<GpuSolution> solutionBuffer;
 
-        std::chrono::steady_clock::time_point stop2 = std::chrono::steady_clock::now();
-        std::chrono::duration<double> processingTime2 = std::chrono::duration_cast<std::chrono::duration<double>>(stop2 - start2);
-        // std::cout << "sendProblemTime = " << processingTime2.count() << std::endl;
-        time_sendProblem_ += processingTime2.count();
+        double end2 = MPI_Wtime();
+        // std::cout << "sendProblemTime = " << end2 - start2 << std::endl;
+        time_sendProblem_ += end2 - start2;
 
         /*=============================submaster work start=============================*/
         if (!(Pstream::myProcNo() % cores_))
         {
-            std::chrono::steady_clock::time_point start1 = std::chrono::steady_clock::now();
-            std::chrono::steady_clock::time_point start3 = std::chrono::steady_clock::now();
+            double start1 = MPI_Wtime();
+            double start3 = MPI_Wtime();
 
             label problemSize = 0; // problemSize is defined to debug
             DynamicBuffer<GpuProblem> problemBuffer(cores_);//each submaster init a local problemBuffer TODO:rename it
@@ -95,10 +93,9 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
                 Info << "problemSize = " << problemSize << endl;
             }
 
-            std::chrono::steady_clock::time_point stop3 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime3 = std::chrono::duration_cast<std::chrono::duration<double>>(stop3 - start3);
-            // std::cout << "RecvProblemTime = " << processingTime3.count() << std::endl;
-            time_RecvProblem_ += processingTime3.count();
+            double end3 = MPI_Wtime();
+            // std::cout << "RecvProblemTime = " << end3 - start3 << std::endl;
+            time_RecvProblem_ += end3 - start3;
 
             /*==============================construct DNN inputs==============================*/
             std::vector<label> outputLength;
@@ -106,66 +103,60 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             std::vector<DynamicBuffer<label>> cellIDBuffer; // Buffer contains the cell numbers
             std::vector<std::vector<label>> problemCounter; // evaluate the number of the problems of each subslave
 
-            std::chrono::steady_clock::time_point start5 = std::chrono::steady_clock::now();
+            double start5 = MPI_Wtime();
             getDNNinputs(problemBuffer, outputLength, DNNinputs, cellIDBuffer, problemCounter);
-            std::chrono::steady_clock::time_point stop5 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime5 = std::chrono::duration_cast<std::chrono::duration<double>>(stop5 - start5);
-            // std::cout << "getDNNinputsTime = " << processingTime5.count() << std::endl;
-            time_getDNNinputs_ += processingTime5.count();
+            double end5 = MPI_Wtime();
+            // std::cout << "getDNNinputsTime = " << end5 - start5 << std::endl;
+            time_getDNNinputs_ += end5 - start5;
 
             /*=============================inference via pybind11=============================*/
-            std::chrono::steady_clock::time_point start7 = std::chrono::steady_clock::now();
-            std::chrono::steady_clock::time_point start8 = std::chrono::steady_clock::now();
+            double start7 = MPI_Wtime();
+            double start8 = MPI_Wtime();
 
             pybind11::array_t<double> vec0 = pybind11::array_t<double>({DNNinputs[0].size()}, {8}, &DNNinputs[0][0]); // cast vector to np.array
             pybind11::array_t<double> vec1 = pybind11::array_t<double>({DNNinputs[1].size()}, {8}, &DNNinputs[1][0]);
             pybind11::array_t<double> vec2 = pybind11::array_t<double>({DNNinputs[2].size()}, {8}, &DNNinputs[2][0]);
 
-            std::chrono::steady_clock::time_point stop8 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime8 = std::chrono::duration_cast<std::chrono::duration<double>>(stop8 - start8);
-            // std::cout << "vec2ndarrayTime = " << processingTime8.count() << std::endl;
-            time_vec2ndarray_ += processingTime8.count();
+            double end8 = MPI_Wtime();
+            // std::cout << "vec2ndarrayTime = " << end8 - start8 << std::endl;
+            time_vec2ndarray_ += end8 - start8;
 
             pybind11::module_ call_torch = pybind11::module_::import("inference"); // import python file
 
-            std::chrono::steady_clock::time_point start9 = std::chrono::steady_clock::now();
+            double start9 = MPI_Wtime();
 
             pybind11::object result = call_torch.attr("inference")(vec0, vec1, vec2); // call python function
             const double* star = result.cast<pybind11::array_t<double>>().data();
 
-            std::chrono::steady_clock::time_point stop9 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime9 = std::chrono::duration_cast<std::chrono::duration<double>>(stop9 - start9);
-            // std::cout << "pythonTime = " << processingTime9.count() << std::endl;
-            time_python_ += processingTime9.count();
+            double end9 = MPI_Wtime();
+            // std::cout << "pythonTime = " << end9 - start9 << std::endl;
+            time_python_ += end9 - start9;
 
-            std::chrono::steady_clock::time_point stop7 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime7 = std::chrono::duration_cast<std::chrono::duration<double>>(stop7 - start7);
-            // std::cout << "DNNinferenceTime = " << processingTime7.count() << std::endl;
-            time_DNNinference_ += processingTime7.count();
+            double end7 = MPI_Wtime();
+            // std::cout << "DNNinferenceTime = " << end7 - start7 << std::endl;
+            time_DNNinference_ += end7 - start7;
 
             /*=============================construct solutions=============================*/
-            std::chrono::steady_clock::time_point start6 = std::chrono::steady_clock::now();
+            double start6 = MPI_Wtime();
             std::vector<double> outputsVec0(star, star+outputLength[0] * 7); //the float number is sample_length*sample_number
             std::vector<double> outputsVec1(star+outputLength[0] * 7, star+outputLength[1] * 7);
             std::vector<double> outputsVec2(star+outputLength[1] * 7, star+outputLength[2] * 7);
             std::vector<std::vector<double>> results = {outputsVec0, outputsVec1, outputsVec2};
             updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
-            std::chrono::steady_clock::time_point stop6 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime6 = std::chrono::duration_cast<std::chrono::duration<double>>(stop6 - start6);
-            // std::cout << "updateSolutionBufferTime = " << processingTime6.count() << std::endl;
-            time_updateSolutionBuffer_ += processingTime6.count();
+            double end6 = MPI_Wtime();
+            // std::cout << "updateSolutionBufferTime = " << end6 - start6 << std::endl;
+            time_updateSolutionBuffer_ += end6 - start6;
 
-            std::chrono::steady_clock::time_point stop1 = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime1 = std::chrono::duration_cast<std::chrono::duration<double>>(stop1 - start1);
-            // std::cout << "submasterTime = " << processingTime1.count() << std::endl;
-            time_submaster_ += processingTime1.count();
+            double end1 = MPI_Wtime();
+            // std::cout << "submasterTime = " << end1 - start1 << std::endl;
+            time_submaster_ += end1 - start1;
         }
 
         /*=============================calculates RR with CVODE use DLB=============================*/
         DynamicList<ChemistrySolution> CPUSolutionList;
         if (Pstream::myProcNo() % cores_) //for slave
         {
-            std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+            double start = MPI_Wtime();
             DynamicBuffer<ChemistrySolution> incomingSolutions;
             balancer_.updateState(CPUproblemList, cvodeComm);
             auto guestProblems = balancer_.balance(CPUproblemList, cvodeComm);
@@ -175,9 +166,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             incomingSolutions = balancer_.unbalance(guestSolutions, cvodeComm);
             incomingSolutions.append(ownSolutions);
             updateReactionRates(incomingSolutions, CPUSolutionList);
-            std::chrono::steady_clock::time_point stop = std::chrono::steady_clock::now();
-            std::chrono::duration<double> processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start);
-            std::cout << "slaveTime = " << processingTime.count() << std::endl;
+            double end = MPI_Wtime();
+            std::cout << "slaveTime = " << end - start << std::endl;
         }
 
         /*=============================send CPUSolutionList back to submaster=============================*/
@@ -196,7 +186,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         }
 
         /*=============================send and recv GPUSolutions=============================*/
-        std::chrono::steady_clock::time_point start4 = std::chrono::steady_clock::now();
+        double start4 = MPI_Wtime();
 
         DynamicList<GpuSolution> finalList;
         PstreamBuffers pBufs2(Pstream::commsTypes::nonBlocking);
@@ -216,10 +206,9 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             recv >> finalList;
         }
 
-        std::chrono::steady_clock::time_point stop4 = std::chrono::steady_clock::now();
-        std::chrono::duration<double> processingTime4 = std::chrono::duration_cast<std::chrono::duration<double>>(stop4 - start4);
-        // std::cout << "SendRecvSolutionTime = " << processingTime4.count() << std::endl;
-        time_sendRecvSolution_ += processingTime4.count();
+        double end4 = MPI_Wtime();
+        // std::cout << "SendRecvSolutionTime = " << end4 - start4 << std::endl;
+        time_sendRecvSolution_ += end4 - start4;
 
         /*=============================update RR fields=============================*/
         for (int cellI = 0; cellI < finalList.size(); cellI++)
@@ -247,6 +236,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
     }
     else
     {
+        double start1 = MPI_Wtime();
         cores_ = 1;
         // solve CPU problem with cvode
         DynamicBuffer<ChemistrySolution> incomingSolutions;
@@ -259,8 +249,12 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         incomingSolutions = balancer_.unbalance(guestSolutions, cvodeComm);
         incomingSolutions.append(ownSolutions);
         updateReactionRates(incomingSolutions, CPUSolutionList);
+        double end1 = MPI_Wtime();
+        time_cvode_ = end1 - start1;
 
         // solve other problems with NN
+        /*==============================construct DNN inputs==============================*/
+        double start2 = MPI_Wtime();
         DynamicBuffer<GpuProblem> problemBuffer;
         DynamicBuffer<GpuSolution> solutionBuffer;
         std::vector<label> outputLength;
@@ -269,17 +263,40 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         std::vector<std::vector<label>> problemCounter; // evaluate the number of the problems of each subslave
         problemBuffer.append(GPUproblemList);
         getDNNinputs(problemBuffer, outputLength, DNNinputs, cellIDBuffer, problemCounter);
+        double end2 = MPI_Wtime();
+        time_getDNNinputs_ = end2 - start2;
+        /*==============================vector to ndarray==============================*/
+        double start3 = MPI_Wtime();
         pybind11::array_t<double> vec0 = pybind11::array_t<double>({DNNinputs[0].size()}, {8}, &DNNinputs[0][0]); // cast vector to np.array
         pybind11::array_t<double> vec1 = pybind11::array_t<double>({DNNinputs[1].size()}, {8}, &DNNinputs[1][0]);
         pybind11::array_t<double> vec2 = pybind11::array_t<double>({DNNinputs[2].size()}, {8}, &DNNinputs[2][0]);
+        double end3 = MPI_Wtime();
+        time_vec2ndarray_ = end3 - start3;
+        
+        /*==============================import python module==============================*/
+        double start4 = MPI_Wtime();
         pybind11::module_ call_torch = pybind11::module_::import("inference"); // import python file
+        double end4 = MPI_Wtime();
+        time_python_import_module_ = end4 - start4;
+        
+        /*==============================call python function==============================*/
+        double start5 = MPI_Wtime();
         pybind11::object result = call_torch.attr("inference")(vec0, vec1, vec2); // call python function
+        double end5 = MPI_Wtime();
+        time_python_inference_ = end5 - start5;
+
+        /*=============================construct solutions=============================*/
+        double start6 = MPI_Wtime();
         const double* star = result.cast<pybind11::array_t<double>>().data();
         std::vector<double> outputsVec0(star, star+outputLength[0] * 7); //the float number is sample_length*sample_number
         std::vector<double> outputsVec1(star+outputLength[0] * 7, star+outputLength[1] * 7);
         std::vector<double> outputsVec2(star+outputLength[1] * 7, star+outputLength[2] * 7);
         std::vector<std::vector<double>> results = {outputsVec0, outputsVec1, outputsVec2};
         updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
+        double end6 = MPI_Wtime();
+        time_updateSolutionBuffer_ = end6 - start6;
+        /*=============================update RR fields=============================*/
+        double start7 = MPI_Wtime();
         DynamicList<GpuSolution> finalList;
         finalList = solutionBuffer[0];
         for (int cellI = 0; cellI < finalList.size(); cellI++)
@@ -290,15 +307,16 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
                 RR_[speciID][finalList[cellI].cellid] = finalList[cellI].RRi[speciID];
                 Qdot_[finalList[cellI].cellid] -= hc_[speciID] * RR_[speciID][finalList[cellI].cellid];
             }
-        }
+        }        
+        double end7 = MPI_Wtime();
+        time_update_RR_ = end7 - start7;
     }
 
     Info << "=== end solve_DNN === " << endl;
 
-    std::chrono::steady_clock::time_point stop = std::chrono::steady_clock::now();
-    std::chrono::duration<double> processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start);
-    // std::cout << "allSolveTime = " << processingTime.count() << std::endl;
-    time_allsolve_ += processingTime.count();
+    double end = MPI_Wtime();
+    // std::cout << "allSolveTime = " << end - start << std::endl;
+    time_allsolve_ = end - start;
 
     return deltaTMin;
 }

@@ -80,14 +80,9 @@ int main(int argc, char *argv[])
     #include "createFields.H"
     #include "createRhoUfIfPresent.H"
 
-    double time_monitor_flow=0;
-    double time_monitor_chem=0;
-    double time_monitor_Y=0;
-    double time_monitor_E=0;
-    double time_monitor_corrThermo=0;
-    double time_monitor_corrDiff=0;
+    double total_start = MPI_Wtime();
+
     label timeIndex = 0;
-    clock_t start, end;
 
     turbulence->validate();
 
@@ -104,6 +99,14 @@ int main(int argc, char *argv[])
     while (runTime.run())
     {
         timeIndex ++;
+
+        double time_monitor_flow=0;
+        double time_monitor_chem=0;
+        double time_monitor_Y=0;
+        double time_monitor_E=0;
+        double time_monitor_corrThermo=0;
+        double time_monitor_corrDiff=0;
+        double start, end;
 
         #include "readDyMControls.H"
 
@@ -143,24 +146,24 @@ int main(int argc, char *argv[])
                 #include "rhoEqn.H"
             }
 
-            start = std::clock();
+            start = MPI_Wtime();
             #include "UEqn.H"
-            end = std::clock();
-            time_monitor_flow += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_flow += end - start;
 
             if(combModelName!="ESF" && combModelName!="flareFGM" )
             {
                 #include "YEqn.H"
 
-                start = std::clock();
+                start = MPI_Wtime();
                 #include "EEqn.H"
-                end = std::clock();
-                time_monitor_E += double(end - start) / double(CLOCKS_PER_SEC);
+                end = MPI_Wtime();
+                time_monitor_E += end - start;
 
-                start = std::clock();
+                start = MPI_Wtime();
                 chemistry->correctThermo();
-                end = std::clock();
-                time_monitor_corrThermo += double(end - start) / double(CLOCKS_PER_SEC);
+                end = MPI_Wtime();
+                time_monitor_corrThermo += end - start;
             }
             else
             {
@@ -171,7 +174,7 @@ int main(int argc, char *argv[])
 
             // --- Pressure corrector loop
 
-            start = std::clock();
+            start = MPI_Wtime();
             while (pimple.correct())
             {
                 if (pimple.consistent())
@@ -183,8 +186,8 @@ int main(int argc, char *argv[])
                     #include "pEqn.H"
                 }
             }
-            end = std::clock();
-            time_monitor_flow += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_flow += end - start;
 
             if (pimple.turbCorr())
             {
@@ -208,21 +211,33 @@ int main(int argc, char *argv[])
         Info<< "sum Time                   = " << (time_monitor_chem + time_monitor_Y + time_monitor_flow + time_monitor_E + time_monitor_corrThermo + time_monitor_corrDiff) << " s" << endl;
         Info<< "============================================"<<nl<< endl;
 
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
+        // Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+        //     << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
 #ifdef USE_PYTORCH
+        // if (log_ && torch_)
+        // {
+        //     Info<< "    allsolveTime = " << chemistry->time_allsolve() << " s"
+        //     << "    submasterTime = " << chemistry->time_submaster() << " s" << nl
+        //     << "    sendProblemTime = " << chemistry->time_sendProblem() << " s"
+        //     << "    recvProblemTime = " << chemistry->time_RecvProblem() << " s"
+        //     << "    sendRecvSolutionTime = " << chemistry->time_sendRecvSolution() << " s" << nl
+        //     << "    getDNNinputsTime = " << chemistry->time_getDNNinputs() << " s"
+        //     << "    DNNinferenceTime = " << chemistry->time_DNNinference() << " s"
+        //     << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl
+        //     << "    vec2ndarrayTime = " << chemistry->time_vec2ndarray() << " s"
+        //     << "    pythonTime = " << chemistry->time_python() << " s"<< nl << endl;
+        // }
         if (log_ && torch_)
         {
-            Info<< "    allsolveTime = " << chemistry->time_allsolve() << " s"
-            << "    submasterTime = " << chemistry->time_submaster() << " s" << nl
-            << "    sendProblemTime = " << chemistry->time_sendProblem() << " s"
-            << "    recvProblemTime = " << chemistry->time_RecvProblem() << " s"
-            << "    sendRecvSolutionTime = " << chemistry->time_sendRecvSolution() << " s" << nl
-            << "    getDNNinputsTime = " << chemistry->time_getDNNinputs() << " s"
-            << "    DNNinferenceTime = " << chemistry->time_DNNinference() << " s"
-            << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl
-            << "    vec2ndarrayTime = " << chemistry->time_vec2ndarray() << " s"
-            << "    pythonTime = " << chemistry->time_python() << " s"<< nl << endl;
+            Info
+            << "    allsolveTime = " << chemistry->time_allsolve() << " s" << endl
+            << "    cvodeTime = " << chemistry->time_cvode() << " s" << endl
+            << "    getDNNinputsTime = " << chemistry->time_getDNNinputs() << " s" << endl
+            << "    vec2ndarrayTime = " << chemistry->time_vec2ndarray() << " s" << endl
+            << "    ImportPythonModuleTime = " << chemistry->time_python_import_module() << " s" << endl
+            << "    PyTorchinferenceTime = " << chemistry->time_python_inference() << " s" << endl
+            << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << endl
+            << "    updateRRTime = " << chemistry->time_update_RR() << " s" << endl;
         }
 #endif
 #ifdef USE_LIBTORCH
@@ -238,7 +253,8 @@ int main(int argc, char *argv[])
         }
 #endif
     }
-
+    double total_end = MPI_Wtime();
+    Info << "Total time : " << total_end - total_start << endl;
     Info<< "End\n" << endl;
 
     return 0;

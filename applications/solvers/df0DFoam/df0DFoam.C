@@ -75,10 +75,8 @@ int main(int argc, char *argv[])
     #include "createFieldRefs.H"
     #include "createRhoUfIfPresent.H"
 
-    double time_monitor_chem=0;
-    double time_monitor_Y=0;
-    double time_monitor_corrThermo=0;
-    clock_t start, end;
+    double start, end;
+    double total_start = MPI_Wtime();
 
     turbulence->validate();
 
@@ -100,10 +98,15 @@ int main(int argc, char *argv[])
         runTime++;
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
+        double time_monitor_chem=0;
+        double time_monitor_Y=0;
+        double time_monitor_corrThermo=0;
 
         // --- Pressure-velocity PIMPLE corrector loop
+        int loop_count = 0;
         while (pimple.loop())
         {
+            loop_count += 1;
             #include "YEqn.H"
             #include "EEqn.H"
             if (constProp == "volume") p[0] = rho[0] / psi[0];
@@ -114,6 +117,7 @@ int main(int argc, char *argv[])
         runTime.write();
 
         Info<< "========Time Spent in diffenet parts========"<< endl;
+        Info<< "pimple loop count          = " << loop_count  << endl;
         Info<< "Chemical sources           = " << time_monitor_chem << " s" << endl;
         Info<< "Species Equations          = " << time_monitor_Y << " s" << endl;
         Info<< "thermo & Trans Properties  = " << time_monitor_corrThermo << " s" << endl;
@@ -122,18 +126,30 @@ int main(int argc, char *argv[])
         Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
             << "  ClockTime = " << runTime.elapsedClockTime() << " s"<<endl;
 #ifdef USE_PYTORCH
+        // if (log_ && torch_)
+        // {
+        //     Info<< "    allsolveTime = " << chemistry.time_allsolve() << " s"
+        //     << "    submasterTime = " << chemistry.time_submaster() << " s" << nl
+        //     << "    sendProblemTime = " << chemistry.time_sendProblem() << " s"
+        //     << "    recvProblemTime = " << chemistry.time_RecvProblem() << " s"
+        //     << "    sendRecvSolutionTime = " << chemistry.time_sendRecvSolution() << " s" << nl
+        //     << "    getDNNinputsTime = " << chemistry.time_getDNNinputs() << " s"
+        //     << "    DNNinferenceTime = " << chemistry.time_DNNinference() << " s"
+        //     << "    updateSolutionBufferTime = " << chemistry.time_updateSolutionBuffer() << " s" << nl
+        //     << "    vec2ndarrayTime = " << chemistry.time_vec2ndarray() << " s"
+        //     << "    pythonTime = " << chemistry.time_python() << " s"<< nl << endl;
+        // }
         if (log_ && torch_)
         {
-            Info<< "    allsolveTime = " << chemistry.time_allsolve() << " s"
-            << "    submasterTime = " << chemistry.time_submaster() << " s" << nl
-            << "    sendProblemTime = " << chemistry.time_sendProblem() << " s"
-            << "    recvProblemTime = " << chemistry.time_RecvProblem() << " s"
-            << "    sendRecvSolutionTime = " << chemistry.time_sendRecvSolution() << " s" << nl
-            << "    getDNNinputsTime = " << chemistry.time_getDNNinputs() << " s"
-            << "    DNNinferenceTime = " << chemistry.time_DNNinference() << " s"
-            << "    updateSolutionBufferTime = " << chemistry.time_updateSolutionBuffer() << " s" << nl
-            << "    vec2ndarrayTime = " << chemistry.time_vec2ndarray() << " s"
-            << "    pythonTime = " << chemistry.time_python() << " s"<< nl << endl;
+            Info
+            << "    allsolveTime = " << chemistry.time_allsolve() << " s" << endl
+            << "    cvodeTime = " << chemistry.time_cvode() << " s" << endl
+            << "    getDNNinputsTime = " << chemistry.time_getDNNinputs() << " s" << endl
+            << "    vec2ndarrayTime = " << chemistry.time_vec2ndarray() << " s" << endl
+            << "    ImportPythonModuleTime = " << chemistry.time_python_import_module() << " s" << endl
+            << "    PyTorchinferenceTime = " << chemistry.time_python_inference() << " s" << endl
+            << "    updateSolutionBufferTime = " << chemistry.time_updateSolutionBuffer() << " s" << endl
+            << "    updateRRTime = " << chemistry.time_update_RR() << " s" << endl;
         }
 #endif
 #ifdef USE_LIBTORCH
@@ -149,7 +165,8 @@ int main(int argc, char *argv[])
         }
 #endif
     }
-
+    double total_stop = MPI_Wtime();
+    Info << "Total time : " << total_stop - total_start << endl;
     Info<< "End\n" << endl;
 
     return 0;
