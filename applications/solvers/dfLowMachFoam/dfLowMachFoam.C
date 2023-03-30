@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     csrMatrix csr(mesh);
-    csr.write_pattern("sparse_pattern");
+    // csr.write_pattern("sparse_pattern");
 
     Info<< "\nStarting time loop\n" << endl;
 
