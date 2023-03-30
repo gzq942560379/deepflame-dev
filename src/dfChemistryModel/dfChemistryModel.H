@@ -72,6 +72,10 @@ SourceFiles
 #include "OFstream.H"
 #include "IOmanip.H"
 #include "PstreamGlobals.H"
+// tensorflow
+#include "DNNInferencertf.H"
+// #include <tensorflow/core/public/session.h>
+// #include <tensorflow/core/framework/tensor.h>
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -128,6 +132,17 @@ public IOdictionary
         volScalarField Qdot_;
         // DNN selection fields
         volScalarField selectDNN_;
+
+        // tensorflow
+        DNNInferencertf DNNInferencertf_;
+        word tfModelName0_;
+        word tfModelName1_;
+        word tfModelName2_;
+        std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
+                            Xmu1_, Xstd1_, Ymu1_, Ystd1_,
+                            Xmu2_, Xstd2_, Ymu2_, Ystd2_;
+        bool useDNN;
+        Switch torchSwitch_;
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
         bool useDNN;
@@ -216,6 +231,9 @@ public IOdictionary
         //- Solve the reaction system with DLB algorithm
         template<class DeltaTType>
         scalar solve_CVODE(const DeltaTType& deltaT);
+
+        template<class DeltaTType>
+        scalar solve_DNN_tf(const DeltaTType& deltaT);
 
         //- Output logFiles
         Foam::autoPtr<Foam::OFstream> logFile(const word& name) const

@@ -23,7 +23,8 @@ EXE_INC = -std=c++14 \
     -I$(CANTERA_ROOT)/include \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include,) \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include/torch/csrc/api/include,) \
-    $(PYTHON_INC_DIR)
+    $(PYTHON_INC_DIR) \
+    -I/home/runze/tensorflow/tensorflow
 
 EXE_LIBS = \
     -lcompressibleTransportModels \
@@ -44,4 +45,7 @@ EXE_LIBS = \
     $(if $(LIBTORCH_ROOT),-lpthread,) \
     $(if $(LIBTORCH_ROOT),$(DF_SRC)/dfChemistryModel/DNNInferencer/build/libDNNInferencer.so,) \
     $(if $(PYTHON_LIB_DIR),-L$(PYTHON_LIB_DIR),) \
-    $(if $(PYTHON_LIB_DIR),-lpython3.8,)
+    $(if $(PYTHON_LIB_DIR),-lpython3.8,) \
+    /home/runze/tensorflow/tensorflow/bazel-bin/tensorflow/libtensorflow_cc.so \
+    $(DF_SRC)/dfChemistryModel/DNNInferencer_tf/build/libDNNInferencertf.so
+

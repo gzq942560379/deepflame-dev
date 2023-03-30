@@ -24,7 +24,8 @@ EXE_INC = -std=c++14 \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include/torch/csrc/api/include,) \
     $(if $(BOOST_ARCH_PATH),-I$(BOOST_ARCH_PATH),) \
     $(if $(BOOST_ARCH_PATH),-DBOOST_ARCH_PATH_FOUNDD,) \
-    $(PYTHON_INC_DIR)
+    $(PYTHON_INC_DIR) \
+    -I/home/runze/tensorflow/tensorflow
 
 
 
@@ -48,4 +49,6 @@ EXE_LIBS = \
     $(if $(LIBTORCH_ROOT),-lpthread,) \
     $(if $(LIBTORCH_ROOT),$(DF_SRC)/dfChemistryModel/DNNInferencer/build/libDNNInferencer.so,) \
     $(if $(PYTHON_LIB_DIR),-L$(PYTHON_LIB_DIR),) \
-    $(if $(PYTHON_LIB_DIR),-lpython3.8,)
+    $(if $(PYTHON_LIB_DIR),-lpython3.8,) \
+    /home/runze/tensorflow/tensorflow/bazel-bin/tensorflow/libtensorflow_cc.so \
+    $(DF_SRC)/dfChemistryModel/DNNInferencer_tf/build/libDNNInferencertf.so
