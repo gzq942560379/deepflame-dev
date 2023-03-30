@@ -39,7 +39,7 @@ splittingStrategy    off;
 TorchSettings
 {
     torch            on;
-    GPU              on;
+    GPU              off;
     log              on;
     torchModel1      "new_ESH2sub1.pt"; 
     torchModel2      "new_ESH2sub2.pt"; 

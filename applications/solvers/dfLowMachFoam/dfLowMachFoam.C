@@ -59,6 +59,8 @@ Description
 #include "basicThermo.H"
 #include "CombustionModel.H"
 
+#include "csrMatrix.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -94,15 +96,19 @@ int main(int argc, char *argv[])
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+    csrMatrix csr(mesh);
+    csr.write_pattern("sparse_pattern");
+
     Info<< "\nStarting time loop\n" << endl;
 
     while (runTime.run())
     {
         timeIndex ++;
 
-        double time_monitor_flow=0;
         double time_monitor_chem=0;
         double time_monitor_Y=0;
+        double time_monitor_U=0;
+        double time_monitor_p=0;
         double time_monitor_E=0;
         double time_monitor_corrThermo=0;
         double time_monitor_corrDiff=0;
@@ -125,49 +131,67 @@ int main(int argc, char *argv[])
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
         // --- Pressure-velocity PIMPLE corrector loop
+        int pimple_loop_count = 0;
         while (pimple.loop())
         {
+            pimple_loop_count += 1;
             if (splitting)
             {
+                Info<< "YEqn_RR.H start" << nl << endl;
                 #include "YEqn_RR.H"
+                Info<< "YEqn_RR.H end" << nl << endl;
             }
             if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
             {
+                Info<< "new rhoU start" << nl << endl;
                 // Store momentum to set rhoUf for introduced faces.
                 autoPtr<volVectorField> rhoU;
                 if (rhoUf.valid())
                 {
                     rhoU = new volVectorField("rhoU", rho*U);
                 }
+                Info<< "new rhoU end" << nl << endl;
             }
 
             if (pimple.firstPimpleIter() && !pimple.simpleRho())
             {
+                Info<< "rhoEqn.H start" << nl << endl;
                 #include "rhoEqn.H"
+                Info<< "rhoEqn.H end" << nl << endl;
             }
 
+            Info<< "UEqn.H start" << nl << endl;
             start = MPI_Wtime();
             #include "UEqn.H"
             end = MPI_Wtime();
-            time_monitor_flow += end - start;
+            Info<< "UEqn.H end" << nl << endl;
+            time_monitor_U += end - start;
 
             if(combModelName!="ESF" && combModelName!="flareFGM" )
             {
+                Info<< "YEqn.H start" << nl << endl;
                 #include "YEqn.H"
+                Info<< "YEqn.H end" << nl << endl;
 
+                Info<< "EEqn.H start" << nl << endl;
                 start = MPI_Wtime();
                 #include "EEqn.H"
                 end = MPI_Wtime();
+                Info<< "EEqn.H end" << nl << endl;
                 time_monitor_E += end - start;
 
+                Info<< "chemistry->correctThermo start" << nl << endl;
                 start = MPI_Wtime();
                 chemistry->correctThermo();
                 end = MPI_Wtime();
+                Info<< "chemistry->correctThermo end" << nl << endl;
                 time_monitor_corrThermo += end - start;
             }
             else
             {
+                Info<< "chemistry->correct start" << nl << endl;
                 combustion->correct();
+                Info<< "chemistry->correct end" << nl << endl;
             }
 
             Info<< "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
@@ -179,19 +203,25 @@ int main(int argc, char *argv[])
             {
                 if (pimple.consistent())
                 {
+                    Info<< "pcEqn.H start" << nl << endl;
                     #include "pcEqn.H"
+                    Info<< "pcEqn.H end" << nl << endl;
                 }
                 else
                 {
+                    Info<< "pEqn.H start" << nl << endl;
                     #include "pEqn.H"
-                }
+                    Info<< "pEqn.H end" << nl << endl;
+                } 
             }
             end = MPI_Wtime();
-            time_monitor_flow += end - start;
+            time_monitor_p += end - start;
 
             if (pimple.turbCorr())
             {
-                turbulence->correct();
+                Info<< "turbulence->correct start" << nl << endl;
+                turbulence->correct(); 
+                Info<< "turbulence->correct end" << nl << endl;
             }
         }
 
@@ -202,13 +232,15 @@ int main(int argc, char *argv[])
         Info << "output time index " << runTime.timeIndex() << endl;
 
         Info<< "========Time Spent in diffenet parts========"<< endl;
+        Info<< "Pimple loop count          = " << pimple_loop_count << endl;
         Info<< "Chemical sources           = " << time_monitor_chem << " s" << endl;
         Info<< "Species Equations          = " << time_monitor_Y << " s" << endl;
-        Info<< "U & p Equations            = " << time_monitor_flow << " s" << endl;
+        Info<< "U Equations                = " << time_monitor_U << " s" << endl;
+        Info<< "p Equations                = " << time_monitor_p << " s" << endl;
         Info<< "Energy Equations           = " << time_monitor_E << " s" << endl;
         Info<< "thermo & Trans Properties  = " << time_monitor_corrThermo << " s" << endl;
         Info<< "Diffusion Correction Time  = " << time_monitor_corrDiff << " s" << endl;
-        Info<< "sum Time                   = " << (time_monitor_chem + time_monitor_Y + time_monitor_flow + time_monitor_E + time_monitor_corrThermo + time_monitor_corrDiff) << " s" << endl;
+        Info<< "sum Time                   = " << (time_monitor_chem + time_monitor_Y + time_monitor_U + time_monitor_p + time_monitor_E + time_monitor_corrThermo + time_monitor_corrDiff) << " s" << endl;
         Info<< "============================================"<<nl<< endl;
 
         // Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"

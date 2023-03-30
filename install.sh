@@ -21,8 +21,8 @@ if [ ! -z "$LIBTORCH_ROOT"  ]; then
     cd "$DF_SRC/dfChemistryModel/DNNInferencer"
     mkdir build
     cd build
-    cmake ..
-    make 
+    cmake .. -DCMAKE_CXX_COMPILER=FCC -DCMAKE_CXX_FLAGS="-Nclang -Ofast"
+    make VERBOSE=1
     cp ./libDNNInferencer.so $DF_ROOT/lib/
 fi
 cd $DF_ROOT

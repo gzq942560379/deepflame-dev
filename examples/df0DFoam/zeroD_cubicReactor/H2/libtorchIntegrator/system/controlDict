@@ -54,4 +54,10 @@ functions
   # includeFunc probes
 }
 
+OptimisationSwitches
+{
+    fileHandler collated;
+    maxThreadFileBufferSize 0;//1e9; // v1712 default is 0;
+}
+
 // ************************************************************************* //

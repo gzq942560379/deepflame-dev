@@ -30,6 +30,7 @@ constrainPressure(p, rho, U, phiHbyA, rhorAUf);
 
 if (pimple.transonic())
 {
+    Info << "pimple.transonic()" << endl;
     surfaceScalarField phid
     (
         "phid",
@@ -46,21 +47,34 @@ if (pimple.transonic())
 
     while (pimple.correctNonOrthogonal())
     {
+        double p_solve_total_start = MPI_Wtime();
+        double p_eqn_build_start = MPI_Wtime();
         fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
+        double p_eqn_build_end = MPI_Wtime();
 
         // Relax the pressure equation to ensure diagonal-dominance
         pEqn.relax();
-
+        
+        double p_solve_start = MPI_Wtime();
         pEqn.solve();
+        double p_solve_end = MPI_Wtime();
 
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
+        double p_solve_total_end = MPI_Wtime();
+        double p_eqn_build_time = p_eqn_build_end - p_eqn_build_start;
+        double p_solve_time = p_solve_end - p_solve_start;
+        double p_solve_total_time = p_solve_total_end - p_solve_total_start;
+        Info << "p solve_total_time Time : " << p_solve_total_time << endl;
+        Info << "p eqn_build_time Time : " << p_eqn_build_time << endl;
+        Info << "p solve_time Time : " << p_solve_time << endl;
     }
 }
 else
 {
+    Info << "not pimple.transonic()" << endl;
     fvScalarMatrix pDDtEqn
     (
         fvc::ddt(rho) + psi*correction(fvm::ddt(p))
@@ -69,14 +83,26 @@ else
 
     while (pimple.correctNonOrthogonal())
     {
+        double p_solve_total_start = MPI_Wtime();
+        double p_eqn_build_start = MPI_Wtime();
         fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
+        double p_eqn_build_end = MPI_Wtime();
 
+        double p_solve_start = MPI_Wtime();
         pEqn.solve();
+        double p_solve_end = MPI_Wtime();
 
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
+        double p_solve_total_end = MPI_Wtime();
+        double p_eqn_build_time = p_eqn_build_end - p_eqn_build_start;
+        double p_solve_time = p_solve_end - p_solve_start;
+        double p_solve_total_time = p_solve_total_end - p_solve_total_start;
+        Info << "p solve_total_time Time : " << p_solve_total_time << endl;
+        Info << "p eqn_build_time Time : " << p_eqn_build_time << endl;
+        Info << "p solve_time Time : " << p_solve_time << endl;
     }
 }
 
