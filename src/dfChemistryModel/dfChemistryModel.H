@@ -135,9 +135,9 @@ public IOdictionary
 
         // tensorflow
         DNNInferencertf DNNInferencertf_;
-        word tfModelName0_;
-        word tfModelName1_;
-        word tfModelName2_;
+        string tfModelPath0_;
+        string tfModelPath1_;
+        string tfModelPath2_;
         std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
                             Xmu1_, Xstd1_, Ymu1_, Ystd1_,
                             Xmu2_, Xstd2_, Ymu2_, Ystd2_;

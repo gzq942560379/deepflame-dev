@@ -390,9 +390,9 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
                                2754.8463649064784,
                                313.3717647966624,
                                2.463374792192512e-10};
-    tfModelName0_ = this->subDict("TorchSettings").lookupOrDefault("torchModel0", word(""));
-    tfModelName1_ = this->subDict("TorchSettings").lookupOrDefault("torchModel1", word(""));
-    tfModelName2_ = this->subDict("TorchSettings").lookupOrDefault("torchModel2", word(""));
+    tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
+    tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
+    tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
 
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     useDNN = true;
@@ -401,15 +401,17 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         useDNN = false;
     }
     
-    std::ifstream input_file0("new_ESH2sub1.pb", std::ios::binary);
+    std::ifstream input_file0(tfModelPath0_, std::ios::binary);
+    std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
     std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
+    std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
     input_file0.close();
 
-    std::ifstream input_file1("new_ESH2sub2.pb", std::ios::binary);
+    std::ifstream input_file1(tfModelPath1_, std::ios::binary);
     std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
     input_file1.close();
 
-    std::ifstream input_file2("new_ESH2sub3.pb", std::ios::binary);
+    std::ifstream input_file2(tfModelPath2_, std::ios::binary);
     std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
     input_file2.close();
 
