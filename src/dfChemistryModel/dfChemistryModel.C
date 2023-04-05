@@ -293,6 +293,128 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     {
         hc_[i] = CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
     }
+    // set normalization parameters
+    Xmu0_ = {956.4666683951323,
+                              1.2621251609602075,
+                              -8.482865855078037,
+                              -8.60195200775564,
+                              -7.5687249938092975,
+                              -8.739604352829021,
+                              -3.0365348658864555,
+                              -4.044646973729736,
+                              -0.12868046894653598};
+    Xstd0_ = {144.56082979138094,
+                               0.4316114858005481,
+                               1.3421800304159297,
+                               1.3271564927376922,
+                               1.964747648182199,
+                               1.1993472911833807,
+                               1.2594695379275647,
+                               1.3518816605077604,
+                               0.17392016053354714};
+    Ymu0_ = {8901.112679962635,
+                              27135.624769093312,
+                              30141.97503208172,
+                              24712.755148584696,
+                              -372.9651472886253,
+                              -493.34322699725413,
+                              -4.31138850114707e-12};
+    Ystd0_ = {8901.112679962635,
+                               27135.624769093312,
+                               30141.97503208172,
+                               24712.755148584696,
+                               372.96514728862553,
+                               493.3432269972544,
+                               9.409165181242247e-11};
+    Xmu1_ = {1933.118541482812,
+                              1.2327983023706526,
+                              -5.705591538151852,
+                              -6.446971251373195,
+                              -4.169802387800032,
+                              -6.1200334699867165,
+                              -4.266343396329115,
+                              -2.6007437468608616,
+                              -0.4049762774428252};
+    Xstd1_ = {716.6568054751183,
+                               0.43268544913281914,
+                               2.0857655247141387,
+                               2.168997234412133,
+                               2.707064105162402,
+                               2.2681157746245897,
+                               2.221785173612795,
+                               1.5510851480805254,
+                               0.30283229364455927};
+    Ymu1_ = {175072.98234441387,
+                              125434.41067566245,
+                              285397.9376620931,
+                              172924.8443087139,
+                              -97451.53428068386,
+                              -7160.953630852251,
+                              -9.791262408691773e-10};
+    Ystd1_ = {179830.51132577812,
+                               256152.83860126554,
+                               285811.9455262339,
+                               263600.5448448552,
+                               98110.53711881173,
+                               11752.979335965118,
+                               4.0735353885293555e-09};
+    Xmu2_ = {2717.141719004927,
+                              1.2871371577864235,
+                              -5.240181052513087,
+                              -4.8947914078286345,
+                              -3.117070179161789,
+                              -4.346362771443917,
+                              -4.657258124450032,
+                              -4.537442872141596,
+                              -0.11656950757756744};
+    Xstd2_ = {141.48030419772115,
+                               0.4281422992061657,
+                               0.6561518672685264,
+                               0.9820405777881894,
+                               1.0442969662425572,
+                               0.7554583907448359,
+                               1.7144519099198097,
+                               1.1299391466695952,
+                               0.15743252221610685};
+    Ymu2_ = {-611.0636921032669,
+                              -915.1244682112174,
+                              519.5930550881994,
+                              -11.949500174512165,
+                              -2660.9187297995336,
+                              159.56360614662788,
+                              -7.136459430073843e-11};
+    Ystd2_ = {611.0636921032669,
+                               915.1244682112174,
+                               519.5930550881994,
+                               342.3100987934528,
+                               2754.8463649064784,
+                               313.3717647966624,
+                               2.463374792192512e-10};
+    tfModelName0_ = this->subDict("TorchSettings").lookupOrDefault("torchModel0", word(""));
+    tfModelName1_ = this->subDict("TorchSettings").lookupOrDefault("torchModel1", word(""));
+    tfModelName2_ = this->subDict("TorchSettings").lookupOrDefault("torchModel2", word(""));
+
+    torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
+    useDNN = true;
+    if (!Qdot_.typeHeaderOk<volScalarField>())
+    {
+        useDNN = false;
+    }
+    
+    std::ifstream input_file0("new_ESH2sub1.pb", std::ios::binary);
+    std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
+    input_file0.close();
+
+    std::ifstream input_file1("new_ESH2sub2.pb", std::ios::binary);
+    std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
+    input_file1.close();
+
+    std::ifstream input_file2("new_ESH2sub3.pb", std::ios::binary);
+    std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
+    input_file2.close();
+
+    DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
+    DNNInferencertf_ = DNNInferencertf;
 }
 
 
@@ -334,7 +456,22 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve
         result = solve_CVODE(deltaT);
     }
 #else
-    result = solve_CVODE(deltaT);
+    if(torchSwitch_)
+    {
+        if (useDNN)
+        {
+            result = solve_DNN_tf(deltaT);
+        }
+        else
+        {
+            result = solve_CVODE(deltaT);
+            useDNN = true;
+        }
+    }
+    else
+    {
+        result = solve_CVODE(deltaT);
+    }
 #endif
 
     return result;
@@ -785,6 +922,169 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
     DynamicList<ChemistrySolution> List;
     Info<<"=== end solve_CVODE === "<<endl;
     return updateReactionRates(incomingSolutions, List);
+}
+
+template <class ThermoType>
+template <class DeltaTType>
+Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_tf
+(
+    const DeltaTType& deltaT
+)
+{
+    scalar deltaTMin = great;
+    Info<<"=== begin solve_DNN with tensorflow === "<<endl;
+    std::vector<float> NNInputs0, NNInputs1, NNInputs2;
+    std::vector<size_t> tfCell0, tfCell1, tfCell2;
+    scalarList yPre_(mixture_.nSpecies());
+    scalarList yBCT_(mixture_.nSpecies());
+    scalarList u_(mixture_.nSpecies());
+    double lambda = 0.1;
+    // get problems
+    forAll(T_, cellI)
+    {
+        scalar Ti = T_[cellI];
+        scalar pi = p_[cellI];
+
+        // NN0
+        if (((Qdot_[cellI] < 3e7) && (T_[cellI] < 2000) && ( T_[cellI] >= 700)) || (T_[cellI] < 700))//choose1
+        {
+            NNInputs0.push_back((Ti - Xmu0_[0])/Xstd0_[0]);
+            NNInputs0.push_back((pi / 101325 - Xmu0_[1])/Xstd0_[1]);
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            {
+                yPre_[i] = Y_[i][cellI];
+                yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
+            }
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            {
+                NNInputs0.push_back((yBCT_[i] - Xmu0_[i+2]) / Xstd0_[i+2]);
+            }
+            tfCell0.push_back(cellI);
+            continue;
+        }
+        // NN1
+        if(((Qdot_[cellI] >= 3e7) && (T_[cellI] < 2000)&&(T_[cellI] >= 700))||((Qdot_[cellI] > 7e8) && T_[cellI] > 2000)) //choose2
+        {
+            NNInputs1.push_back((Ti - Xmu1_[0])/Xstd1_[0]);
+            NNInputs1.push_back((pi / 101325 - Xmu1_[1])/Xstd1_[1]);
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            {
+                yPre_[i] = Y_[i][cellI];
+                yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
+            }
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            {
+                NNInputs1.push_back((yBCT_[i] - Xmu1_[i+2]) / Xstd1_[i+2]);
+            }
+            tfCell1.push_back(cellI);
+            continue;
+        }
+        // NN2
+        if  ((Qdot_[cellI] < 7e8) && (T_[cellI] >= 2000) && (Qdot_[cellI]!=0)) //choose3
+        {
+            NNInputs2.push_back((Ti - Xmu2_[0])/Xstd2_[0]);
+            NNInputs2.push_back((pi / 101325 - Xmu2_[1])/Xstd2_[1]);
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            {
+                yPre_[i] = Y_[i][cellI];
+                yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
+            }
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            {
+                NNInputs2.push_back((yBCT_[i] - Xmu2_[i+2]) / Xstd2_[i+2]);
+            }
+            tfCell2.push_back(cellI);
+            continue;
+        }
+    }
+    std::cout<<"tfCell0 = "<< tfCell0.size()<<std::endl;
+    std::cout<<"tfCell1 = "<< tfCell1.size()<<std::endl;
+    std::cout<<"tfCell2 = "<< tfCell2.size()<<std::endl;
+    
+    // module inference
+    std::vector<std::vector<float>> NNInputs = {NNInputs0, NNInputs1, NNInputs2};
+    auto results = DNNInferencertf_.Inference_multiDNNs(NNInputs, mixture_.nSpecies()+2);
+
+    // update Q & RR
+    // - NN0
+    int offset;
+    for(size_t cellI = 0; cellI<tfCell0.size(); cellI ++)
+    {
+        offset = cellI * (CanteraGas_->nSpecies() + 2);
+        scalar Yt = 0;
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)
+        {
+            yPre_[i] = Y_[i][tfCell0[cellI]];
+            yTemp_[i] = Y_[i][tfCell0[cellI]];
+            yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
+        }
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)//
+        {
+            u_[i] = results[0][offset + i + 2]*Ystd0_[i]+Ymu0_[i];
+            yTemp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
+            Yt += yTemp_[i]; // normalization
+        }
+        Qdot_[tfCell0[cellI]] = 0;
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)
+        {
+            yTemp_[i] = yTemp_[i] / Yt;
+            RR_[i][tfCell0[cellI]] = (yTemp_[i] - Y_[i][tfCell0[cellI]])*rho_[tfCell0[cellI]]/1e-6;
+            Qdot_[tfCell0[cellI]] -= hc_[i]*RR_[i][tfCell0[cellI]];
+        }
+    }
+    // - NN1
+    for(size_t cellI = 0; cellI<tfCell1.size(); cellI ++)
+    {
+        offset = cellI * (CanteraGas_->nSpecies() + 2);
+        scalar Yt = 0;
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)
+        {
+            yPre_[i] = Y_[i][tfCell1[cellI]];
+            yTemp_[i] = Y_[i][tfCell1[cellI]];
+            yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
+        }
+        for (int i=0; i<(CanteraGas_->nSpecies()); i++)//
+        {
+            u_[i] = results[1][offset + i + 2]*Ystd1_[i]+Ymu1_[i];
+            yTemp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
+            Yt += yTemp_[i];
+        }
+        Qdot_[tfCell1[cellI]] = 0;
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)
+        {
+            yTemp_[i] = yTemp_[i] / Yt;
+            RR_[i][tfCell1[cellI]] = (yTemp_[i] - Y_[i][tfCell1[cellI]])*rho_[tfCell1[cellI]]/1e-6;
+            Qdot_[tfCell1[cellI]] -= hc_[i]*RR_[i][tfCell1[cellI]];
+        }
+    }
+    // - NN2
+    for(size_t cellI = 0; cellI<tfCell2.size(); cellI ++)
+    {
+        offset = cellI * (CanteraGas_->nSpecies() + 2);
+        scalar Yt = 0;
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)
+        {
+            yPre_[i] = Y_[i][tfCell2[cellI]];
+            yTemp_[i] = Y_[i][tfCell2[cellI]];
+            yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
+        }
+        for (int i=0; i<(CanteraGas_->nSpecies()); i++)//
+        {
+            u_[i] = results[2][offset + i + 2]*Ystd2_[i]+Ymu2_[i];
+            yTemp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
+            Yt += yTemp_[i];
+        }
+        Qdot_[tfCell2[cellI]] = 0;
+        for (int i=0; i<CanteraGas_->nSpecies(); i++)
+        {
+            yTemp_[i] = yTemp_[i] / Yt;
+            RR_[i][tfCell2[cellI]] = (yTemp_[i] - Y_[i][tfCell2[cellI]])*rho_[tfCell2[cellI]]/1e-6;
+            Qdot_[tfCell2[cellI]] -= hc_[i]*RR_[i][tfCell2[cellI]];
+        }
+    }
+
+    Info << "=== end solve_DNN with tensorflow === " << endl;
+    return deltaTMin;
 }
 
 

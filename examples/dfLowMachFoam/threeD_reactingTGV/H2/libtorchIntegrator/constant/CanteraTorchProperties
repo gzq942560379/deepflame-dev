@@ -41,9 +41,9 @@ TorchSettings
     torch            on;
     GPU              on;
     log              on;
-    torchModel1      "new_ESH2sub1.pt"; 
-    torchModel2      "new_ESH2sub2.pt"; 
-    torchModel3      "new_ESH2sub3.pt"; 
+    torchModel1      "new_ESH2sub1.pb"; 
+    torchModel2      "new_ESH2sub2.pb"; 
+    torchModel3      "new_ESH2sub3.pb"; 
     coresPerGPU      4;
     GPUsPerNode      4;
 }

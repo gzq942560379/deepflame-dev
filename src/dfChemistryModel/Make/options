@@ -15,7 +15,9 @@ EXE_INC = -std=c++14 \
     -I$(CANTERA_ROOT)/include \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include,) \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include/torch/csrc/api/include,) \
-    $(PYTHON_INC_DIR)
+    $(PYTHON_INC_DIR) \
+    $(if $(LIBTENSORFLOW_ROOT),-I$(LIBTENSORFLOW_ROOT)/include,)
+
 
 EXE_LIBS = \
     -lcompressibleTransportModels \
@@ -28,4 +30,5 @@ EXE_LIBS = \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \
-    $(if $(LIBTORCH_ROOT),-lpthread,)
+    $(if $(LIBTORCH_ROOT),-lpthread,) \
+    $(if $(LIBTENSORFLOW_ROOT),$(LIBTENSORFLOW_ROOT)/lib/libtensorflow_cc.so,) 

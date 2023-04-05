@@ -16,6 +16,7 @@ print_usage() {
 LIBTORCH_AUTO=false
 USE_LIBTORCH=false
 USE_PYTORCH=false
+USE_LIBTENSORFLOW=false
 
 while test $# -gt 0; do
     case "$1" in
@@ -28,6 +29,17 @@ while test $# -gt 0; do
             if test $# -gt 0; then
                 LIBTORCH_DIR=$1
                 USE_LIBTORCH=true
+            else
+                print_usage
+            return
+            fi
+            shift
+            ;;
+        --libtensorflow_dir)
+            shift
+            if test $# -gt 0; then
+                LIBTENSORFLOW_DIR=$1
+                USE_LIBTENSORFLOW=true
             else
                 print_usage
             return
@@ -143,6 +155,11 @@ if [ $USE_LIBTORCH = true ]; then
     echo PYTORCH_INC=""
     echo PYTORCH_LIB=""
 fi
+if [ $USE_LIBTENSORFLOW = true ]; then
+    echo LIBTENSORFLOW_DIR=$LIBTENSORFLOW_DIR
+    echo PYTORCH_INC=""
+    echo PYTORCH_LIB=""
+fi
 if [ $USE_PYTORCH = true ]; then
     echo PYTORCH_INC=$PYTORCH_INC
     echo PYTORCH_LIB=$PYTORCH_LIB
@@ -152,10 +169,10 @@ fi
 cp bashrc.in bashrc
 sed -i "s#pwd#$PWD#g" ./bashrc
 sed -i "s#LIBTORCH_DIR#$LIBTORCH_DIR#g" ./bashrc
+sed -i "s#LIBTENSORFLOW_DIR#$LIBTENSORFLOW_DIR#g" ./bashrc
 sed -i "s#PYTORCH_INC#$PYTORCH_INC#g" ./bashrc
 sed -i "s#PYTORCH_LIB#$PYTORCH_LIB#g" ./bashrc
 sed -i "s#LIBCANTERA_DIR#$LIBCANTERA_DIR#g" ./bashrc
-
 
 
 
