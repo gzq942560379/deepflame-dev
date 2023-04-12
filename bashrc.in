@@ -13,3 +13,6 @@ export DF_APPBIN=pwd/bin
 export DF_LIBBIN=pwd/lib
 export PATH=$DF_APPBIN:$PATH
 export LD_LIBRARY_PATH=$DF_LIBBIN:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$DF_SRC/dfChemistryModel/DNNInferencer_tf/build:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/runze/tensorflow/tensorflow/bazel-bin/tensorflow:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$DF_SRC/dfMatrices/dfMatrix/build:$LD_LIBRARY_PATH
