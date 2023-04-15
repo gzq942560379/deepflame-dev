@@ -9,10 +9,11 @@ fvVectorMatrix& UEqn = tUEqn.ref();
 
 UEqn.relax();
 
+/*
 fvVectorMatrix turb_source
 (
     turbulence->divDevRhoReff(U)
-);
+);*/
 
 if (pimple.momentumPredictor())
 {
@@ -21,6 +22,7 @@ if (pimple.momentumPredictor())
     K = 0.5*magSqr(U);
 }
 
+/*
 int offset = 0;
 forAll(U.boundaryField(), patchi)
 {
@@ -50,4 +52,4 @@ UEqn_csr.fvm_ddt(&rho.oldTime()[0], &rho[0], &U.oldTime()[0][0]);
 UEqn_csr.fvm_div(&phi[0], ueqn_internalCoeffs_init, ueqn_boundaryCoeffs_init, boundary_pressure_init);
 UEqn_csr.fvc_grad(&p[0]);
 UEqn_csr.add_fvMatrix(&turb_source.lower()[0], &turb_source.diag()[0], &turb_source.upper()[0], &turb_source.source()[0][0]);
-UEqn_csr.checkValue(false);
+// UEqn_csr.checkValue(false);*/
