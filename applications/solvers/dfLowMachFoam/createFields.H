@@ -2,10 +2,23 @@
 
 Info<< "Reading data from file\n" << endl;
 
+IOdictionary CanteraTorchProperties
+(
+    IOobject
+    (
+        "CanteraTorchProperties",
+        runTime.constant(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    )
+);
+const string filePath = CanteraTorchProperties.lookupOrDefault("filePath", string(""));
+
 std::vector<double *> filedata;
 std::ifstream infile;
 std::string str;
-infile.open("/home/runze/massiveParallel/deepflame-dev/examples/dfLowMachFoam/threeD_reactingTGV/H2/cvodeIntegrator_128/adiabatic_128.txt");
+infile.open(filePath);
 while (std::getline(infile, str))
 {
     double * data = new double[128]{0.0};
@@ -37,7 +50,8 @@ forAll(mesh.C(), celli)
     z = mesh.C()[celli][2];
 
     // set scalar fields
-    index = round((x/0.001) / 0.0494739);
+    index = round((x/0.001) / filedata[0][1]);
+    
     T[celli] = filedata[1][index]; 
 }
 T.correctBoundaryConditions();
@@ -219,17 +233,6 @@ volVectorField sumYDiffError
     dimensionedVector("sumYDiffError", dimDynamicViscosity/dimLength, Zero)
 );
 
-IOdictionary CanteraTorchProperties
-(
-    IOobject
-    (
-        "CanteraTorchProperties",
-        runTime.constant(),
-        mesh,
-        IOobject::MUST_READ,
-        IOobject::NO_WRITE
-    )
-);
 const Switch splitting = CanteraTorchProperties.lookupOrDefault("splittingStrategy", false);
 #ifdef USE_PYTORCH
     const Switch log_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("log", false);
