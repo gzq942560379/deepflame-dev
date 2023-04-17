@@ -315,6 +315,7 @@ public:
 
         const volScalarField& hai(const label i) {return hai_[i];}
 
+        void correctEnthalpy();
         // update T, psi, mu, alpha, rhoD, hai (if needed)
         void correctThermo();
 

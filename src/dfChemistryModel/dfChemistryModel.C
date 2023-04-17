@@ -507,6 +507,51 @@ void Foam::dfChemistryModel<ThermoType>::setNumerics(Cantera::ReactorNet &sim)
 }
 
 template<class ThermoType>
+void Foam::dfChemistryModel<ThermoType>::correctEnthalpy()
+{
+    forAll(T_, celli)
+    {
+        forAll(Y_, i)
+        {
+            yTemp_[i] = Y_[i][celli];
+        }
+        CanteraGas_->setState_TPY(T_[celli], p_[celli], yTemp_.begin());
+        thermo_.he()[celli] = CanteraGas_->enthalpy_mass();
+        if (celli == 0)
+        {
+            printf("celli = %d\n", celli);
+            printf("T_ = %lf\n", T_[celli]);
+            printf("p_ = %lf\n", p_[celli]);
+            forAll(Y_, i)
+            {
+                printf("Y[%d] = %.15lf\n", i, yTemp_[i]);
+            }
+            printf("ha_ = %lf\n", thermo_.he()[celli]);
+        }
+    }
+    volScalarField::Boundary& hBf = thermo_.he().boundaryFieldRef();
+    volScalarField::Boundary& TBf = T_.boundaryFieldRef();
+    const volScalarField::Boundary& pBf = p_.boundaryField();
+
+    forAll(T_.boundaryField(), patchi)
+    {
+        fvPatchScalarField& ph = hBf[patchi];
+        fvPatchScalarField& pT = TBf[patchi];
+        const fvPatchScalarField& pp = pBf[patchi];
+
+        forAll(pT, facei)
+        {
+            forAll(Y_, i)
+            {
+                yTemp_[i] = Y_[i].boundaryField()[patchi][facei];
+            }
+            CanteraGas_->setState_TPY(pT[facei], pp[facei], yTemp_.begin());
+            ph[facei] = CanteraGas_->enthalpy_mass();
+        }
+    }
+}
+
+template<class ThermoType>
 void Foam::dfChemistryModel<ThermoType>::correctThermo()
 {
     psi_.oldTime();
