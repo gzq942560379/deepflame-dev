@@ -61,6 +61,38 @@ Description
 
 #include "dfMatrix.H"
 
+#include "argList.H"
+#include "Time.H"
+#include "fvMesh.H"
+#include "snappyRefineDriver.H"
+#include "snappySnapDriver.H"
+#include "snappyLayerDriver.H"
+#include "searchableSurfaces.H"
+#include "refinementSurfaces.H"
+#include "refinementFeatures.H"
+#include "shellSurfaces.H"
+#include "decompositionMethod.H"
+#include "noDecomp.H"
+#include "fvMeshDistribute.H"
+#include "wallPolyPatch.H"
+#include "refinementParameters.H"
+#include "snapParameters.H"
+#include "layerParameters.H"
+#include "vtkSetWriter.H"
+#include "faceSet.H"
+#include "motionSmoother.H"
+#include "polyTopoChange.H"
+#include "cellModeller.H"
+#include "uindirectPrimitivePatch.H"
+#include "surfZoneIdentifierList.H"
+#include "UnsortedMeshedSurface.H"
+#include "MeshedSurface.H"
+#include "globalIndex.H"
+#include "IOmanip.H"
+#include "fvMeshTools.H"
+
+#include "snappyHexMeshFuncs.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -76,7 +108,8 @@ int main(int argc, char *argv[])
     #include "listOutput.H"
 
     #include "createTime.H"
-    #include "createMesh.H"
+    // #include "createMesh.H"
+    #include "snappyHexMesh.H"
     #include "createDyMControls.H"
     #include "initContinuityErrs.H"
     #include "createFields.H"
