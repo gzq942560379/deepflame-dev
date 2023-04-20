@@ -1,3 +1,15 @@
-csrMatrix.C
+
+csrMatrix=csrMatrix
+$(csrMatrix)/csrMatrix/csrMatrixSmoother.C
+$(csrMatrix)/csrMatrix/csrMatrixSolver.C
+$(csrMatrix)/csrMatrix/csrMatrixAmul.C
+$(csrMatrix)/csrMatrix/csrMatrixPreconditioner.C
+$(csrMatrix)/csrMatrix/csrMatrixUpdateMatrixInterfaces.C
+$(csrMatrix)/csrMatrix/csrMatrix.C
+
+$(csrMatrix)/preconditioners/noPreconditioner/noPreconditioner.C
+
+$(csrMatrix)/solvers/PCG/PCG.C
+
 
 LIB = $(DF_LIBBIN)/libdfMatrices

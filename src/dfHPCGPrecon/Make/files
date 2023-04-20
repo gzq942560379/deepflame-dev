@@ -1,0 +1,61 @@
+
+HPCGPreconditioner/HPCGPreconditioner.C
+faceAreaPairHPCGAgglomeration.C
+smoothSolver2/smoothSolver2.C
+HPCG = HPCG
+$(HPCG)/HPCGSolver.C
+$(HPCG)/HPCGSolverAgglomerateMatrix.C
+$(HPCG)/HPCGSolverInterpolate.C
+$(HPCG)/HPCGSolverScale.C
+$(HPCG)/HPCGSolverSolve.C
+
+HPCGInterfaces = $(HPCG)/interfaces
+$(HPCGInterfaces)/HPCGInterface/HPCGInterface.C
+$(HPCGInterfaces)/HPCGInterface/HPCGInterfaceNew.C
+$(HPCGInterfaces)/processorHPCGInterface/processorHPCGInterface.C
+$(HPCGInterfaces)/processorCyclicHPCGInterface/processorCyclicHPCGInterface.C
+$(HPCGInterfaces)/cyclicHPCGInterface/cyclicHPCGInterface.C
+
+HPCGInterfaceFields = $(HPCG)/interfaceFields
+$(HPCGInterfaceFields)/HPCGInterfaceField/HPCGInterfaceField.C
+$(HPCGInterfaceFields)/HPCGInterfaceField/HPCGInterfaceFieldNew.C
+$(HPCGInterfaceFields)/processorHPCGInterfaceField/processorHPCGInterfaceField.C
+$(HPCGInterfaceFields)/processorCyclicHPCGInterfaceField/processorCyclicHPCGInterfaceField.C
+$(HPCGInterfaceFields)/cyclicHPCGInterfaceField/cyclicHPCGInterfaceField.C
+
+HPCGAgglomerations = $(HPCG)/HPCGAgglomerations
+
+HPCGAgglomeration = $(HPCGAgglomerations)/HPCGAgglomeration
+$(HPCGAgglomeration)/HPCGAgglomeration.C
+$(HPCGAgglomeration)/HPCGAgglomerateLduAddressing.C
+
+pairHPCGAgglomeration = $(HPCGAgglomerations)/pairHPCGAgglomeration
+$(pairHPCGAgglomeration)/pairHPCGAgglomeration.C
+$(pairHPCGAgglomeration)/pairHPCGAgglomerate.C
+
+algebraicPairHPCGAgglomeration = $(HPCGAgglomerations)/algebraicPairHPCGAgglomeration
+$(algebraicPairHPCGAgglomeration)/algebraicPairHPCGAgglomeration.C
+
+dummyAgglomeration = $(HPCGAgglomerations)/dummyAgglomeration
+$(dummyAgglomeration)/dummyAgglomeration.C
+
+
+HPCGProcAgglomerations = $(HPCG)/HPCGProcAgglomerations
+
+HPCGProcAgglomeration = $(HPCGProcAgglomerations)/HPCGProcAgglomeration
+$(HPCGProcAgglomeration)/HPCGProcAgglomeration.C
+masterCoarsestHPCGProcAgglomeration = $(HPCGProcAgglomerations)/masterCoarsestHPCGProcAgglomeration
+$(masterCoarsestHPCGProcAgglomeration)/masterCoarsestHPCGProcAgglomeration.C
+manualHPCGProcAgglomeration = $(HPCGProcAgglomerations)/manualHPCGProcAgglomeration
+$(manualHPCGProcAgglomeration)/manualHPCGProcAgglomeration.C
+eagerHPCGProcAgglomeration = $(HPCGProcAgglomerations)/eagerHPCGProcAgglomeration
+$(eagerHPCGProcAgglomeration)/eagerHPCGProcAgglomeration.C
+noneHPCGProcAgglomeration = $(HPCGProcAgglomerations)/noneHPCGProcAgglomeration
+$(noneHPCGProcAgglomeration)/noneHPCGProcAgglomeration.C
+procFacesHPCGProcAgglomeration = $(HPCGProcAgglomerations)/procFacesHPCGProcAgglomeration
+$(procFacesHPCGProcAgglomeration)/procFacesHPCGProcAgglomeration.C
+
+
+
+LIB = $(DF_LIBBIN)/libHPCGPrecon
+

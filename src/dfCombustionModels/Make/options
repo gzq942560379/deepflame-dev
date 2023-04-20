@@ -5,6 +5,8 @@ EXE_INC = -std=c++14 \
     $(PFLAGS) $(PINC) \
     $(if $(LIBTORCH_ROOT),-DUSE_LIBTORCH,) \
     $(if $(PYTHON_INC_DIR),-DUSE_PYTORCH,) \
+    $(if $(USE_TENSORFLOW),-DUSE_TENSORFLOW,) \
+    $(if $(USE_BLASDNN),-DUSE_BLASDNN,) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
     -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
@@ -18,7 +20,7 @@ EXE_INC = -std=c++14 \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include,) \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include/torch/csrc/api/include,) \
     $(PYTHON_INC_DIR) \
-    $(if $(LIBTENSORFLOW_ROOT),-I$(LIBTENSORFLOW_ROOT)/include,)
+    $(if $(USE_TENSORFLOW),-I$(LIBTENSORFLOW_ROOT)/include,)
 
 LIB_LIBS = \
     -lcompressibleTransportModels \
@@ -37,5 +39,5 @@ LIB_LIBS = \
     $(if $(LIBTORCH_ROOT),-lpthread,) \
     $(if $(PYTHON_LIB_DIR),-L$(PYTHON_LIB_DIR),) \
     $(if $(PYTHON_LIB_DIR),-lpython3,) \
-    $(if $(LIBTENSORFLOW_ROOT),$(LIBTENSORFLOW_ROOT)/lib/libtensorflow_cc.so,) 
+    $(if $(USE_TENSORFLOW),$(LIBTENSORFLOW_ROOT)/lib/libtensorflow_cc.so,) 
 

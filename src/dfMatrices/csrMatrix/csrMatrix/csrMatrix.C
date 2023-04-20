@@ -6,6 +6,11 @@
 
 namespace Foam{
 
+defineTypeNameAndDebug(csrMatrix, 1);
+
+const label csrMatrix::solver::defaultMaxIter_ = 1000;
+
+
 csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
@@ -92,5 +97,6 @@ void csrMatrix::write_pattern(const std::string& filename){
 
 
 }
+
 
 

@@ -37,16 +37,16 @@ Description
 #include "CanteraMixture.H"
 #include "hePsiThermo.H"
 
-#ifdef USE_PYTORCH
-#include <pybind11/embed.h>
-#include <pybind11/numpy.h>
-#include <pybind11/stl.h> //used to convert
-#endif
+// #ifdef USE_PYTORCH
+// #include <pybind11/embed.h>
+// #include <pybind11/numpy.h>
+// #include <pybind11/stl.h> //used to convert
+// #endif
 
-#ifdef USE_LIBTORCH
-#include <torch/script.h>
-#include "DNNInferencer.H"
-#endif
+// #ifdef USE_LIBTORCH
+// #include <torch/script.h>
+// #include "DNNInferencer.H"
+// #endif
 
 #include "fvCFD.H"
 #include "fluidThermo.H"
@@ -59,7 +59,7 @@ Description
 #include "basicThermo.H"
 #include "CombustionModel.H"
 
-#include "csrMatrix.H"
+// #include "csrMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,6 +73,9 @@ int main(int argc, char *argv[])
     // #include "setRootCaseLists.H"
     #include "listOptions.H"
     #include "setRootCase2.H"
+
+    double init_start = MPI_Wtime();
+
     #include "listOutput.H"
 
     #include "createTime.H"
@@ -81,6 +84,8 @@ int main(int argc, char *argv[])
     #include "initContinuityErrs.H"
     #include "createFields.H"
     #include "createRhoUfIfPresent.H"
+
+    double init_end = MPI_Wtime();
 
     double total_start = MPI_Wtime();
 
@@ -96,7 +101,7 @@ int main(int argc, char *argv[])
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-    csrMatrix csr(mesh);
+    // csrMatrix csr(mesh);
     // csr.write_pattern("sparse_pattern");
 
     Info<< "\nStarting time loop\n" << endl;
@@ -286,6 +291,7 @@ int main(int argc, char *argv[])
 #endif
     }
     double total_end = MPI_Wtime();
+    Info << "Init time : " << init_end - init_start << endl;
     Info << "Total time : " << total_end - total_start << endl;
     Info<< "End\n" << endl;
 
