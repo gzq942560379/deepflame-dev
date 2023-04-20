@@ -1,0 +1,4 @@
+decomposeFieldsPar.C
+
+# EXE = $(FOAM_USER_APPBIN)/decomposeFieldsPar
+EXE = $(DF_APPBIN)/decomposeFieldsPar

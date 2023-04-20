@@ -74,6 +74,5 @@ lib/
 bin/
 .vscode/
 
-applications/utilities/decomposeFieldsPar/
 /examples
 /mechanisms
