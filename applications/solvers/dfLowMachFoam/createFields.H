@@ -1,7 +1,5 @@
 #include "createRDeltaT.H"
 
-Info<< "Reading data from file\n" << endl;
-
 IOdictionary CanteraTorchProperties
 (
     IOobject
@@ -13,27 +11,6 @@ IOdictionary CanteraTorchProperties
         IOobject::NO_WRITE
     )
 );
-const string adiabaticFilePath = CanteraTorchProperties.lookupOrDefault("adiabaticFilePath", string(""));
-const int adiabaticGridSize = CanteraTorchProperties.lookupOrDefault("adiabaticGridSize", 0);
-
-std::vector<double *> filedata;
-std::ifstream infile;
-std::string str;
-infile.open(adiabaticFilePath);
-while (std::getline(infile, str))
-{
-    double * data = new double[adiabaticGridSize]{0.0};
-    std::stringstream sumstr(str);
-    string out;
-    int i = 0;
-    while (sumstr >> out)
-    {
-        double a = std::stod(out); 
-        data[i] = a;
-        i++;
-    }
-    filedata.push_back(data);
-}
 
 Info<< "Reading thermophysical properties\n" << endl;
 
@@ -42,20 +19,6 @@ fluidThermo& thermo = *pThermo;
 thermo.validate(args.executable(), "ha");
 
 volScalarField& T = thermo.T();
-scalar x, y, z;
-label index;
-forAll(mesh.C(), celli)
-{
-    x = mesh.C()[celli][0];
-    y = mesh.C()[celli][1];
-    z = mesh.C()[celli][2];
-
-    // set scalar fields
-    index = round((x/0.001) / filedata[0][1]);
-    
-    T[celli] = filedata[1][index]; 
-}
-T.correctBoundaryConditions();
 
 const volScalarField& psi = thermo.psi();
 volScalarField& p = thermo.p();
@@ -87,17 +50,6 @@ volVectorField U
     ),
     mesh
 );
-forAll(mesh.C(), celli)
-{
-    // vector c = mesh.C()[celli];
-    x = mesh.C()[celli][0];
-    y = mesh.C()[celli][1];
-    z = mesh.C()[celli][2];
-
-    // set filed U
-    U[celli] = vector(4*std::sin(x/0.001)*std::cos(y/0.001)*std::cos(z/0.001),-4*std::cos(x/0.001)*std::sin(y/0.001)*std::cos(z/0.001),0.0); 
-}
-U.correctBoundaryConditions();
 
 #include "compressibleCreatePhi.H"
 
@@ -148,31 +100,8 @@ Info << "Combustion Model Name is confirmed as "<< combModelName << endl;
 dfChemistryModel<basicThermo>* chemistry = combustion->chemistry();
 PtrList<volScalarField>& Y = chemistry->Y();
 
-forAll(mesh.C(), celli)
-{
-    x = mesh.C()[celli][0];
-    y = mesh.C()[celli][1];
-    z = mesh.C()[celli][2];
-
-    index = round((x/0.001) / filedata[0][1]);
-
-    for (int speciI = 0; speciI < Y.size(); speciI++)
-    {
-        Y[speciI][celli] = filedata[2+speciI][index];
-    }
-}
-for (int speciI = 0; speciI < Y.size(); speciI++)
-{
-    Y[speciI].correctBoundaryConditions();
-}
-
 const word inertSpecie(chemistry->lookup("inertSpecie"));
 const label inertIndex(chemistry->species()[inertSpecie]);
-
-chemistry->correctEnthalpy();
-chemistry->correctThermo();
-rho = p * psi;
-rho.correctBoundaryConditions();
 
 Info<< "At initial time, min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
 
@@ -235,6 +164,11 @@ volVectorField sumYDiffError
 );
 
 const Switch splitting = CanteraTorchProperties.lookupOrDefault("splittingStrategy", false);
+// switch for field initialization
+bool initialized = false;
+int refineLevel = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("refineLevel", 0);
+
+
 #ifdef USE_PYTORCH
     const Switch log_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("log", false);
     const Switch torch_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("torch", false);

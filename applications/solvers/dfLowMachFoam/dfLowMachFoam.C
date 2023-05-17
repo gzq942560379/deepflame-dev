@@ -49,6 +49,7 @@ Description
 // #endif
 
 #include "fvCFD.H"
+#include "dynamicFvMesh.H"
 #include "fluidThermo.H"
 #include "turbulentFluidThermoModel.H"
 #include "pimpleControl.H"
@@ -58,44 +59,11 @@ Description
 #include "PstreamGlobals.H"
 #include "basicThermo.H"
 #include "CombustionModel.H"
-
-#include "dfMatrix.H"
-
-#include "argList.H"
-#include "Time.H"
-#include "fvMesh.H"
-#include "snappyRefineDriver.H"
-#include "snappySnapDriver.H"
-#include "snappyLayerDriver.H"
-#include "searchableSurfaces.H"
-#include "refinementSurfaces.H"
-#include "refinementFeatures.H"
-#include "shellSurfaces.H"
-#include "decompositionMethod.H"
-#include "noDecomp.H"
-#include "fvMeshDistribute.H"
-#include "wallPolyPatch.H"
-#include "refinementParameters.H"
-#include "snapParameters.H"
-#include "layerParameters.H"
-#include "vtkSetWriter.H"
-#include "faceSet.H"
-#include "motionSmoother.H"
-#include "polyTopoChange.H"
-#include "cellModeller.H"
-#include "uindirectPrimitivePatch.H"
-#include "surfZoneIdentifierList.H"
-#include "UnsortedMeshedSurface.H"
-#include "MeshedSurface.H"
-#include "globalIndex.H"
-#include "IOmanip.H"
-#include "fvMeshTools.H"
-
-#include "snappyHexMeshFuncs.H"
+#include "CorrectPhi.H"
 
 #include <typeinfo>
 #include "GenFvMatrix.H"
-#define _CSR_
+// #define _CSR_
 #ifdef _CSR_
 #include "csrMatrix.H"
 #endif
@@ -124,10 +92,9 @@ int main(int argc, char *argv[])
     double createTime_end = MPI_Wtime();
 
     // #include "createMesh.H"
-
-    double snappyHexMesh_start = MPI_Wtime();
-    #include "snappyHexMesh.H"
-    double snappyHexMesh_end = MPI_Wtime();
+    double createDynamicFvMesh_start = MPI_Wtime();
+    #include "createDynamicFvMesh.H"
+    double createDynamicFvMesh_end = MPI_Wtime();
 
     double createDyMControls_start = MPI_Wtime();
     #include "createDyMControls.H"
@@ -169,17 +136,8 @@ int main(int argc, char *argv[])
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     Info<< "\nStarting time loop\n" << endl;
-    
-    bool first = true;
-    double first_iter_start;
-    double first_iter_end;
-
     while (runTime.run())
     {
-        if(first){
-            first_iter_start = MPI_Wtime();
-        }
-
         timeIndex ++;
 
         double time_monitor_chem=0;
@@ -202,7 +160,13 @@ int main(int argc, char *argv[])
             #include "compressibleCourantNo.H"
             #include "setDeltaT.H"
         }
-
+        
+        // for (size_t j = 0; j < 2; j++)
+        // {
+        //     runTime ++;
+        //     #include "Refine.H"
+        // }
+        
         runTime++;
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
@@ -361,27 +325,21 @@ int main(int argc, char *argv[])
             << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl;
         }
 #endif
-        if(first){
-            first_iter_end = MPI_Wtime();
-            first = false;
-        }
     }
     double total_end = MPI_Wtime();
 
     Info << "Init time : " << init_end - init_start << endl;
     Info << "listOutput time : " << listOutput_end - listOutput_start << endl;
     Info << "createTime time : " << createTime_end - createTime_start << endl;
-    Info << "snappyHexMesh time : " << snappyHexMesh_end - snappyHexMesh_start << endl;
+    Info << "createDynamicFvMesh time : " << createDynamicFvMesh_end - createDynamicFvMesh_start << endl;
     Info << "createDyMControls time : " << createDyMControls_end - createDyMControls_start << endl;
     Info << "initContinuityErrs time : " << initContinuityErrs_end - initContinuityErrs_start << endl;
     Info << "createFields time : " << createFields_end - createFields_start << endl;
     Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
     Info << endl;
 
-    double first_iter_time = first_iter_end - first_iter_start;
-    Info << "First Iter time : " << first_iter_time << endl;
     
-    double total_time = total_end - total_start - first_iter_time;
+    double total_time = total_end - total_start;
     Info << "Total time : " << total_time << endl;
     Info<< "End\n" << endl;
 

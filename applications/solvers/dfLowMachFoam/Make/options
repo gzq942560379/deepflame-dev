@@ -36,13 +36,14 @@ EXE_INC = -std=c++14 \
     -I$(LIB_SRC)/triSurface/lnInclude \
     -I$(LIB_SRC)/surfMesh/lnInclude \
     -I$(LIB_SRC)/dynamicMesh/lnInclude \
-    -I$(LIB_SRC)/finiteVolume/lnInclude
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
 
 EXE_LIBS = \
     -lcompressibleTransportModels \
     -lturbulenceModels \
     -ldfGenMatrix \
     -lfiniteVolume \
+    -ldynamicFvMesh \
     -lmeshTools \
     -lsampling \
     -L$(DF_LIBBIN) \
@@ -68,6 +69,6 @@ EXE_LIBS = \
     -lsurfMesh \
     -lfileFormats \
     -ldynamicMesh \
-    -lsnappyHexMesh
+    -lsnappyHexMesh \
     
     
