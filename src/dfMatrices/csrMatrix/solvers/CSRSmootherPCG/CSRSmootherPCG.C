@@ -1,16 +1,16 @@
-#include "PCG.H"
+#include "CSRSmootherPCG.H"
 
 namespace Foam
 {
-    defineTypeNameAndDebug(PCG, 0);
+    defineTypeNameAndDebug(CSRSmootherPCG, 0);
 
-    csrMatrix::solver::addsymMatrixConstructorToTable<PCG>
-        addPCGSymMatrixConstructorToTable_;
+    csrMatrix::solver::addsymMatrixConstructorToTable<CSRSmootherPCG>
+        addCSRSmootherPCGSymMatrixConstructorToTable_;
 }
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::PCG::PCG
+Foam::CSRSmootherPCG::CSRSmootherPCG
 (
     const word& fieldName,
     const csrMatrix& matrix,
@@ -35,7 +35,7 @@ Foam::PCG::PCG
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::solverPerformance Foam::PCG::solve
+Foam::solverPerformance Foam::CSRSmootherPCG::solve
 (
     scalarField& psi,
     const scalarField& source,
@@ -43,9 +43,15 @@ Foam::solverPerformance Foam::PCG::solve
 ) const
 {
     // --- Setup class containing solver performance data
+    // solverPerformance solverPerf
+    // (
+    //     csrMatrix::preconditioner::getName(controlDict_) + typeName,
+    //     fieldName_
+    // );
+    Info << "Foam::CSRSmootherPCG::solve start" << endl;
     solverPerformance solverPerf
     (
-        csrMatrix::preconditioner::getName(controlDict_) + typeName,
+        typeName,
         fieldName_
     );
 
@@ -86,12 +92,22 @@ Foam::solverPerformance Foam::PCG::solve
     )
     {
         // --- Select and construct the preconditioner
-        autoPtr<csrMatrix::preconditioner> preconPtr =
-        csrMatrix::preconditioner::New
+        // autoPtr<csrMatrix::preconditioner> preconPtr =
+        // csrMatrix::preconditioner::New
+        // (
+        //     *this,
+        //     controlDict_
+        // );
+
+        autoPtr<csrMatrix::smoother> smootherPtr = csrMatrix::smoother::New
         (
-            *this,
+            fieldName_,
+            matrix_,
+            interfaceBouCoeffs_,
+            interfaceIntCoeffs_,
+            interfaces_,
             controlDict_
-        );
+        );    
 
         // --- Solver iteration
         do
@@ -100,7 +116,16 @@ Foam::solverPerformance Foam::PCG::solve
             wArAold = wArA;
 
             // --- Precondition residual
-            preconPtr->precondition(wA, rA, cmpt);
+            // preconPtr->precondition(wA, rA, cmpt);
+
+            wA = Zero;
+            smootherPtr->smooth
+            (
+                wA,
+                rA,
+                cmpt,
+                2
+            );
 
             // --- Update search directions:
             wArA = gSumProd(wA, rA, matrix().mesh().comm());
@@ -157,6 +182,7 @@ Foam::solverPerformance Foam::PCG::solve
         );
     }
 
+    Info << "Foam::CSRSmootherPCG::solve end" << endl;
     return solverPerf;
 }
 

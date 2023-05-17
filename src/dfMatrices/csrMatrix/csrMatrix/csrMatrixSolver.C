@@ -1,5 +1,8 @@
 #include "csrMatrix.H"
-#include "diagonalSolver.H"
+#include "csrDiagonalSolver.H"
+#include "CSRPBiCGStab.H"
+#include "CSRPCG.H"
+#include "CSRSmootherPCG.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -24,39 +27,62 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
 {
     const word name(solverControls.lookup("solver"));
 
-    // if (matrix.diagonal())
-    // {
-    //     return autoPtr<csrMatrix::solver>
-    //     (
-    //         new diagonalSolver
-    //         (
-    //             fieldName,
-    //             matrix,
-    //             interfaceBouCoeffs,
-    //             interfaceIntCoeffs,
-    //             interfaces,
-    //             solverControls
-    //         )
-    //     );
-    // }
-    // else 
-    if (matrix.symmetric())
+    if (matrix.diagonal())
     {
-        symMatrixConstructorTable::iterator constructorIter =
-            symMatrixConstructorTablePtr_->find(name);
-
-        if (constructorIter == symMatrixConstructorTablePtr_->end())
-        {
-            FatalIOErrorInFunction(solverControls)
-                << "Unknown symmetric matrix solver " << name << nl << nl
-                << "Valid symmetric matrix solvers are :" << endl
-                << symMatrixConstructorTablePtr_->sortedToc()
-                << exit(FatalIOError);
-        }
-
         return autoPtr<csrMatrix::solver>
         (
-            constructorIter()
+            new csrDiagonalSolver
+            (
+                fieldName,
+                matrix,
+                interfaceBouCoeffs,
+                interfaceIntCoeffs,
+                interfaces,
+                solverControls
+            )
+        );
+    }
+    else if (matrix.symmetric())
+    {
+        // symMatrixConstructorTable::iterator constructorIter =
+        //     symMatrixConstructorTablePtr_->find(name);
+
+        // if (constructorIter == symMatrixConstructorTablePtr_->end())
+        // {
+        //     FatalIOErrorInFunction(solverControls)
+        //         << "Unknown symmetric matrix solver " << name << nl << nl
+        //         << "Valid symmetric matrix solvers are :" << endl
+        //         << symMatrixConstructorTablePtr_->sortedToc()
+        //         << exit(FatalIOError);
+        // }
+
+        // return autoPtr<csrMatrix::solver>
+        // (
+        //     constructorIter()
+        //     (
+        //         fieldName,
+        //         matrix,
+        //         interfaceBouCoeffs,
+        //         interfaceIntCoeffs,
+        //         interfaces,
+        //         solverControls
+        //     )
+        // );
+        // return autoPtr<csrMatrix::solver>
+        // (
+        //     new CSRPCG
+        //     (
+        //         fieldName,
+        //         matrix,
+        //         interfaceBouCoeffs,
+        //         interfaceIntCoeffs,
+        //         interfaces,
+        //         solverControls
+        //     )
+        // );
+        return autoPtr<csrMatrix::solver>
+        (
+            new CSRSmootherPCG
             (
                 fieldName,
                 matrix,
@@ -69,21 +95,21 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
     }
     else if (matrix.asymmetric())
     {
-        asymMatrixConstructorTable::iterator constructorIter =
-            asymMatrixConstructorTablePtr_->find(name);
+        // asymMatrixConstructorTable::iterator constructorIter =
+        //     asymMatrixConstructorTablePtr_->find(name);
 
-        if (constructorIter == asymMatrixConstructorTablePtr_->end())
-        {
-            FatalIOErrorInFunction(solverControls)
-                << "Unknown asymmetric matrix solver " << name << nl << nl
-                << "Valid asymmetric matrix solvers are :" << endl
-                << asymMatrixConstructorTablePtr_->sortedToc()
-                << exit(FatalIOError);
-        }
+        // if (constructorIter == asymMatrixConstructorTablePtr_->end())
+        // {
+        //     FatalIOErrorInFunction(solverControls)
+        //         << "Unknown asymmetric matrix solver " << name << nl << nl
+        //         << "Valid asymmetric matrix solvers are :" << endl
+        //         << asymMatrixConstructorTablePtr_->sortedToc()
+        //         << exit(FatalIOError);
+        // }
 
         return autoPtr<csrMatrix::solver>
         (
-            constructorIter()
+            new CSRPBiCGStab
             (
                 fieldName,
                 matrix,

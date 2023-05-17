@@ -23,29 +23,29 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "diagonalSolver.H"
+#include "csrDiagonalSolver.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-defineTypeNameAndDebug(diagonalSolver, 0);
+defineTypeNameAndDebug(csrDiagonalSolver, 0);
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::diagonalSolver::diagonalSolver
+Foam::csrDiagonalSolver::csrDiagonalSolver
 (
     const word& fieldName,
-    const lduMatrix& matrix,
+    const csrMatrix& matrix,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const FieldField<Field, scalar>& interfaceIntCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
     const dictionary& solverControls
 )
 :
-    lduMatrix::solver
+    csrMatrix::solver
     (
         fieldName,
         matrix,
@@ -59,20 +59,15 @@ Foam::diagonalSolver::diagonalSolver
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-Foam::solverPerformance Foam::diagonalSolver::solve
+Foam::solverPerformance Foam::csrDiagonalSolver::solve
 (
     scalarField& psi,
     const scalarField& source,
     const direction cmpt
 ) const
 {
-    // psi = source/matrix_.diag();
-
-    label nCells = psi.size();
+    psi = source/matrix_.diag();
     
-    scalar* __restrict__ psiPtr = psi.begin();
-    
-
     return solverPerformance
     (
         typeName,

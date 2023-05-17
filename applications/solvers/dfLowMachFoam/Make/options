@@ -22,16 +22,26 @@ EXE_INC = -std=c++14 \
     -I$(DF_SRC)/dfCanteraMixture/lnInclude \
     -I$(DF_SRC)/dfChemistryModel/lnInclude \
     -I$(DF_SRC)/dfCombustionModels/lnInclude \
+    -I$(DF_SRC)/dfGenMatrix/lnInclude \
     -I$(DF_SRC)/dfMatrices/lnInclude \
     -I$(CANTERA_ROOT)/include \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include,) \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include/torch/csrc/api/include,) \
     $(PYTHON_INC_DIR) \
-    $(if $(USE_TENSORFLOW),-I$(LIBTENSORFLOW_ROOT)/include,)
+    $(if $(USE_TENSORFLOW),-I$(LIBTENSORFLOW_ROOT)/include,) \
+    -I$(LIB_SRC)/parallel/decompose/decompositionMethods/lnInclude \
+    -I$(LIB_SRC)/mesh/snappyHexMesh/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/fileFormats/lnInclude \
+    -I$(LIB_SRC)/triSurface/lnInclude \
+    -I$(LIB_SRC)/surfMesh/lnInclude \
+    -I$(LIB_SRC)/dynamicMesh/lnInclude \
+    -I$(LIB_SRC)/finiteVolume/lnInclude
 
 EXE_LIBS = \
     -lcompressibleTransportModels \
     -lturbulenceModels \
+    -ldfGenMatrix \
     -lfiniteVolume \
     -lmeshTools \
     -lsampling \
@@ -53,5 +63,11 @@ EXE_LIBS = \
     $(if $(USE_TENSORFLOW),$(LIBTENSORFLOW_ROOT)/lib/libtensorflow_cc.so,) \
     $(if $(USE_TENSORFLOW),$(DF_SRC)/dfChemistryModel/DNNInferencer_tf/build/libDNNInferencertf.so,) \
     $(if $(USE_BLASDNN),$(DF_SRC)/dfChemistryModel/DNNInferencer_blas/build/libDNNInferencer_blas.so,) \
+    -ldecompositionMethods \
+    -L$(FOAM_LIBBIN)/dummy -lscotchDecomp -lptscotchDecomp \
+    -lsurfMesh \
+    -lfileFormats \
+    -ldynamicMesh \
+    -lsnappyHexMesh
     
     

@@ -24,6 +24,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "csrMatrix.H"
+#include "csrSymGaussSeidelSmoother.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -41,18 +42,18 @@ Foam::csrMatrix::smoother::getName
     const dictionary& solverControls
 )
 {
-    word name;
+    word name("symGaussSeidel");
 
-    // handle primitive or dictionary entry
-    const entry& e = solverControls.lookupEntry("smoother", false, false);
-    if (e.isDict())
-    {
-        e.dict().lookup("smoother") >> name;
-    }
-    else
-    {
-        e.stream() >> name;
-    }
+    // // handle primitive or dictionary entry
+    // const entry& e = solverControls.lookupEntry("smoother", false, false);
+    // if (e.isDict())
+    // {
+    //     e.dict().lookup("smoother") >> name;
+    // }
+    // else
+    // {
+    //     e.stream() >> name;
+    // }
 
     return name;
 }
@@ -71,37 +72,49 @@ Foam::autoPtr<Foam::csrMatrix::smoother> Foam::csrMatrix::smoother::New
     word name;
 
     // handle primitive or dictionary entry
-    const entry& e = solverControls.lookupEntry("smoother", false, false);
-    if (e.isDict())
-    {
-        e.dict().lookup("smoother") >> name;
-    }
-    else
-    {
-        e.stream() >> name;
-    }
+    // const entry& e = solverControls.lookupEntry("smoother", false, false);
+    // if (e.isDict())
+    // {
+    //     e.dict().lookup("smoother") >> name;
+    // }
+    // else
+    // {
+    //     e.stream() >> name;
+    // }
 
     // not (yet?) needed:
     // const dictionary& controls = e.isDict() ? e.dict() : dictionary::null;
 
     if (matrix.symmetric())
     {
-        symMatrixConstructorTable::iterator constructorIter =
-            symMatrixConstructorTablePtr_->find(name);
+        // symMatrixConstructorTable::iterator constructorIter =
+        //     symMatrixConstructorTablePtr_->find(name);
 
-        if (constructorIter == symMatrixConstructorTablePtr_->end())
-        {
-            FatalIOErrorInFunction(solverControls)
-                << "Unknown symmetric matrix smoother "
-                << name << nl << nl
-                << "Valid symmetric matrix smoothers are :" << endl
-                << symMatrixConstructorTablePtr_->sortedToc()
-                << exit(FatalIOError);
-        }
+        // if (constructorIter == symMatrixConstructorTablePtr_->end())
+        // {
+        //     FatalIOErrorInFunction(solverControls)
+        //         << "Unknown symmetric matrix smoother "
+        //         << name << nl << nl
+        //         << "Valid symmetric matrix smoothers are :" << endl
+        //         << symMatrixConstructorTablePtr_->sortedToc()
+        //         << exit(FatalIOError);
+        // }
+
+        // return autoPtr<csrMatrix::smoother>
+        // (
+        //     constructorIter()
+        //     (
+        //         fieldName,
+        //         matrix,
+        //         interfaceBouCoeffs,
+        //         interfaceIntCoeffs,
+        //         interfaces
+        //     )
+        // );
 
         return autoPtr<csrMatrix::smoother>
         (
-            constructorIter()
+            new csrSymGaussSeidelSmoother
             (
                 fieldName,
                 matrix,

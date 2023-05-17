@@ -2,7 +2,7 @@
   =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
    \\    /   O peration     | Website:  https://openfoam.org
-    \\  /    A nd           | Copyright (C) 2011-2019 OpenFOAM Foundation
+    \\  /    A nd           | Copyright (C) 2012-2018 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
@@ -22,18 +22,18 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::diagonalSolver
+    Foam::csrSymGaussSeidelSmoother
 
 Description
-    Foam::diagonalSolver
+    A csrMatrix::smoother for symmetric Gauss-Seidel
 
 SourceFiles
-    diagonalSolver.C
+    csrSymGaussSeidelSmoother.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef diagonalSolver_H
-#define diagonalSolver_H
+#ifndef csrSymGaussSeidelSmoother_H
+#define csrSymGaussSeidelSmoother_H
 
 #include "csrMatrix.H"
 
@@ -43,56 +43,57 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                           Class diagonalSolver Declaration
+                           Class csrSymGaussSeidelSmoother Declaration
 \*---------------------------------------------------------------------------*/
 
-class diagonalSolver
+class csrSymGaussSeidelSmoother
 :
-    public csrMatrix::solver
+    public csrMatrix::smoother
 {
 
 public:
 
     //- Runtime type information
-    TypeName("diagonal");
+    TypeName("symGaussSeidel");
 
 
     // Constructors
 
-        //- Construct from matrix and solver controls
-        diagonalSolver
+        //- Construct from components
+        csrSymGaussSeidelSmoother
         (
             const word& fieldName,
             const csrMatrix& matrix,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const FieldField<Field, scalar>& interfaceIntCoeffs,
-            const lduInterfaceFieldPtrsList& interfaces,
-            const dictionary& solverControls
+            const lduInterfaceFieldPtrsList& interfaces
         );
-
-        //- Disallow default bitwise copy construction
-        diagonalSolver(const diagonalSolver&) = delete;
 
 
     // Member Functions
 
-        //- Read and reset the solver parameters from the given stream
-        void read(const dictionary&)
-        {}
+        //- Smooth for the given number of sweeps
+        static void smooth
+        (
+            const word& fieldName,
+            scalarField& psi,
+            const csrMatrix& matrix,
+            const scalarField& source,
+            const FieldField<Field, scalar>& interfaceBouCoeffs,
+            const lduInterfaceFieldPtrsList& interfaces,
+            const direction cmpt,
+            const label nSweeps
+        );
 
-        //- Solve the matrix with this solver
-        solverPerformance solve
+
+        //- Smooth the solution for a given number of sweeps
+        virtual void smooth
         (
             scalarField& psi,
-            const scalarField& source,
-            const direction cmpt=0
+            const scalarField& Source,
+            const direction cmpt,
+            const label nSweeps
         ) const;
-
-
-    // Member Operators
-
-        //- Disallow default bitwise assignment
-        void operator=(const diagonalSolver&) = delete;
 };
 
 

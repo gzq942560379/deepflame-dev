@@ -23,27 +23,27 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "noPreconditioner.H"
+#include "csrNoPreconditioner.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(noPreconditioner, 0);
+    defineTypeNameAndDebug(csrNoPreconditioner, 0);
 
     csrMatrix::preconditioner::
-        addsymMatrixConstructorToTable<noPreconditioner>
-        addnoPreconditionerSymMatrixConstructorToTable_;
+        addsymMatrixConstructorToTable<csrNoPreconditioner>
+        addcsrNoPreconditionerSymMatrixConstructorToTable_;
 
     csrMatrix::preconditioner::
-        addasymMatrixConstructorToTable<noPreconditioner>
-        addnoPreconditionerAsymMatrixConstructorToTable_;
+        addasymMatrixConstructorToTable<csrNoPreconditioner>
+        addcsrNoPreconditionerAsymMatrixConstructorToTable_;
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::noPreconditioner::noPreconditioner
+Foam::csrNoPreconditioner::csrNoPreconditioner
 (
     const csrMatrix::solver& sol,
     const dictionary&
@@ -55,7 +55,7 @@ Foam::noPreconditioner::noPreconditioner
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::noPreconditioner::precondition
+void Foam::csrNoPreconditioner::precondition
 (
     scalarField& wA,
     const scalarField& rA,

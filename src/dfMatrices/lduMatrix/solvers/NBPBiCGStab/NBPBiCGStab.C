@@ -32,10 +32,10 @@ namespace Foam
     defineTypeNameAndDebug(NBPBiCGStab, 0);
 
     lduMatrix::solver::addsymMatrixConstructorToTable<NBPBiCGStab>
-        addPBiCGStabSymMatrixConstructorToTable_;
+        addNBPBiCGStabSymMatrixConstructorToTable_;
 
     lduMatrix::solver::addasymMatrixConstructorToTable<NBPBiCGStab>
-        addPBiCGStabAsymMatrixConstructorToTable_;
+        addNBPBiCGStabAsymMatrixConstructorToTable_;
 }
 
 

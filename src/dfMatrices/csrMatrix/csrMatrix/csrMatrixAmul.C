@@ -28,9 +28,16 @@ Description
 \*---------------------------------------------------------------------------*/
 
 #include "csrMatrix.H"
+#include <cassert>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+
+// #ifdef Amul_NAIVE
+#define Amul_UNLOOP
+
+
+#ifdef Amul_NAIVE
 void Foam::csrMatrix::Amul
 (
     scalarField& Apsi,
@@ -44,7 +51,7 @@ void Foam::csrMatrix::Amul
 
     const scalarField& psi = tpsi();
     const scalar* const __restrict__ psiPtr = psi.begin();
-    const scalar* const __restrict__ diagPtr = diag().begin();
+    const scalar* const __restrict__ diagPtr = diag_value_.begin();
 
     // Initialise the update of interfaced interfaces
     initMatrixInterfaces
@@ -56,10 +63,15 @@ void Foam::csrMatrix::Amul
         cmpt
     );
 
+    const label* const __restrict__ off_diag_rowptr_Ptr = off_diag_rowptr_.begin();
+    const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
+    const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
+
+    #pragma omp parallel for
     for (label r = 0; r < row_; ++r){
         scalar tmp = diagPtr[r] * psiPtr[r];
-        for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
-            tmp += off_diag_value_[index] * psiPtr[off_diag_colidx_[index]];
+        for(label index = off_diag_rowptr_Ptr[r]; index < off_diag_rowptr_Ptr[r+1]; ++index){
+            tmp += off_diag_value_Ptr[index] * psiPtr[off_diag_colidx_Ptr[index]];
         }
         ApsiPtr[r] = tmp;
     }
@@ -76,6 +88,90 @@ void Foam::csrMatrix::Amul
 
     tpsi.clear();
 }
+#endif
+
+#ifdef Amul_UNLOOP
+void Foam::csrMatrix::Amul
+(
+    scalarField& Apsi,
+    const tmp<scalarField>& tpsi,
+    const FieldField<Field, scalar>& interfaceBouCoeffs,
+    const lduInterfaceFieldPtrsList& interfaces,
+    const direction cmpt
+) const
+{
+    scalar* __restrict__ ApsiPtr = Apsi.begin();
+
+    const scalarField& psi = tpsi();
+    const scalar* const __restrict__ psiPtr = psi.begin();
+    const scalar* const __restrict__ diagPtr = diag_value_.begin();
+
+    // Initialise the update of interfaced interfaces
+    initMatrixInterfaces
+    (
+        interfaceBouCoeffs,
+        interfaces,
+        psi,
+        Apsi,
+        cmpt
+    );
+
+    const label* const __restrict__ off_diag_rowptr_Ptr = off_diag_rowptr_.begin();
+    const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
+    const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
+
+    #pragma omp parallel for
+    for (label r = 0; r < row_; ++r){
+        scalar tmp = diagPtr[r] * psiPtr[r];
+        const label row_len = off_diag_rowptr_Ptr[r+1] - off_diag_rowptr_Ptr[r];
+        const label row_start = off_diag_rowptr_Ptr[r];
+        const label* const __restrict__ off_diag_colidx_Ptr_row = &off_diag_colidx_Ptr[row_start];
+        const scalar* const __restrict__ off_diag_value_Ptr_row = &off_diag_value_Ptr[row_start];
+        if(row_len == 6){
+            scalar tmp0 = off_diag_value_Ptr_row[0] * psiPtr[off_diag_colidx_Ptr_row[0]];
+            scalar tmp1 = off_diag_value_Ptr_row[1] * psiPtr[off_diag_colidx_Ptr_row[1]];
+            scalar tmp2 = off_diag_value_Ptr_row[2] * psiPtr[off_diag_colidx_Ptr_row[2]];
+            scalar tmp3 = off_diag_value_Ptr_row[3] * psiPtr[off_diag_colidx_Ptr_row[3]];
+            scalar tmp4 = off_diag_value_Ptr_row[4] * psiPtr[off_diag_colidx_Ptr_row[4]];
+            scalar tmp5 = off_diag_value_Ptr_row[5] * psiPtr[off_diag_colidx_Ptr_row[5]];
+            ApsiPtr[r] = tmp + tmp0 + tmp1 + tmp2 + tmp3 + tmp4 + tmp5;
+        }else if(row_len == 5){
+            scalar tmp0 = off_diag_value_Ptr_row[0] * psiPtr[off_diag_colidx_Ptr_row[0]];
+            scalar tmp1 = off_diag_value_Ptr_row[1] * psiPtr[off_diag_colidx_Ptr_row[1]];
+            scalar tmp2 = off_diag_value_Ptr_row[2] * psiPtr[off_diag_colidx_Ptr_row[2]];
+            scalar tmp3 = off_diag_value_Ptr_row[3] * psiPtr[off_diag_colidx_Ptr_row[3]];
+            scalar tmp4 = off_diag_value_Ptr_row[4] * psiPtr[off_diag_colidx_Ptr_row[4]];
+            ApsiPtr[r] = tmp + tmp0 + tmp1 + tmp2 + tmp3 + tmp4;
+        }else if(row_len == 4){
+            scalar tmp0 = off_diag_value_Ptr_row[0] * psiPtr[off_diag_colidx_Ptr_row[0]];
+            scalar tmp1 = off_diag_value_Ptr_row[1] * psiPtr[off_diag_colidx_Ptr_row[1]];
+            scalar tmp2 = off_diag_value_Ptr_row[2] * psiPtr[off_diag_colidx_Ptr_row[2]];
+            scalar tmp3 = off_diag_value_Ptr_row[3] * psiPtr[off_diag_colidx_Ptr_row[3]];
+            ApsiPtr[r] = tmp + tmp0 + tmp1 + tmp2 + tmp3;
+        }else if(row_len == 3){
+            scalar tmp0 = off_diag_value_Ptr_row[0] * psiPtr[off_diag_colidx_Ptr_row[0]];
+            scalar tmp1 = off_diag_value_Ptr_row[1] * psiPtr[off_diag_colidx_Ptr_row[1]];
+            scalar tmp2 = off_diag_value_Ptr_row[2] * psiPtr[off_diag_colidx_Ptr_row[2]];
+            ApsiPtr[r] = tmp + tmp0 + tmp1 + tmp2;
+        }else{
+            assert(false);
+        }
+    }
+
+    // Update interface interfaces
+    updateMatrixInterfaces
+    (
+        interfaceBouCoeffs,
+        interfaces,
+        psi,
+        Apsi,
+        cmpt
+    );
+
+    tpsi.clear();
+}
+#endif
+
 
 
 // void Foam::csrMatrix::Tmul
@@ -148,6 +244,7 @@ void Foam::csrMatrix::sumA
 
     const scalar* __restrict__ diagPtr = diag().begin();
 
+    #pragma omp parallel for
     for (label r = 0; r < row_; ++r){
         scalar tmp = diagPtr[r];
         for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
@@ -160,21 +257,20 @@ void Foam::csrMatrix::sumA
     // and the interface boundary coefficients to the sum-off-diagonal
 
     // FIX Here
-    // forAll(interfaces, patchi)
-    // {
-    //     if (interfaces.set(patchi))
-    //     {
-    //         const labelUList& pa = lduAddr().patchAddr(patchi);
-    //         const scalarField& pCoeffs = interfaceBouCoeffs[patchi];
+    forAll(interfaces, patchi)
+    {
+        if (interfaces.set(patchi))
+        {
+            const labelUList& pa = lduAddr().patchAddr(patchi);
+            const scalarField& pCoeffs = interfaceBouCoeffs[patchi];
 
-    //         forAll(pa, face)
-    //         {
-    //             sumAPtr[pa[face]] -= pCoeffs[face];
-    //         }
-    //     }
-    // }
+            forAll(pa, face)
+            {
+                sumAPtr[pa[face]] -= pCoeffs[face];
+            }
+        }
+    }
 }
-
 
 // void Foam::csrMatrix::residual
 // (

@@ -22,18 +22,18 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::noPreconditioner
+    Foam::csrDiagonalSolver
 
 Description
-    Null preconditioner for both symmetric and asymmetric matrices.
+    Foam::csrDiagonalSolver
 
 SourceFiles
-    noPreconditioner.C
+    csrDiagonalSolver.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef noPreconditioner_H
-#define noPreconditioner_H
+#ifndef csrDiagonalSolver_H
+#define csrDiagonalSolver_H
 
 #include "csrMatrix.H"
 
@@ -43,64 +43,56 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                           Class noPreconditioner Declaration
+                           Class csrDiagonalSolver Declaration
 \*---------------------------------------------------------------------------*/
 
-class noPreconditioner
+class csrDiagonalSolver
 :
-    public csrMatrix::preconditioner
+    public csrMatrix::solver
 {
 
 public:
 
     //- Runtime type information
-    TypeName("none");
+    TypeName("diagonal");
 
 
     // Constructors
 
-        //- Construct from matrix components and preconditioner solver controls
-        noPreconditioner
+        //- Construct from matrix and solver controls
+        csrDiagonalSolver
         (
-            const csrMatrix::solver&,
-            const dictionary& solverControlsUnused
+            const word& fieldName,
+            const csrMatrix& matrix,
+            const FieldField<Field, scalar>& interfaceBouCoeffs,
+            const FieldField<Field, scalar>& interfaceIntCoeffs,
+            const lduInterfaceFieldPtrsList& interfaces,
+            const dictionary& solverControls
         );
 
         //- Disallow default bitwise copy construction
-        noPreconditioner(const noPreconditioner&) = delete;
-
-
-    //- Destructor
-    virtual ~noPreconditioner()
-    {}
+        csrDiagonalSolver(const csrDiagonalSolver&) = delete;
 
 
     // Member Functions
 
-        //- Return wA the preconditioned form of residual rA
-        virtual void precondition
+        //- Read and reset the solver parameters from the given stream
+        void read(const dictionary&)
+        {}
+
+        //- Solve the matrix with this solver
+        solverPerformance solve
         (
-            scalarField& wA,
-            const scalarField& rA,
+            scalarField& psi,
+            const scalarField& source,
             const direction cmpt=0
         ) const;
-
-        //- Return wT the transpose-matrix preconditioned form of residual rT.
-        virtual void preconditionT
-        (
-            scalarField& wT,
-            const scalarField& rT,
-            const direction cmpt=0
-        ) const
-        {
-            return precondition(wT, rT, cmpt);
-        }
 
 
     // Member Operators
 
         //- Disallow default bitwise assignment
-        void operator=(const noPreconditioner&) = delete;
+        void operator=(const csrDiagonalSolver&) = delete;
 };
 
 

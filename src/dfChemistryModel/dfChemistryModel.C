@@ -403,35 +403,38 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
 
 #ifdef USE_TENSORFLOW
-    tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
-    tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
-    tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
+    if(torchSwitch_){
+        tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
+        tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
+        tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
 
-    std::ifstream input_file0(tfModelPath0_, std::ios::binary);
-    std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
-    std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
-    std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
-    input_file0.close();
+        std::ifstream input_file0(tfModelPath0_, std::ios::binary);
+        std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
+        std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
+        std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
+        input_file0.close();
 
-    std::ifstream input_file1(tfModelPath1_, std::ios::binary);
-    std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
-    std::cout<<"model_data1 = "<<model_data0.size()<<std::endl;
-    input_file1.close();
+        std::ifstream input_file1(tfModelPath1_, std::ios::binary);
+        std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
+        std::cout<<"model_data1 = "<<model_data0.size()<<std::endl;
+        input_file1.close();
 
-    std::ifstream input_file2(tfModelPath2_, std::ios::binary);
-    std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
-    std::cout<<"model_data2 = "<<model_data0.size()<<std::endl;
-    input_file2.close();
+        std::ifstream input_file2(tfModelPath2_, std::ios::binary);
+        std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
+        std::cout<<"model_data2 = "<<model_data0.size()<<std::endl;
+        input_file2.close();
 
-    DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
-    DNNInferencertf_ = DNNInferencertf;
+        DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
+        DNNInferencertf_ = DNNInferencertf;
+    }
 #endif
 
 #ifdef USE_BLASDNN
-    BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
-
-    DNNInferencer_blas_.load_models(BLASDNNModelPath_);
-    DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
+    if(torchSwitch_){
+        BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
+        DNNInferencer_blas_.load_models(BLASDNNModelPath_);
+        DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
+    }
 #endif
 }
 
@@ -543,6 +546,51 @@ template<class ThermoType>
 void Foam::dfChemistryModel<ThermoType>::setNumerics(Cantera::ReactorNet &sim)
 {
     sim.setTolerances(relTol_,absTol_);
+}
+
+template<class ThermoType>
+void Foam::dfChemistryModel<ThermoType>::correctEnthalpy()
+{
+    forAll(T_, celli)
+    {
+        forAll(Y_, i)
+        {
+            yTemp_[i] = Y_[i][celli];
+        }
+        CanteraGas_->setState_TPY(T_[celli], p_[celli], yTemp_.begin());
+        thermo_.he()[celli] = CanteraGas_->enthalpy_mass();
+        // if (celli == 0)
+        // {
+        //     printf("celli = %d\n", celli);
+        //     printf("T_ = %lf\n", T_[celli]);
+        //     printf("p_ = %lf\n", p_[celli]);
+        //     forAll(Y_, i)
+        //     {
+        //         printf("Y[%d] = %.15lf\n", i, yTemp_[i]);
+        //     }
+        //     printf("ha_ = %lf\n", thermo_.he()[celli]);
+        // }
+    }
+    volScalarField::Boundary& hBf = thermo_.he().boundaryFieldRef();
+    volScalarField::Boundary& TBf = T_.boundaryFieldRef();
+    const volScalarField::Boundary& pBf = p_.boundaryField();
+
+    forAll(T_.boundaryField(), patchi)
+    {
+        fvPatchScalarField& ph = hBf[patchi];
+        fvPatchScalarField& pT = TBf[patchi];
+        const fvPatchScalarField& pp = pBf[patchi];
+
+        forAll(pT, facei)
+        {
+            forAll(Y_, i)
+            {
+                yTemp_[i] = Y_[i].boundaryField()[patchi][facei];
+            }
+            CanteraGas_->setState_TPY(pT[facei], pp[facei], yTemp_.begin());
+            ph[facei] = CanteraGas_->enthalpy_mass();
+        }
+    }
 }
 
 template<class ThermoType>

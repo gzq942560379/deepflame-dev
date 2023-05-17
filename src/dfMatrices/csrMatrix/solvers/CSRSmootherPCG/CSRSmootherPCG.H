@@ -5,13 +5,13 @@
 namespace Foam
 {
 
-class PCG: public  csrMatrix::solver{
+class CSRSmootherPCG: public  csrMatrix::solver{
 public:
     //- Runtime type information
-    TypeName("CSRPCG");
+    TypeName("SmootherPCG");
 
     //- Construct from matrix components and solver controls
-    PCG
+    CSRSmootherPCG
     (
         const word& fieldName,
         const csrMatrix& matrix,
@@ -22,10 +22,10 @@ public:
     );
 
     //- Disallow default bitwise copy construction
-    PCG(const PCG&) = delete;
+    CSRSmootherPCG(const CSRSmootherPCG&) = delete;
 
     //- Destructor
-    virtual ~PCG(){}
+    virtual ~CSRSmootherPCG(){}
 
     // Member Functions
 
@@ -41,7 +41,7 @@ public:
     // Member Operators
 
     //- Disallow default bitwise assignment
-    void operator=(const PCG&) = delete;
+    void operator=(const CSRSmootherPCG&) = delete;
 
 };
 

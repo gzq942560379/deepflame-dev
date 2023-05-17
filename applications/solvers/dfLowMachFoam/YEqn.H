@@ -43,17 +43,46 @@ time_monitor_corrDiff += end - start;
     volScalarField Yt(0.0*Y[0]);
 
     start = MPI_Wtime();
+
+
+    double Y_total_start, Y_total_end, Y_total_time = 0.; 
+    double Y_build_start, Y_build_end, Y_build_time = 0.; 
+    double Y_convert_start, Y_convert_end, Y_convert_time = 0.; 
+    double Y_solve_start, Y_solve_end, Y_solve_time = 0.;
+
+    double Y_build_ddt_start, Y_build_ddt_end, Y_build_ddt_time = 0.;
+    double Y_build_div_start, Y_build_div_end, Y_build_div_time = 0.;
+    double Y_build_laplacian_start, Y_build_laplacian_end, Y_build_laplacian_time = 0.;
+    double Y_build_sum_start, Y_build_sum_end, Y_build_sum_time = 0.;
+
+    Info << "Y equation build scheme : " << endl;
+
+    Y_total_start = MPI_Wtime();
     forAll(Y, i)
     {
+        Y_build_start = MPI_Wtime();
+        
         volScalarField& Yi = Y[i];
+
+        Info << "fvc::grad(Yi) Scheme : " << Yi.mesh().gradScheme("grad(" + Yi.name() + ')') << endl;
+        auto alpha_mul_hai = thermo.alpha()*chemistry->hai(i);
+        Info << alpha_mul_hai().name() << endl;
+        // "(thermo:alpha*hai_O)"
+        // "(thermo:alpha*hai_H2O)"
+        // Info << "fvc::laplacian(thermo.alpha()*chemistry->hai(i), Yi) Scheme : " <<  << endl;
+
+
         hDiffCorrFlux += chemistry->hai(i)*(chemistry->rhoD(i)*fvc::grad(Yi) - Yi*sumYDiffError);
-        diffAlphaD += fvc::laplacian(thermo.alpha()*chemistry->hai(i), Yi);
+        diffAlphaD += fvc::laplacian(alpha_mul_hai, Yi);
+
+        Y_build_end = MPI_Wtime();
+        Y_build_time += Y_build_end - Y_build_start;
 
         if (i != inertIndex)
         {
-            double Y_solve_total_start = MPI_Wtime();
-            double Y_eqn_build_start = MPI_Wtime();
+            Y_build_start = MPI_Wtime();
             tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
+           
             fvScalarMatrix YiEqn
             (
                 fvm::ddt(rho, Yi)
@@ -66,25 +95,129 @@ time_monitor_corrDiff += end - start;
                 :  (fvm::laplacian(DEff(), Yi) + combustion->R(Yi))
                 )
             );
-            double Y_eqn_build_end = MPI_Wtime();
+        
+            // fvScalarMatrix YiEqn
+            // (
+            //     EulerDdtSchemeFvmDdt(rho, Yi)
+            //   + gaussConvectionSchemeFvmDiv(phi, Yi, "div(phi,Yi_h)")
+            //   + gaussConvectionSchemeFvmDiv(phiUc, Yi, "div(phi,Yi_h)")
+            //  ==
+            //     (
+            //         splitting
+            //     ?   gaussLaplacianSchemeFvmLaplacian(DEff(), Yi)
+            //     :  (gaussLaplacianSchemeFvmLaplacian(DEff(), Yi) + combustion->R(Yi))
+            //     )
+            // );
+
+            // Y_build_ddt_start = MPI_Wtime();
+            // tmp<fvScalarMatrix> YiEqnDDT = fvm::ddt(rho, Yi);
+            // tmp<fvScalarMatrix> YiEqnDDT = EulerDdtSchemeFvmDdt(rho, Yi);
+            // Y_build_ddt_end = MPI_Wtime();
+            // Y_build_ddt_time += Y_build_ddt_end - Y_build_ddt_start;
+
+            // Y_build_div_start = MPI_Wtime();
+            // tmp<fvScalarMatrix> YiEqnDIV1 = gaussConvectionSchemeFvmDiv(phi, Yi, "div(phi,Yi_h)");
+            // tmp<fvScalarMatrix> YiEqnDIV2 = gaussConvectionSchemeFvmDiv(phiUc, Yi, "div(phi,Yi_h)");
+            // tmp<fvScalarMatrix> YiEqnDIV1 = mvConvection->fvmDiv(phi, Yi);
+            // tmp<fvScalarMatrix> YiEqnDIV2 = mvConvection->fvmDiv(phiUc, Yi);
+            // Y_build_div_end = MPI_Wtime();
+            // Y_build_div_time += Y_build_div_end - Y_build_div_start;
+
+            // Y_build_laplacian_start = MPI_Wtime();
+            // tmp<fvScalarMatrix> YiEqnLaplacian = splitting
+            //     ?   gaussLaplacianSchemeFvmLaplacian(DEff(), Yi)
+            //     :  (gaussLaplacianSchemeFvmLaplacian(DEff(), Yi) + combustion->R(Yi));
+            // tmp<fvScalarMatrix> YiEqnLaplacian = splitting
+            //     ?   fvm::laplacian(DEff(), Yi)
+            //     :  (fvm::laplacian(DEff(), Yi) + combustion->R(Yi));
+            // Y_build_laplacian_end = MPI_Wtime();
+            // Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
+
+            // Y_build_sum_start = MPI_Wtime();
+            // fvScalarMatrix YiEqn_new
+            // (
+            //     YiEqnDDT
+            //   + YiEqnDIV1
+            //   + YiEqnDIV2
+            //  ==
+            //     YiEqnLaplacian
+            // );
+
+            // Y_build_sum_end = MPI_Wtime();
+            // Y_build_sum_time += Y_build_sum_end - Y_build_sum_start;
+
+            // tmp<fvScalarMatrix> tYiEqn_new = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref());
+            // fvScalarMatrix& YiEqn_new = tYiEqn_new.ref();
+
+            // assert(YiEqn.source().begin() != YiEqn_new.source().begin());
+            // for(label i = 0; i < YiEqn.source().size(); ++i){
+            //     assert(abs(YiEqn.source()[i] - YiEqn_new.source()[i]) < 1e-12);
+            // }
+            // for(label i = 0; i < YiEqn.diag().size(); ++i){
+            //     assert(abs(YiEqn.diag()[i] - YiEqn_new.diag()[i]) < 1e-12);
+            // }
+            // for(label i = 0; i < YiEqn.lower().size(); ++i){
+            //     assert(abs(YiEqn.lower()[i] - YiEqn_new.lower()[i]) < 1e-12);
+            // }
+            // for(label i = 0; i < YiEqn.upper().size(); ++i){
+            //     assert(abs(YiEqn.upper()[i] - YiEqn_new.upper()[i]) < 1e-12);
+            // }
+
+            // forAll(Yi.boundaryField(), patchi)
+            // {
+            //     auto internalCoeffsDiffTmp = YiEqn.internalCoeffs()[patchi] - YiEqn_new.internalCoeffs()[patchi];
+            //     auto boundaryCoeffsDiffTmp = YiEqn.boundaryCoeffs()[patchi] - YiEqn_new.boundaryCoeffs()[patchi];
+            //     auto& internalCoeffsDiff = internalCoeffsDiffTmp.ref();
+            //     auto& boundaryCoeffsDiff = boundaryCoeffsDiffTmp.ref();
+
+            //     for(label i = 0; i < internalCoeffsDiff.size(); ++i){
+            //         assert(abs(internalCoeffsDiff[i]) < 1e-12);
+            //     }
+            //     for(label i = 0; i < YiEqn.boundaryCoeffs()[patchi].size(); ++i){
+            //         assert(abs(boundaryCoeffsDiff[i]) < 1e-12);
+            //     }
+            // }
 
             YiEqn.relax();
-
-            double Y_solve_start = MPI_Wtime();
+            Y_build_end = MPI_Wtime();
+            Y_build_time += Y_build_end - Y_build_start;
+#ifdef _CSR_
+            Y_convert_start = MPI_Wtime();
+            csr.init_value_from_lduMatrix(YiEqn);
+            Y_convert_end = MPI_Wtime();
+            Y_convert_time += Y_convert_end - Y_convert_start;
+#endif
+            Y_solve_start = MPI_Wtime();
+#ifdef _CSR_
+            auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
+            auto& source = YiEqn.source();
+            auto& internalCoeffs = YiEqn.internalCoeffs();
+            auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+            csr.solve(psi, source, internalCoeffs, boundaryCoeffs, "Yi");
+#else
             YiEqn.solve("Yi");
-            double Y_solve_end = MPI_Wtime();
+#endif
+            Y_solve_end = MPI_Wtime();
+            Y_solve_time += Y_solve_end - Y_solve_start;
 
             Yi.max(0.0);
             Yt += Yi;
-            double Y_solve_total_end = MPI_Wtime();
-            double Y_eqn_build_time = Y_eqn_build_end - Y_eqn_build_start;
-            double Y_solve_time = Y_solve_end - Y_solve_start;
-            double Y_solve_total_time = Y_solve_total_end - Y_solve_total_start;
-            Info << "Y solve_total_time Time : " << Y_solve_total_time << endl;
-            Info << "Y eqn_build_time Time : " << Y_eqn_build_time << endl;
-            Info << "Y solve_time Time : " << Y_solve_time << endl;
         }
     }
+
+    Y_total_end = MPI_Wtime();
+    Y_total_time += Y_total_end - Y_total_start;
+
+    Info << "Y total Time : " << Y_total_time << endl;
+    Info << "Y build Time : " << Y_build_time << endl;
+    Info << "Y build ddt Time : " << Y_build_ddt_time << endl;
+    Info << "Y build div Time : " << Y_build_div_time << endl;
+    Info << "Y build laplacian Time : " << Y_build_laplacian_time << endl;
+    Info << "Y build sum Time : " << Y_build_sum_time << endl;
+    Info << "Y build other Time : " << Y_build_time - Y_build_ddt_time - Y_build_div_time - Y_build_laplacian_time - Y_build_sum_time << endl;
+    Info << "Y convert Time : " << Y_convert_time << endl;
+    Info << "Y solve Time : " << Y_solve_time << endl;
+    Info << "Y other Time : " << Y_total_time - Y_build_time - Y_convert_time - Y_solve_time << endl;
 
     Y[inertIndex] = scalar(1) - Yt;
     Y[inertIndex].max(0.0);

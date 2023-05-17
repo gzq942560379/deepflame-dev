@@ -3,12 +3,12 @@
 #include <sstream>
 #include <cstdio>
 #include "PstreamGlobals.H"
+#include "Residuals.H"
+#include <vector>
 
 namespace Foam{
 
 defineTypeNameAndDebug(csrMatrix, 1);
-
-const label csrMatrix::solver::defaultMaxIter_ = 1000;
 
 
 csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
@@ -18,19 +18,19 @@ csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
     this->row_ = mesh.nCells();
     this->col_ = mesh.nCells();
     label face_count = neighbour.size();
-    this->off_diag_nnz_ = neighbour.size() * 2;
+    this->off_diag_nnz_ = face_count * 2;
 
     this->diag_value_.resize(row_);
     this->off_diag_rowptr_.resize(row_ + 1);
     this->off_diag_colidx_.resize(off_diag_nnz_);
     this->off_diag_value_.resize(off_diag_nnz_);
-    this->face2lower_.resize(off_diag_nnz_);
-    this->face2upper_.resize(off_diag_nnz_);
+    this->face2lower_.resize(face_count);
+    this->face2upper_.resize(face_count);
 
     // compute off_diag_count
     std::vector<label> off_diag_count(row_, 0);
     std::vector<label> off_diag_current_index(row_ + 1);
-    for(label i = 0; i < neighbour.size(); ++i){
+    for(label i = 0; i < face_count; ++i){
         auto own = owner[i];
         auto nei = neighbour[i];
         off_diag_count[own] += 1;
@@ -46,7 +46,7 @@ csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
 
     // compute map from face to lower
     // (nei, own)
-    for(label i = 0; i < neighbour.size(); ++i){
+    for(label i = 0; i < face_count; ++i){
         label r = neighbour[i];
         label c = owner[i];
         label index = off_diag_current_index[r];
@@ -56,21 +56,38 @@ csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
     }
 
     // (own, nei)
-    for(label i = 0; i < neighbour.size(); ++i){
+    for(label i = 0; i < face_count; ++i){
         label r = owner[i];
         label c = neighbour[i];
         label index = off_diag_current_index[r];
+        face2upper_[i] = index;
         off_diag_colidx_[index] = c;
         off_diag_current_index[r] += 1;
     }
 }
 
-csrMatrix::csrMatrix(const csrMatrix& other):mesh_(other.mesh_){
-    
-}
+void csrMatrix::init_value_from_lduMatrix(const lduMatrix& lduMatrix){
+    diagonal_ = lduMatrix.diagonal();
+    symmetric_ = lduMatrix.symmetric();
+    asymmetric_ = lduMatrix.asymmetric();
 
-csrMatrix::~csrMatrix(){
+    const scalarField& ldu_diag_ = lduMatrix.diag();
+    const scalarField& ldu_lower = lduMatrix.lower();
+    const scalarField& ldu_upper_ = lduMatrix.upper();
 
+    assert(ldu_diag_.size() == diag_value_.size());
+    std::copy(ldu_diag_.begin(),ldu_diag_.end(),diag_value_.begin());
+
+    assert(ldu_lower.size() == face2lower_.size());
+    assert(ldu_upper_.size() == face2upper_.size());
+
+    label face_count = mesh().neighbour().size();
+
+    #pragma omp parallel for
+    for(label i = 0; i < face_count; ++i){
+        off_diag_value_[face2lower_[i]] = ldu_lower[i];
+        off_diag_value_[face2upper_[i]] = ldu_upper_[i];
+    }
 }
 
 void csrMatrix::write_pattern(const std::string& filename){
@@ -95,8 +112,36 @@ void csrMatrix::write_pattern(const std::string& filename){
     fclose(file);
 }
 
+void csrMatrix::analyze(){
+
+    label max_col_count = 0;
+
+    for(label r = 0; r < row_; ++r){
+        label col_count = off_diag_rowptr_[r+1] - off_diag_rowptr_[r];
+        max_col_count = std::max(max_col_count, col_count);
+    }
+
+    std::vector<label> col_count_frequency(max_col_count+1,0);
+
+    for(label r = 0; r < row_; ++r){
+        label col_count = off_diag_rowptr_[r+1] - off_diag_rowptr_[r];
+        col_count_frequency[col_count] += 1;
+    }
+
+    Info << "sparse matrix analyze : " << endl;
+    Info << "row(col) : " << row_ << max_col_count << endl;
+    Info << "nnz : " << off_diag_nnz_ + row_ << max_col_count << endl;
+    Info << "sparsity : " << (off_diag_nnz_ + row_) * 1.0 / row_ / row_ * 100  << "%" << endl;
+    Info << "max colume count : " << max_col_count << endl;
+    Info << "colume frequency : " << endl;
+    for(label i = 0; i < col_count_frequency.size(); ++i){
+        if(col_count_frequency[i] > 0){
+            Info << "\t" << i << " : " << col_count_frequency[i] << endl;
+        }
+    }
+    Info << endl;
 
 }
 
 
-
+}

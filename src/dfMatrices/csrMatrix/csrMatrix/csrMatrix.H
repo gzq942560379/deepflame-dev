@@ -10,6 +10,14 @@
 #include "runTimeSelectionTables.H"
 #include "solverPerformance.H"
 #include "InfoProxy.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "tmp.H"
+#include "className.H"
+
+#include "lduMatrix.H"
+
+
 
 namespace Foam{
 
@@ -31,6 +39,10 @@ private:
     // map from face to upper in off_diag_value_
     // lower (own,nei)
     labelList face2upper_;
+
+    bool diagonal_;
+    bool symmetric_;
+    bool asymmetric_;
     
 public:
     // Static data
@@ -41,22 +53,38 @@ public:
     csrMatrix(const fvMesh& mesh);
 
     // Copy constructor
-    csrMatrix(const csrMatrix& other);
+    csrMatrix(const csrMatrix& other) = delete;
+
+    // Copy constructor
+    void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
 
     //- Destructor
-    ~csrMatrix();
+    ~csrMatrix(){};
 
     //- Return the LDU mesh from which the addressing is obtained
     const fvMesh& mesh() const {return mesh_;}
+    //- Return the LDU addressing
+    const lduAddressing& lduAddr() const {return mesh_.lduAddr();}
 
-    bool diagonal() const {return false;}
+    //- Return the patch evaluation schedule
+    const lduSchedule& patchSchedule() const {return lduAddr().patchSchedule();}
 
-    bool symmetric() const {return true;}
+    bool diagonal() const {return diagonal_;}
 
-    bool asymmetric() const {return false;}
+    bool symmetric() const {return symmetric_;}
 
+    bool asymmetric() const {return asymmetric_;}
+
+    label row() const {return row_;}
+    label col() const {return col_;}
     const scalarField& diag() const {return diag_value_;}
     scalarField& diag() {return diag_value_;}
+    const scalarField& off_diag_value() const {return off_diag_value_;}
+    scalarField& off_diag_value() {return off_diag_value_;}
+    const labelList& off_diag_colidx() const {return off_diag_colidx_;}
+    labelList& off_diag_colidx() {return off_diag_colidx_;}
+    const labelList& off_diag_rowptr() const {return off_diag_rowptr_;}
+    labelList& off_diag_rowptr() {return off_diag_rowptr_;}
 
     //- Matrix multiplication with updated interfaces.
     void Amul
@@ -97,8 +125,70 @@ public:
         const direction cmpt
     ) const;
 
+
+    template<class Type>
+    SolverPerformance<Type> solve(
+        GeometricField<Type, fvPatchField, volMesh>& psi,
+        const Field<Type>& source,
+        const FieldField<Field, Type>& internalCoeffs,
+        const FieldField<Field, Type>& boundaryCoeffs
+    );
+
+    template<class Type>
+    SolverPerformance<Type> solve(
+        GeometricField<Type, fvPatchField, volMesh>& psi,
+        const Field<Type>& source,
+        const FieldField<Field, Type>& internalCoeffs,
+        const FieldField<Field, Type>& boundaryCoeffs,
+        const word& name
+    );
+
+    template<class Type>
+    SolverPerformance<Type> solve(
+        GeometricField<Type, fvPatchField, volMesh>& psi,
+        const Field<Type>& source,
+        const FieldField<Field, Type>& internalCoeffs,
+        const FieldField<Field, Type>& boundaryCoeffs,
+        const dictionary& solverControls
+    );
+
+
+    template<class Type2>
+    void addToInternalField
+    (
+        const labelUList& addr,
+        const Field<Type2>& pf,
+        Field<Type2>& intf
+    ) const;
+
+    template<class Type2>
+    void addToInternalField
+    (
+        const labelUList& addr,
+        const tmp<Field<Type2>>& tpf,
+        Field<Type2>& intf
+    ) const;
+
+    template<class Type>
+    void addBoundarySource
+    (
+        Field<Type>& source,
+        const GeometricField<Type, fvPatchField, volMesh>& psi,
+        const FieldField<Field, Type>& boundaryCoeffs,
+        const bool couples=true
+    ) const;
+
+    template<class Type>
+    void addBoundaryDiag
+    (
+        scalarField& diag,
+        const FieldField<Field, Type>& internalCoeffs,
+        const direction solveCmpt
+    ) const;
+
     void write_pattern(const std::string& filename);
 
+    void analyze();
 
     class solver{
     protected:
