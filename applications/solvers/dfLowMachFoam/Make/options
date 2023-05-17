@@ -39,6 +39,7 @@ EXE_LIBS = \
     -lcompressibleTransportModels \
     -lturbulenceModels \
     -lfiniteVolume \
+    -ldynamicFvMesh \
     -lmeshTools \
     -lsampling \
     -L$(DF_LIBBIN) \

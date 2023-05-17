@@ -517,17 +517,6 @@ void Foam::dfChemistryModel<ThermoType>::correctEnthalpy()
         }
         CanteraGas_->setState_TPY(T_[celli], p_[celli], yTemp_.begin());
         thermo_.he()[celli] = CanteraGas_->enthalpy_mass();
-        if (celli == 0)
-        {
-            printf("celli = %d\n", celli);
-            printf("T_ = %lf\n", T_[celli]);
-            printf("p_ = %lf\n", p_[celli]);
-            forAll(Y_, i)
-            {
-                printf("Y[%d] = %.15lf\n", i, yTemp_[i]);
-            }
-            printf("ha_ = %lf\n", thermo_.he()[celli]);
-        }
     }
     volScalarField::Boundary& hBf = thermo_.he().boundaryFieldRef();
     volScalarField::Boundary& TBf = T_.boundaryFieldRef();

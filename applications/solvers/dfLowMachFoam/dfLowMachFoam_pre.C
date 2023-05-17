@@ -61,6 +61,8 @@ Description
 #include "CombustionModel.H"
 #include "CorrectPhi.H"
 
+#include "dfMatrix.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -76,9 +78,8 @@ int main(int argc, char *argv[])
     #include "listOutput.H"
 
     #include "createTime.H"
-    //#include "createMesh.H"
+    // #include "createMesh.H"
     #include "createDynamicFvMesh.H"
-    //#include "createTimeControls.H"
     #include "createDyMControls.H"
     #include "initContinuityErrs.H"
     #include "createFields.H"
@@ -102,24 +103,30 @@ int main(int argc, char *argv[])
         #include "setInitialDeltaT.H"
     }
 
+    // #include "createdfSolver.H"
+
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     Info<< "\nStarting time loop\n" << endl;
+
     while (runTime.run())
     {
-        while (refineLevel)
-        {
-            runTime++;
-            #include "Refine.H"
-        }
-        if (!initialized)
-        {
-            #include "intializeFields.H"
-        }
-
         timeIndex ++;
 
         #include "readDyMControls.H"
+
+        // Store divrhoU from the previous mesh so that it can be mapped
+        // and used in correctPhi to ensure the corrected phi has the
+        // same divergence
+        autoPtr<volScalarField> divrhoU;
+        if (correctPhi)
+        {
+            divrhoU = new volScalarField
+            (
+                "divrhoU",
+                fvc::div(fvc::absolute(phi, rho, U))
+            );
+        }
 
         if (LTS)
         {
@@ -130,16 +137,39 @@ int main(int argc, char *argv[])
             #include "compressibleCourantNo.H"
             #include "setDeltaT.H"
         }
-        
-        // for (size_t j = 0; j < 2; j++)
-        // {
-        //     runTime ++;
-        //     #include "Refine.H"
-        // }
-        
+
         runTime++;
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
+
+        // Store momentum to set rhoUf for introduced faces.
+        autoPtr<volVectorField> rhoU;
+        if (rhoUf.valid())
+        {
+            rhoU = new volVectorField("rhoU", rho*U);
+        }
+
+        // Do any mesh changes
+        mesh.update();
+
+        if (mesh.changing())
+        {
+            if (correctPhi)
+            {
+                // Calculate absolute flux from the mapped surface velocity
+                phi = mesh.Sf() & rhoUf();
+
+                #include "correctPhi.H"
+
+                // Make the fluxes relative to the mesh-motion
+                fvc::makeRelative(phi, rho, U);
+            }
+
+            if (checkMeshCourantNo)
+            {
+                #include "meshCourantNo.H"
+            }
+        }
 
         // --- Pressure-velocity PIMPLE corrector loop
         while (pimple.loop())
