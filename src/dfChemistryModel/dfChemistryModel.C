@@ -433,7 +433,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     if(torchSwitch_){
         BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
         DNNInferencer_blas_.load_models(BLASDNNModelPath_);
-        DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
+        // DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
     }
 #endif
 }

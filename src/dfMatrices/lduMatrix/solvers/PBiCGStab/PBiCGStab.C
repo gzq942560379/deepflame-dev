@@ -90,7 +90,7 @@ Foam::solverPerformance Foam::PBiCGStab::solve
     double checkSingularity_start, checkSingularity_end, checkSingularity_time = 0;
     int checkSingularity_count = 0;
 
-    Info << "Foam::PBiCGStab::solve LDU start -------------------------------------" << endl;
+    // Info << "Foam::PBiCGStab::solve LDU start -------------------------------------" << endl;
     double solve_start = MPI_Wtime();
 
     // --- Setup class containing solver performance data
@@ -355,28 +355,28 @@ Foam::solverPerformance Foam::PBiCGStab::solve
 
     double other_time = solve_time - spmv_time - normFactor_time - gSumMag_time - gSumProd_time - gSumSqr_time - localUpdate_time - precondition_time - checkSingularity_time;
 
-    Info << "solve time : " << solve_time << endl;
+    // Info << "solve time : " << solve_time << endl;
 
-    Info << "spmv time : " << spmv_time << ", " << spmv_time / solve_time * 100 << "%" << endl;
-    Info << "spmv count : " << spmv_count << endl;
-    Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / solve_time * 100 << "%" << endl;
-    Info << "normFactor count : " << normFactor_count << endl;
-    Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
-    Info << "gSumMag count : " << gSumMag_count << endl;
-    Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
-    Info << "gSumProd count : " << gSumProd_count << endl;
-    Info << "gSumSqr time : " << gSumSqr_time << ", " << gSumSqr_time / solve_time * 100 << "%" << endl;
-    Info << "gSumSqr count : " << gSumSqr_count << endl;
-    Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / solve_time * 100 << "%" << endl;
-    Info << "localUpdate count : " << localUpdate_count << endl;
-    Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
-    Info << "precondition count : " << precondition_count << endl;
-    Info << "checkSingularity time : " << checkSingularity_time << ", " << checkSingularity_time / solve_time * 100 << "%" << endl;
-    Info << "checkSingularity count : " << checkSingularity_count << endl;
-    Info << "other time : " << other_time << ", " << other_time / solve_time * 100 << "%" << endl;
+    // Info << "spmv time : " << spmv_time << ", " << spmv_time / solve_time * 100 << "%" << endl;
+    // Info << "spmv count : " << spmv_count << endl;
+    // Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / solve_time * 100 << "%" << endl;
+    // Info << "normFactor count : " << normFactor_count << endl;
+    // Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
+    // Info << "gSumMag count : " << gSumMag_count << endl;
+    // Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
+    // Info << "gSumProd count : " << gSumProd_count << endl;
+    // Info << "gSumSqr time : " << gSumSqr_time << ", " << gSumSqr_time / solve_time * 100 << "%" << endl;
+    // Info << "gSumSqr count : " << gSumSqr_count << endl;
+    // Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / solve_time * 100 << "%" << endl;
+    // Info << "localUpdate count : " << localUpdate_count << endl;
+    // Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
+    // Info << "precondition count : " << precondition_count << endl;
+    // Info << "checkSingularity time : " << checkSingularity_time << ", " << checkSingularity_time / solve_time * 100 << "%" << endl;
+    // Info << "checkSingularity count : " << checkSingularity_count << endl;
+    // Info << "other time : " << other_time << ", " << other_time / solve_time * 100 << "%" << endl;
 
 
-    Info << "Foam::PBiCGStab::solve LDU end --------------------------------------------" << endl;
+    // Info << "Foam::PBiCGStab::solve LDU end --------------------------------------------" << endl;
     return solverPerf;
 }
 

@@ -71,6 +71,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             continue;
         }
     }
+
+    DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
     // module inference
     // std::vector<std::vector<float>> NNInputs = {NNInputs0, NNInputs1, NNInputs2};
     // auto results = DNNInferencertf_.Inference_multiDNNs(NNInputs, mixture_.nSpecies()+2);

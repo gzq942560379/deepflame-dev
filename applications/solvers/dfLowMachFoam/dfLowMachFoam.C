@@ -37,16 +37,16 @@ Description
 #include "CanteraMixture.H"
 #include "hePsiThermo.H"
 
-// #ifdef USE_PYTORCH
-// #include <pybind11/embed.h>
-// #include <pybind11/numpy.h>
-// #include <pybind11/stl.h> //used to convert
-// #endif
+#ifdef USE_PYTORCH
+#include <pybind11/embed.h>
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h> //used to convert
+#endif
 
-// #ifdef USE_LIBTORCH
-// #include <torch/script.h>
-// #include "DNNInferencer.H"
-// #endif
+#ifdef USE_LIBTORCH
+#include <torch/script.h>
+#include "DNNInferencer.H"
+#endif
 
 #include "fvCFD.H"
 #include "dynamicFvMesh.H"
@@ -126,18 +126,27 @@ int main(int argc, char *argv[])
         #include "setInitialDeltaT.H"
     }
 
-    // #include "createdfSolver.H"
 
-#ifdef _CSR_
-    csrMatrix csr(mesh);
-    csr.analyze();
-#endif
+// #ifdef _CSR_
+//     csrMatrix csr(mesh);
+//     csr.analyze();
+// #endif
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     Info<< "\nStarting time loop\n" << endl;
     while (runTime.run())
     {
+        while (refineLevel)
+        {
+            runTime++;
+            #include "Refine.H"
+        }
+        if (!initialized)
+        {
+            #include "intializeFields.H"
+        }
+
         timeIndex ++;
 
         double time_monitor_chem=0;
@@ -253,7 +262,7 @@ int main(int argc, char *argv[])
                     Info<< "pEqn.H start" << nl << endl;
                     #include "pEqn.H"
                     Info<< "pEqn.H end" << nl << endl;
-                } 
+                }
             }
             end = MPI_Wtime();
             time_monitor_p += end - start;
@@ -261,7 +270,7 @@ int main(int argc, char *argv[])
             if (pimple.turbCorr())
             {
                 Info<< "turbulence->correct start" << nl << endl;
-                turbulence->correct(); 
+                turbulence->correct();
                 Info<< "turbulence->correct end" << nl << endl;
             }
         }
@@ -287,30 +296,18 @@ int main(int argc, char *argv[])
         // Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
         //     << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
 #ifdef USE_PYTORCH
-        // if (log_ && torch_)
-        // {
-        //     Info<< "    allsolveTime = " << chemistry->time_allsolve() << " s"
-        //     << "    submasterTime = " << chemistry->time_submaster() << " s" << nl
-        //     << "    sendProblemTime = " << chemistry->time_sendProblem() << " s"
-        //     << "    recvProblemTime = " << chemistry->time_RecvProblem() << " s"
-        //     << "    sendRecvSolutionTime = " << chemistry->time_sendRecvSolution() << " s" << nl
-        //     << "    getDNNinputsTime = " << chemistry->time_getDNNinputs() << " s"
-        //     << "    DNNinferenceTime = " << chemistry->time_DNNinference() << " s"
-        //     << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl
-        //     << "    vec2ndarrayTime = " << chemistry->time_vec2ndarray() << " s"
-        //     << "    pythonTime = " << chemistry->time_python() << " s"<< nl << endl;
-        // }
         if (log_ && torch_)
         {
-            Info
-            << "    allsolveTime = " << chemistry->time_allsolve() << " s" << endl
-            << "    cvodeTime = " << chemistry->time_cvode() << " s" << endl
-            << "    getDNNinputsTime = " << chemistry->time_getDNNinputs() << " s" << endl
-            << "    vec2ndarrayTime = " << chemistry->time_vec2ndarray() << " s" << endl
-            << "    ImportPythonModuleTime = " << chemistry->time_python_import_module() << " s" << endl
-            << "    PyTorchinferenceTime = " << chemistry->time_python_inference() << " s" << endl
-            << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << endl
-            << "    updateRRTime = " << chemistry->time_update_RR() << " s" << endl;
+            Info<< "    allsolveTime = " << chemistry->time_allsolve() << " s"
+            << "    submasterTime = " << chemistry->time_submaster() << " s" << nl
+            << "    sendProblemTime = " << chemistry->time_sendProblem() << " s"
+            << "    recvProblemTime = " << chemistry->time_RecvProblem() << " s"
+            << "    sendRecvSolutionTime = " << chemistry->time_sendRecvSolution() << " s" << nl
+            << "    getDNNinputsTime = " << chemistry->time_getDNNinputs() << " s"
+            << "    DNNinferenceTime = " << chemistry->time_DNNinference() << " s"
+            << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl
+            << "    vec2ndarrayTime = " << chemistry->time_vec2ndarray() << " s"
+            << "    pythonTime = " << chemistry->time_python() << " s"<< nl << endl;
         }
 #endif
 #ifdef USE_LIBTORCH

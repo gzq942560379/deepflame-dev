@@ -48,13 +48,20 @@ void DNNInferencer_blas::load_models(const std::string dir){
 }
 
 void DNNInferencer_blas::alloc_buffer(int64_t total_samples){
-    assert(!buffer_alloced_);
+    if(buffer_alloced_){
+        if(total_samples <= total_samples_){
+            return;
+        }else{
+            assert(false);
+        }
+    }
     total_samples_ = total_samples;
     buffer_alloced_ = true;
     output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[1]));
     output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[2]));
     output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[3]));
     output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[4]));
+
 }
 
 void DNNInferencer_blas::Inference_multiDNNs(
@@ -62,7 +69,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
     const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
     const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2){
     
-    assert(input_count0 + input_count1 + input_count2 == total_samples_);
+    assert(input_count0 + input_count1 + input_count2 <= total_samples_);
     assert(buffer_alloced_);
 
     if(input_count0 > 0){
