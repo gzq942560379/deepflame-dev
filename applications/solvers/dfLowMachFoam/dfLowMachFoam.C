@@ -61,6 +61,13 @@ Description
 #include "CombustionModel.H"
 #include "CorrectPhi.H"
 
+#include <typeinfo>
+#include "GenFvMatrix.H"
+// #define _CSR_
+#ifdef _CSR_
+#include "csrMatrix.H"
+#endif
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -73,26 +80,43 @@ int main(int argc, char *argv[])
     // #include "setRootCaseLists.H"
     #include "listOptions.H"
     #include "setRootCase2.H"
+
+    double init_start = MPI_Wtime();
+
+    double listOutput_start = MPI_Wtime();
     #include "listOutput.H"
+    double listOutput_end = MPI_Wtime();
 
+    double createTime_start = MPI_Wtime();
     #include "createTime.H"
-    //#include "createMesh.H"
-    #include "createDynamicFvMesh.H"
-    //#include "createTimeControls.H"
-    #include "createDyMControls.H"
-    #include "initContinuityErrs.H"
-    #include "createFields.H"
-    #include "createRhoUfIfPresent.H"
+    double createTime_end = MPI_Wtime();
 
-    double time_monitor_flow=0;
-    double time_monitor_chem=0;
-    double time_monitor_Y=0;
-    double time_monitor_E=0;
-    double time_monitor_corrThermo=0;
-    double time_monitor_corrDiff=0;
+    // #include "createMesh.H"
+    double createDynamicFvMesh_start = MPI_Wtime();
+    #include "createDynamicFvMesh.H"
+    double createDynamicFvMesh_end = MPI_Wtime();
+
+    double createDyMControls_start = MPI_Wtime();
+    #include "createDyMControls.H"
+    double createDyMControls_end = MPI_Wtime();
+
+    double initContinuityErrs_start = MPI_Wtime();
+    #include "initContinuityErrs.H"
+    double initContinuityErrs_end = MPI_Wtime();
+
+    double createFields_start = MPI_Wtime();
+    #include "createFields.H"
+    double createFields_end = MPI_Wtime();
+
+    double createRhoUfIfPresent_start = MPI_Wtime();
+    #include "createRhoUfIfPresent.H"
+    double createRhoUfIfPresent_end = MPI_Wtime();
+
+    double init_end = MPI_Wtime();
+
+    double total_start = MPI_Wtime();
+
     label timeIndex = 0;
-    std::chrono::steady_clock::time_point start, end;
-    std::chrono::duration<double> processingTime;
 
     turbulence->validate();
 
@@ -101,6 +125,12 @@ int main(int argc, char *argv[])
         #include "compressibleCourantNo.H"
         #include "setInitialDeltaT.H"
     }
+
+
+// #ifdef _CSR_
+//     csrMatrix csr(mesh);
+//     csr.analyze();
+// #endif
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -118,6 +148,15 @@ int main(int argc, char *argv[])
         }
 
         timeIndex ++;
+
+        double time_monitor_chem=0;
+        double time_monitor_Y=0;
+        double time_monitor_U=0;
+        double time_monitor_p=0;
+        double time_monitor_E=0;
+        double time_monitor_corrThermo=0;
+        double time_monitor_corrDiff=0;
+        double start, end;
 
         #include "readDyMControls.H"
 
@@ -142,77 +181,97 @@ int main(int argc, char *argv[])
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
         // --- Pressure-velocity PIMPLE corrector loop
+        int pimple_loop_count = 0;
         while (pimple.loop())
         {
+            pimple_loop_count += 1;
             if (splitting)
             {
+                Info<< "YEqn_RR.H start" << nl << endl;
                 #include "YEqn_RR.H"
+                Info<< "YEqn_RR.H end" << nl << endl;
             }
             if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
             {
+                Info<< "new rhoU start" << nl << endl;
                 // Store momentum to set rhoUf for introduced faces.
                 autoPtr<volVectorField> rhoU;
                 if (rhoUf.valid())
                 {
                     rhoU = new volVectorField("rhoU", rho*U);
                 }
+                Info<< "new rhoU end" << nl << endl;
             }
 
             if (pimple.firstPimpleIter() && !pimple.simpleRho())
             {
+                Info<< "rhoEqn.H start" << nl << endl;
                 #include "rhoEqn.H"
+                Info<< "rhoEqn.H end" << nl << endl;
             }
 
-            start = std::chrono::steady_clock::now();
+            Info<< "UEqn.H start" << nl << endl;
+            start = MPI_Wtime();
             #include "UEqn.H"
-            end = std::chrono::steady_clock::now();
-            processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-            time_monitor_flow += processingTime.count();
+            end = MPI_Wtime();
+            Info<< "UEqn.H end" << nl << endl;
+            time_monitor_U += end - start;
 
             if(combModelName!="ESF" && combModelName!="flareFGM" )
             {
+                Info<< "YEqn.H start" << nl << endl;
                 #include "YEqn.H"
+                Info<< "YEqn.H end" << nl << endl;
 
-                start = std::chrono::steady_clock::now();
+                Info<< "EEqn.H start" << nl << endl;
+                start = MPI_Wtime();
                 #include "EEqn.H"
-                end = std::chrono::steady_clock::now();
-                processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-                time_monitor_E += processingTime.count();
+                end = MPI_Wtime();
+                Info<< "EEqn.H end" << nl << endl;
+                time_monitor_E += end - start;
 
-                start = std::chrono::steady_clock::now();
+                Info<< "chemistry->correctThermo start" << nl << endl;
+                start = MPI_Wtime();
                 chemistry->correctThermo();
-                end = std::chrono::steady_clock::now();
-                processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-                time_monitor_corrThermo += processingTime.count();
+                end = MPI_Wtime();
+                Info<< "chemistry->correctThermo end" << nl << endl;
+                time_monitor_corrThermo += end - start;
             }
             else
             {
+                Info<< "chemistry->correct start" << nl << endl;
                 combustion->correct();
+                Info<< "chemistry->correct end" << nl << endl;
             }
 
             Info<< "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
 
             // --- Pressure corrector loop
 
-            start = std::chrono::steady_clock::now();
+            start = MPI_Wtime();
             while (pimple.correct())
             {
                 if (pimple.consistent())
                 {
+                    Info<< "pcEqn.H start" << nl << endl;
                     #include "pcEqn.H"
+                    Info<< "pcEqn.H end" << nl << endl;
                 }
                 else
                 {
+                    Info<< "pEqn.H start" << nl << endl;
                     #include "pEqn.H"
+                    Info<< "pEqn.H end" << nl << endl;
                 }
             }
-            end = std::chrono::steady_clock::now();
-            processingTime = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-            time_monitor_flow += processingTime.count();
+            end = MPI_Wtime();
+            time_monitor_p += end - start;
 
             if (pimple.turbCorr())
             {
+                Info<< "turbulence->correct start" << nl << endl;
                 turbulence->correct();
+                Info<< "turbulence->correct end" << nl << endl;
             }
         }
 
@@ -223,17 +282,19 @@ int main(int argc, char *argv[])
         Info << "output time index " << runTime.timeIndex() << endl;
 
         Info<< "========Time Spent in diffenet parts========"<< endl;
+        Info<< "Pimple loop count          = " << pimple_loop_count << endl;
         Info<< "Chemical sources           = " << time_monitor_chem << " s" << endl;
         Info<< "Species Equations          = " << time_monitor_Y << " s" << endl;
-        Info<< "U & p Equations            = " << time_monitor_flow << " s" << endl;
+        Info<< "U Equations                = " << time_monitor_U << " s" << endl;
+        Info<< "p Equations                = " << time_monitor_p << " s" << endl;
         Info<< "Energy Equations           = " << time_monitor_E << " s" << endl;
         Info<< "thermo & Trans Properties  = " << time_monitor_corrThermo << " s" << endl;
         Info<< "Diffusion Correction Time  = " << time_monitor_corrDiff << " s" << endl;
-        Info<< "sum Time                   = " << (time_monitor_chem + time_monitor_Y + time_monitor_flow + time_monitor_E + time_monitor_corrThermo + time_monitor_corrDiff) << " s" << endl;
+        Info<< "sum Time                   = " << (time_monitor_chem + time_monitor_Y + time_monitor_U + time_monitor_p + time_monitor_E + time_monitor_corrThermo + time_monitor_corrDiff) << " s" << endl;
         Info<< "============================================"<<nl<< endl;
 
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
+        // Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+        //     << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
 #ifdef USE_PYTORCH
         if (log_ && torch_)
         {
@@ -262,7 +323,21 @@ int main(int argc, char *argv[])
         }
 #endif
     }
+    double total_end = MPI_Wtime();
 
+    Info << "Init time : " << init_end - init_start << endl;
+    Info << "listOutput time : " << listOutput_end - listOutput_start << endl;
+    Info << "createTime time : " << createTime_end - createTime_start << endl;
+    Info << "createDynamicFvMesh time : " << createDynamicFvMesh_end - createDynamicFvMesh_start << endl;
+    Info << "createDyMControls time : " << createDyMControls_end - createDyMControls_start << endl;
+    Info << "initContinuityErrs time : " << initContinuityErrs_end - initContinuityErrs_start << endl;
+    Info << "createFields time : " << createFields_end - createFields_start << endl;
+    Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
+    Info << endl;
+
+    
+    double total_time = total_end - total_start;
+    Info << "Total time : " << total_time << endl;
     Info<< "End\n" << endl;
 
     return 0;

@@ -20,8 +20,8 @@ cmake_minimum_required(VERSION 3.10)
 project(DNNInferencertf)
 
 # Set the path to the TensorFlow C++ library
-set(TENSORFLOW_LIB_PATH "/home/runze/tensorflow/tensorflow/bazel-bin/tensorflow")
-set(TENSORFLOW_INCLUDE_PATH "/home/runze/tensorflow/tensorflow")
+set(TENSORFLOW_LIB_PATH "${LIBTENSORFLOW_ROOT}/lib")
+set(TENSORFLOW_INCLUDE_PATH "${LIBTENSORFLOW_ROOT}/include")
 
 # Find the TensorFlow libraries
 # find_library(TENSORFLOW_LIB tensorflow HINTS ${TENSORFLOW_LIB_PATH})

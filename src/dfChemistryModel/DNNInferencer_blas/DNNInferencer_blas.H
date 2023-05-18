@@ -1,0 +1,37 @@
+#ifndef DNNInferencer_blas_H
+#define DNNInferencer_blas_H
+
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <string> 
+#include <memory>
+#include <cstring>
+#include "Layer.H"
+
+class DNNInferencer_blas
+{
+private:
+    std::vector<int64_t> layers_{9,1600,800,400,9};
+    std::vector<Layer<float>*> model0_;
+    std::vector<Layer<float>*> model1_;
+    std::vector<Layer<float>*> model2_;
+
+    int64_t total_samples_;
+    bool buffer_alloced_ = false;
+    std::vector<std::vector<float>> output_buffer_;
+public:
+    DNNInferencer_blas();
+    ~DNNInferencer_blas();
+
+    void load_models(const std::string dir);
+    void alloc_buffer(int64_t total_samples);
+    // Inference
+    void Inference_multiDNNs(
+        const std::vector<float>& input0, std::vector<double>& output0, int64_t input_count0,
+        const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
+        const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2);
+
+};
+
+#endif

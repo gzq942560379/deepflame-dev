@@ -182,12 +182,12 @@ void Foam::dfChemistryModel<ThermoType>::getDNNinputs
     cellIDBuffer = {cellIDList0Buffer, cellIDList1Buffer, cellIDList2Buffer};
     problemCounter = {problemCounter0, problemCounter1, problemCounter2};
 
-    if (gpulog_)
-    {
-        std::cout<<"inputsDNN0 = "<<inputsDNN0.size()/10 << "\n";
-        std::cout<<"inputsDNN1 = "<<inputsDNN1.size()/10 << "\n";
-        std::cout<<"inputsDNN2 = "<<inputsDNN2.size()/10 << "\n";
-    }
+    // if (gpulog_)
+    // {
+    //     std::cout<<"inputsDNN0 = "<<inputsDNN0.size()/10 << "\n";
+    //     std::cout<<"inputsDNN1 = "<<inputsDNN1.size()/10 << "\n";
+    //     std::cout<<"inputsDNN2 = "<<inputsDNN2.size()/10 << "\n";
+    // }
 
     return;
 }

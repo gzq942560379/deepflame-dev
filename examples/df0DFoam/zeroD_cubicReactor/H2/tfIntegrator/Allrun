@@ -1,5 +1,21 @@
 #!/bin/sh
+#PJM -L  "node=1"
+#PJM -L  "freq=2200,eco_state=2"
+#PJM -L  "rscgrp=small-s1"
+#PJM -L  "elapse=00:30:00"
+#PJM --mpi "max-proc-per-node=4"
+#PJM -s
+
+export OMPI_MCA_plm_ple_memory_allocation_policy=bind_local
+export PLE_MPI_STD_EMPTYFILE=off
+export OMP_NUM_THREADS=1
+
 cd ${0%/*} || exit 1    # Run from this directory
+
+# HOME
+export DeepFlame_HOME=/vol0001/hp210260/guozhuoqiang/DeepFlame
+
+source $DeepFlame_HOME/env.sh
 
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions

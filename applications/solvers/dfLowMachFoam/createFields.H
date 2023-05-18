@@ -50,7 +50,6 @@ volVectorField U
     ),
     mesh
 );
-Info << U << endl;
 
 #include "compressibleCreatePhi.H"
 

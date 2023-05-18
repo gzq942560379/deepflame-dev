@@ -132,6 +132,8 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     time_DNNinference_ = 0;
     time_updateSolutionBuffer_ = 0;
     time_getProblems_ = 0;
+    time_cvode_ = 0;
+    time_update_RR_ = 0;
 #endif
 
 #ifdef USE_LIBTORCH
@@ -178,6 +180,8 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     time_vec2ndarray_ = 0;
     time_python_ = 0;
+    time_python_import_module_ = 0;
+    time_python_inference_ = 0;
 #endif
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
@@ -197,8 +201,8 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         {
             label sub_rank;
             MPI_Comm_rank(PstreamGlobals::MPICommunicators_[cvodeComm], &sub_rank);
-            std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
-            << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;
+            // std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
+            // << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;
         }
     }
 #endif
@@ -290,6 +294,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         hc_[i] = CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
     }
     // set normalization parameters
+#if defined USE_TENSORFLOW || defined USE_BLASDNN
     Xmu0_ = {956.4666683951323,
                               1.2621251609602075,
                               -8.482865855078037,
@@ -386,9 +391,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
                                2754.8463649064784,
                                313.3717647966624,
                                2.463374792192512e-10};
-    tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
-    tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
-    tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
+
 
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     useDNN = true;
@@ -396,23 +399,43 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     {
         useDNN = false;
     }
-    
-    std::ifstream input_file0(tfModelPath0_, std::ios::binary);
-    std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
-    std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
-    std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
-    input_file0.close();
+#endif
 
-    std::ifstream input_file1(tfModelPath1_, std::ios::binary);
-    std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
-    input_file1.close();
 
-    std::ifstream input_file2(tfModelPath2_, std::ios::binary);
-    std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
-    input_file2.close();
+#ifdef USE_TENSORFLOW
+    if(torchSwitch_){
+        tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
+        tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
+        tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
 
-    DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
-    DNNInferencertf_ = DNNInferencertf;
+        std::ifstream input_file0(tfModelPath0_, std::ios::binary);
+        std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
+        std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
+        std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
+        input_file0.close();
+
+        std::ifstream input_file1(tfModelPath1_, std::ios::binary);
+        std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
+        std::cout<<"model_data1 = "<<model_data0.size()<<std::endl;
+        input_file1.close();
+
+        std::ifstream input_file2(tfModelPath2_, std::ios::binary);
+        std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
+        std::cout<<"model_data2 = "<<model_data0.size()<<std::endl;
+        input_file2.close();
+
+        DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
+        DNNInferencertf_ = DNNInferencertf;
+    }
+#endif
+
+#ifdef USE_BLASDNN
+    if(torchSwitch_){
+        BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
+        DNNInferencer_blas_.load_models(BLASDNNModelPath_);
+        // DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
+    }
+#endif
 }
 
 
@@ -436,7 +459,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve
 {
     scalar result = 0;
 
-#if defined USE_LIBTORCH || defined USE_PYTORCH
+#if defined(USE_LIBTORCH) || defined(USE_PYTORCH)
     if(torchSwitch_)
     {
         if (useDNN)
@@ -453,7 +476,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve
     {
         result = solve_CVODE(deltaT);
     }
-#else
+#elif defined(USE_TENSORFLOW)
     if(torchSwitch_)
     {
         if (useDNN)
@@ -470,6 +493,25 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve
     {
         result = solve_CVODE(deltaT);
     }
+#elif defined(USE_BLASDNN)
+    if(torchSwitch_)
+    {
+        if (useDNN)
+        {
+            result = solve_DNN_blas(deltaT);
+        }
+        else
+        {
+            result = solve_CVODE(deltaT);
+            useDNN = true;
+        }
+    }
+    else
+    {
+        result = solve_CVODE(deltaT);
+    }
+#else
+    result = solve_CVODE(deltaT);
 #endif
 
     return result;
@@ -956,169 +998,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
     return updateReactionRates(incomingSolutions, List);
 }
 
-template <class ThermoType>
-template <class DeltaTType>
-Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_tf
-(
-    const DeltaTType& deltaT
-)
-{
-    scalar deltaTMin = great;
-    Info<<"=== begin solve_DNN with tensorflow === "<<endl;
-    std::vector<float> NNInputs0, NNInputs1, NNInputs2;
-    std::vector<size_t> tfCell0, tfCell1, tfCell2;
-    scalarList yPre_(mixture_.nSpecies());
-    scalarList yBCT_(mixture_.nSpecies());
-    scalarList u_(mixture_.nSpecies());
-    double lambda = 0.1;
-    // get problems
-    forAll(T_, cellI)
-    {
-        scalar Ti = T_[cellI];
-        scalar pi = p_[cellI];
+#ifdef USE_TENSORFLOW
+#include "tensorflowFunctions.H"
+#endif
 
-        // NN0
-        if (((Qdot_[cellI] < 3e7) && (T_[cellI] < 2000) && ( T_[cellI] >= 700)) || (T_[cellI] < 700))//choose1
-        {
-            NNInputs0.push_back((Ti - Xmu0_[0])/Xstd0_[0]);
-            NNInputs0.push_back((pi / 101325 - Xmu0_[1])/Xstd0_[1]);
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
-            {
-                yPre_[i] = Y_[i][cellI];
-                yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
-            }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
-            {
-                NNInputs0.push_back((yBCT_[i] - Xmu0_[i+2]) / Xstd0_[i+2]);
-            }
-            tfCell0.push_back(cellI);
-            continue;
-        }
-        // NN1
-        if(((Qdot_[cellI] >= 3e7) && (T_[cellI] < 2000)&&(T_[cellI] >= 700))||((Qdot_[cellI] > 7e8) && T_[cellI] > 2000)) //choose2
-        {
-            NNInputs1.push_back((Ti - Xmu1_[0])/Xstd1_[0]);
-            NNInputs1.push_back((pi / 101325 - Xmu1_[1])/Xstd1_[1]);
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
-            {
-                yPre_[i] = Y_[i][cellI];
-                yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
-            }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
-            {
-                NNInputs1.push_back((yBCT_[i] - Xmu1_[i+2]) / Xstd1_[i+2]);
-            }
-            tfCell1.push_back(cellI);
-            continue;
-        }
-        // NN2
-        if  ((Qdot_[cellI] < 7e8) && (T_[cellI] >= 2000) && (Qdot_[cellI]!=0)) //choose3
-        {
-            NNInputs2.push_back((Ti - Xmu2_[0])/Xstd2_[0]);
-            NNInputs2.push_back((pi / 101325 - Xmu2_[1])/Xstd2_[1]);
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
-            {
-                yPre_[i] = Y_[i][cellI];
-                yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
-            }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
-            {
-                NNInputs2.push_back((yBCT_[i] - Xmu2_[i+2]) / Xstd2_[i+2]);
-            }
-            tfCell2.push_back(cellI);
-            continue;
-        }
-    }
-    std::cout<<"tfCell0 = "<< tfCell0.size()<<std::endl;
-    std::cout<<"tfCell1 = "<< tfCell1.size()<<std::endl;
-    std::cout<<"tfCell2 = "<< tfCell2.size()<<std::endl;
-    
-    // module inference
-    std::vector<std::vector<float>> NNInputs = {NNInputs0, NNInputs1, NNInputs2};
-    auto results = DNNInferencertf_.Inference_multiDNNs(NNInputs, mixture_.nSpecies()+2);
-
-    // update Q & RR
-    // - NN0
-    int offset;
-    for(size_t cellI = 0; cellI<tfCell0.size(); cellI ++)
-    {
-        offset = cellI * (CanteraGas_->nSpecies() + 2);
-        scalar Yt = 0;
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)
-        {
-            yPre_[i] = Y_[i][tfCell0[cellI]];
-            yTemp_[i] = Y_[i][tfCell0[cellI]];
-            yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
-        }
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)//
-        {
-            u_[i] = results[0][offset + i + 2]*Ystd0_[i]+Ymu0_[i];
-            yTemp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
-            Yt += yTemp_[i]; // normalization
-        }
-        Qdot_[tfCell0[cellI]] = 0;
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)
-        {
-            yTemp_[i] = yTemp_[i] / Yt;
-            RR_[i][tfCell0[cellI]] = (yTemp_[i] - Y_[i][tfCell0[cellI]])*rho_[tfCell0[cellI]]/1e-6;
-            Qdot_[tfCell0[cellI]] -= hc_[i]*RR_[i][tfCell0[cellI]];
-        }
-    }
-    // - NN1
-    for(size_t cellI = 0; cellI<tfCell1.size(); cellI ++)
-    {
-        offset = cellI * (CanteraGas_->nSpecies() + 2);
-        scalar Yt = 0;
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)
-        {
-            yPre_[i] = Y_[i][tfCell1[cellI]];
-            yTemp_[i] = Y_[i][tfCell1[cellI]];
-            yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
-        }
-        for (int i=0; i<(CanteraGas_->nSpecies()); i++)//
-        {
-            u_[i] = results[1][offset + i + 2]*Ystd1_[i]+Ymu1_[i];
-            yTemp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
-            Yt += yTemp_[i];
-        }
-        Qdot_[tfCell1[cellI]] = 0;
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)
-        {
-            yTemp_[i] = yTemp_[i] / Yt;
-            RR_[i][tfCell1[cellI]] = (yTemp_[i] - Y_[i][tfCell1[cellI]])*rho_[tfCell1[cellI]]/1e-6;
-            Qdot_[tfCell1[cellI]] -= hc_[i]*RR_[i][tfCell1[cellI]];
-        }
-    }
-    // - NN2
-    for(size_t cellI = 0; cellI<tfCell2.size(); cellI ++)
-    {
-        offset = cellI * (CanteraGas_->nSpecies() + 2);
-        scalar Yt = 0;
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)
-        {
-            yPre_[i] = Y_[i][tfCell2[cellI]];
-            yTemp_[i] = Y_[i][tfCell2[cellI]];
-            yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
-        }
-        for (int i=0; i<(CanteraGas_->nSpecies()); i++)//
-        {
-            u_[i] = results[2][offset + i + 2]*Ystd2_[i]+Ymu2_[i];
-            yTemp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
-            Yt += yTemp_[i];
-        }
-        Qdot_[tfCell2[cellI]] = 0;
-        for (int i=0; i<CanteraGas_->nSpecies(); i++)
-        {
-            yTemp_[i] = yTemp_[i] / Yt;
-            RR_[i][tfCell2[cellI]] = (yTemp_[i] - Y_[i][tfCell2[cellI]])*rho_[tfCell2[cellI]]/1e-6;
-            Qdot_[tfCell2[cellI]] -= hc_[i]*RR_[i][tfCell2[cellI]];
-        }
-    }
-
-    Info << "=== end solve_DNN with tensorflow === " << endl;
-    return deltaTMin;
-}
-
+#ifdef USE_BLASDNN
+#include "blasdnnFunctions.H"
+#endif
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
 #include "torchFunctions.H"

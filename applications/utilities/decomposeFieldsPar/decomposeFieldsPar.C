@@ -36,28 +36,61 @@ Description
 #include <fstream>
 #include <string>
 #include <vector>
+#include <mpi.h>
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
 {
-
     #include "setRootCase.H"
-    #include "createTime.H"
-    #include "createMesh.H"
-    #include "createFields.H"
+    
+    int mpirank = 0;
+    int mpisize = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD,&mpirank);
+    MPI_Comm_rank(MPI_COMM_WORLD,&mpisize);
 
+    double total_start = MPI_Wtime();
+
+    #include "createTime.H"
+    double time_1 = MPI_Wtime();
+    #include "createMesh.H"
+    double time_2 = MPI_Wtime();
+    #include "createFields.H"
+    double time_3 = MPI_Wtime();
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     // read .txt
     std::vector<double *> filedata;
     std::ifstream infile;
     std::string str;
-    infile.open("/home/runze/massiveParallel/deepflame-dev/examples/dfLowMachFoam/threeD_reactingTGV/H2/cvodeIntegrator_128/adiabatic_128.txt");
+    std::string adiabatic_file_path;
+    int grid_size = 0;
+
+    Info << "adiabatic file path : " << adiabatic_file_path << endl;
+    Info << "grid size : " << grid_size << endl;
+
+    std::vector<int> gird_size_list({256,512,1024,2048});
+    for(size_t i = 0; i < gird_size_list.size(); ++i){
+        std::stringstream ss;
+        grid_size = gird_size_list[i];
+        ss << "./adiabatic_" << grid_size << ".txt";
+        adiabatic_file_path = ss.str();
+        Info << "Try" << endl;
+        Info << "adiabatic file path : " << adiabatic_file_path << endl;
+        Info << "grid size : " << grid_size << endl;
+        infile.open(adiabatic_file_path);
+        if(infile.good()){
+            Info << "Success" << endl;
+            break;
+        }
+    }
+    double time_4 = MPI_Wtime();
+
+    // infile.open(adiabatic_file_path);
     while (std::getline(infile, str))
     {
-        double * data = new double[128]{0.0};
+        double * data = new double[grid_size]{0.0};
         std::stringstream sumstr(str);
         string out;
         int i = 0;
@@ -69,6 +102,10 @@ int main(int argc, char *argv[])
         }
         filedata.push_back(data);
     }
+    double time_5 = MPI_Wtime();
+
+    Info << "vector size" << filedata.size() << endl;
+    Info << "array" << filedata[0][1] << endl;
 
     scalar x, y, z;
     label index;
@@ -83,7 +120,7 @@ int main(int argc, char *argv[])
         U[celli] = vector(4*std::sin(x/0.001)*std::cos(y/0.001)*std::cos(z/0.001),-4*std::cos(x/0.001)*std::sin(y/0.001)*std::cos(z/0.001),0.0);
 
         // set scalar fields
-        index = round((x/0.001) / 0.0494739);
+        index = round((x/0.001) / filedata[0][1]);
         T[celli] = filedata[1][index];
         H2[celli] = filedata[2][index];
         H[celli] = filedata[3][index];
@@ -96,6 +133,7 @@ int main(int argc, char *argv[])
         N2[celli] = filedata[10][index];
         
     }
+    double time_6 = MPI_Wtime();
 
     U.correctBoundaryConditions();
     T.correctBoundaryConditions();
@@ -108,6 +146,7 @@ int main(int argc, char *argv[])
     HO2.correctBoundaryConditions();
     H2O2.correctBoundaryConditions();
     N2.correctBoundaryConditions();
+    double time_7 = MPI_Wtime();
 
     U.write();
     T.write();
@@ -121,7 +160,18 @@ int main(int argc, char *argv[])
     H2O2.write();
     N2.write();
 
-    Info<< "\n end\n";
+    Info << "\n end\n";
+    double total_end = MPI_Wtime();
+
+    Info << "total_time : " << total_end - total_start << endl;
+    Info << "createTime : " << time_1 - total_start << endl;
+    Info << "createMesh : " << time_2 - time_1 << endl;
+    Info << "createFields : " << time_3 - time_2 << endl;
+    Info << "open file : " << time_4 - time_3 << endl;
+    Info << "read file : " << time_5 - time_4 << endl;
+    Info << "init field : " << time_6 - time_5 << endl;
+    Info << "correctBoundaryConditions : " << time_7 - time_6 << endl;
+    Info << "write : " << total_end - time_7 << endl;
 
     return 0;
 }

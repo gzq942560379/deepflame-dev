@@ -1,0 +1,23 @@
+
+dfMatrix/dfMatrix.cpp
+
+csrMatrix=csrMatrix
+$(csrMatrix)/csrMatrix/csrMatrix.C
+$(csrMatrix)/csrMatrix/csrMatrixAmul.C
+$(csrMatrix)/csrMatrix/csrMatrixSolve.C
+$(csrMatrix)/csrMatrix/csrMatrixSolver.C
+$(csrMatrix)/csrMatrix/csrMatrixPreconditioner.C
+$(csrMatrix)/csrMatrix/csrMatrixSmoother.C
+$(csrMatrix)/csrMatrix/csrMatrixUpdateMatrixInterfaces.C
+$(csrMatrix)/preconditioners/csrNoPreconditioner/csrNoPreconditioner.C
+$(csrMatrix)/solvers/csrDiagonalSolver/csrDiagonalSolver.C
+$(csrMatrix)/solvers/CSRPBiCGStab/CSRPBiCGStab.C
+$(csrMatrix)/solvers/CSRSmootherPCG/CSRSmootherPCG.C
+$(csrMatrix)/solvers/CSRPCG/CSRPCG.C
+$(csrMatrix)/smoothers/csrSymGaussSeidel/csrSymGaussSeidelSmoother.C
+
+lduMatrix=lduMatrix
+
+$(lduMatrix)/solvers/PBiCGStab/PBiCGStab.C
+
+LIB = $(DF_LIBBIN)/libdfMatrices

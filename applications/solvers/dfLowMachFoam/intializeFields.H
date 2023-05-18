@@ -1,6 +1,7 @@
 Info<< "Constructing fields for refined mesh\n" << endl;
 Info<< "Reading data from file\n" << endl;
 const string filePath = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("filePath", string(""));
+const label girdSize = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("girdSize", 0);
 
 std::vector<double *> filedata;
 std::ifstream infile;
@@ -8,7 +9,7 @@ std::string str;
 infile.open(filePath);
 while (std::getline(infile, str))
 {
-    double * data = new double[128]{0.0};
+    double * data = new double[girdSize]{0.0};
     std::stringstream sumstr(str);
     string out;
     int i = 0;

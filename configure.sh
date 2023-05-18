@@ -16,6 +16,8 @@ print_usage() {
 LIBTORCH_AUTO=false
 USE_LIBTORCH=false
 USE_PYTORCH=false
+USE_TENSORFLOW=
+USE_BLASDNN=
 
 while test $# -gt 0; do
     case "$1" in
@@ -28,6 +30,17 @@ while test $# -gt 0; do
             if test $# -gt 0; then
                 LIBTORCH_DIR=$1
                 USE_LIBTORCH=true
+            else
+                print_usage
+            return
+            fi
+            shift
+            ;;
+        --libtensorflow_dir)
+            shift
+            if test $# -gt 0; then
+                LIBTENSORFLOW_DIR=$1
+                USE_TENSORFLOW=true
             else
                 print_usage
             return
@@ -48,6 +61,11 @@ while test $# -gt 0; do
         --use_pytorch)
             shift
             USE_PYTORCH=true
+            shift
+            ;;
+        --use_blasdnn)
+            shift
+            USE_BLASDNN=true
             shift
             ;;
         --libcantera_dir)
@@ -139,23 +157,32 @@ fi
 echo "setup for deepflame bashrc:"
 echo LIBCANTERA_DIR=$LIBCANTERA_DIR
 if [ $USE_LIBTORCH = true ]; then
+    echo USE_LIBTORCH=$USE_LIBTORCH
     echo LIBTORCH_DIR=$LIBTORCH_DIR
-    echo PYTORCH_INC=""
-    echo PYTORCH_LIB=""
 fi
+
 if [ $USE_PYTORCH = true ]; then
+    echo USE_PYTORCH=$USE_PYTORCH
     echo PYTORCH_INC=$PYTORCH_INC
     echo PYTORCH_LIB=$PYTORCH_LIB
-    echo LIBTORCH_DIR=""
+fi
+if [ ! -z "$USE_TENSORFLOW" ]; then
+    echo USE_TENSORFLOW=$USE_TENSORFLOW
+    echo LIBTENSORFLOW_DIR=$LIBTENSORFLOW_DIR
+fi
+if [ ! -z "$USE_BLASDNN" ]; then
+    echo USE_BLASDNN=$USE_BLASDNN
 fi
 
 cp bashrc.in bashrc
 sed -i "s#pwd#$PWD#g" ./bashrc
 sed -i "s#LIBTORCH_DIR#$LIBTORCH_DIR#g" ./bashrc
+sed -i "s#@USE_TENSORFLOW@#$USE_TENSORFLOW#g" ./bashrc
+sed -i "s#LIBTENSORFLOW_DIR#$LIBTENSORFLOW_DIR#g" ./bashrc
 sed -i "s#PYTORCH_INC#$PYTORCH_INC#g" ./bashrc
 sed -i "s#PYTORCH_LIB#$PYTORCH_LIB#g" ./bashrc
+sed -i "s#@USE_BLASDNN@#$USE_BLASDNN#g" ./bashrc
 sed -i "s#LIBCANTERA_DIR#$LIBCANTERA_DIR#g" ./bashrc
-
 
 
 

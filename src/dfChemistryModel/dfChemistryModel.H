@@ -73,9 +73,13 @@ SourceFiles
 #include "IOmanip.H"
 #include "PstreamGlobals.H"
 // tensorflow
+#ifdef USE_TENSORFLOW
 #include "DNNInferencertf.H"
-// #include <tensorflow/core/public/session.h>
-// #include <tensorflow/core/framework/tensor.h>
+#endif
+// blas
+#ifdef USE_BLASDNN
+#include "DNNInferencer_blas.H"
+#endif
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -133,18 +137,14 @@ public IOdictionary
         // DNN selection fields
         volScalarField selectDNN_;
 
-        // tensorflow
-        DNNInferencertf DNNInferencertf_;
-        string tfModelPath0_;
-        string tfModelPath1_;
-        string tfModelPath2_;
+#if defined USE_TENSORFLOW || defined USE_BLASDNN
         std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
                             Xmu1_, Xstd1_, Ymu1_, Ystd1_,
                             Xmu2_, Xstd2_, Ymu2_, Ystd2_;
-        bool useDNN;
-        Switch torchSwitch_;
 
-#if defined USE_LIBTORCH || defined USE_PYTORCH
+#endif
+
+#if defined USE_LIBTORCH || defined USE_PYTORCH || defined USE_TENSORFLOW || defined USE_BLASDNN
         bool useDNN;
         Switch torchSwitch_;
         Switch gpu_;
@@ -162,6 +162,8 @@ public IOdictionary
         double time_DNNinference_;
         double time_updateSolutionBuffer_;
         double time_getProblems_;
+        double time_cvode_;
+        double time_update_RR_;
 #endif
 
 #ifdef USE_LIBTORCH
@@ -174,12 +176,28 @@ public IOdictionary
         word torchModelName3_;
 #endif
 
+#ifdef USE_TENSORFLOW
+        // tensorflow
+        DNNInferencertf DNNInferencertf_;
+        string tfModelPath0_;
+        string tfModelPath1_;
+        string tfModelPath2_;
+#endif
+
+#ifdef USE_BLASDNN
+        // tensorflow
+        DNNInferencer_blas DNNInferencer_blas_;
+        string BLASDNNModelPath_;
+#endif
+
 #ifdef USE_PYTORCH
         int cores_; // The number of cores per node when use pytorch
 
         // profiling
         double time_vec2ndarray_;
         double time_python_;
+        double time_python_import_module_;
+        double time_python_inference_;
 #endif
 
         // Load balancing object
@@ -232,9 +250,15 @@ public IOdictionary
         template<class DeltaTType>
         scalar solve_CVODE(const DeltaTType& deltaT);
 
+#ifdef USE_TENSORFLOW
         template<class DeltaTType>
         scalar solve_DNN_tf(const DeltaTType& deltaT);
+#endif
 
+#ifdef USE_BLASDNN
+        template<class DeltaTType>
+        scalar solve_DNN_blas(const DeltaTType& deltaT);
+#endif
         //- Output logFiles
         Foam::autoPtr<Foam::OFstream> logFile(const word& name) const
         {
@@ -334,10 +358,14 @@ public:
     double time_getDNNinputs() {return time_getDNNinputs_;}
     double time_DNNinference() {return time_DNNinference_;}
     double time_updateSolutionBuffer() {return time_updateSolutionBuffer_;}
+    double time_cvode() {return time_cvode_;}
+    double time_update_RR() {return time_update_RR_;}
 #endif
 #ifdef USE_PYTORCH
     double time_vec2ndarray() {return time_vec2ndarray_;}
     double time_python() {return time_python_;}
+    double time_python_import_module() {return time_python_import_module_;}
+    double time_python_inference() {return time_python_inference_;}
 #endif
 
 };
