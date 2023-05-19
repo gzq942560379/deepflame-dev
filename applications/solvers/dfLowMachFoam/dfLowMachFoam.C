@@ -114,6 +114,16 @@ int main(int argc, char *argv[])
 
     double init_end = MPI_Wtime();
 
+    Info << "Init time : " << init_end - init_start << endl;
+    Info << "listOutput time : " << listOutput_end - listOutput_start << endl;
+    Info << "createTime time : " << createTime_end - createTime_start << endl;
+    Info << "createDynamicFvMesh time : " << createDynamicFvMesh_end - createDynamicFvMesh_start << endl;
+    Info << "createDyMControls time : " << createDyMControls_end - createDyMControls_start << endl;
+    Info << "initContinuityErrs time : " << initContinuityErrs_end - initContinuityErrs_start << endl;
+    Info << "createFields time : " << createFields_end - createFields_start << endl;
+    Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
+    Info << endl;
+
     double total_start = MPI_Wtime();
 
     label timeIndex = 0;
@@ -134,17 +144,41 @@ int main(int argc, char *argv[])
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+    bool first = true;
+    double first_iter_start, first_iter_end;
+    double refine_start, refine_end;
+    double intializeFields_start, intializeFields_end;
+
     Info<< "\nStarting time loop\n" << endl;
     while (runTime.run())
     {
+        if(first){
+            refine_start = MPI_Wtime();
+        }
         while (refineLevel)
         {
+            double refine_one_step_start = MPI_Wtime();
             runTime++;
             #include "Refine.H"
+            double refine_one_step_end = MPI_Wtime();
+            Info << "refine one step time : " << refine_one_step_end - refine_one_step_start << endl; 
+        }
+        if(first){
+            refine_end = MPI_Wtime();
+        }
+
+        if(first){
+            intializeFields_start = MPI_Wtime();
         }
         if (!initialized)
         {
             #include "intializeFields.H"
+        }
+        if(first){
+            intializeFields_end = MPI_Wtime();
+        }
+        if(first){
+            first_iter_start = MPI_Wtime();
         }
 
         timeIndex ++;
@@ -322,22 +356,22 @@ int main(int argc, char *argv[])
             << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl;
         }
 #endif
+        if(first){
+            first_iter_end = MPI_Wtime();
+            Info << "first Iter time : " << first_iter_end - first_iter_start << endl;
+            Info << "refine time : " << refine_end - refine_start << endl; 
+            Info << "intializeFields time : " << intializeFields_end - intializeFields_start << endl; 
+            first = false;
+        }
+
     }
     double total_end = MPI_Wtime();
 
-    Info << "Init time : " << init_end - init_start << endl;
-    Info << "listOutput time : " << listOutput_end - listOutput_start << endl;
-    Info << "createTime time : " << createTime_end - createTime_start << endl;
-    Info << "createDynamicFvMesh time : " << createDynamicFvMesh_end - createDynamicFvMesh_start << endl;
-    Info << "createDyMControls time : " << createDyMControls_end - createDyMControls_start << endl;
-    Info << "initContinuityErrs time : " << initContinuityErrs_end - initContinuityErrs_start << endl;
-    Info << "createFields time : " << createFields_end - createFields_start << endl;
-    Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
-    Info << endl;
-
-    
+    double refine_time = refine_end - refine_start;
+    double intializeFields_time = intializeFields_end - intializeFields_start;
+    double first_iter_time = first_iter_end - first_iter_start;
     double total_time = total_end - total_start;
-    Info << "Total time : " << total_time << endl;
+    Info << "Total time : " << total_time - refine_time - intializeFields_time - first_iter_time << endl;
     Info<< "End\n" << endl;
 
     return 0;
