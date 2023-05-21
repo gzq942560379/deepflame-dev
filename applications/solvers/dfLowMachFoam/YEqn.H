@@ -64,15 +64,10 @@ time_monitor_corrDiff += end - start;
         
         volScalarField& Yi = Y[i];
 
-        Info << "fvc::grad(Yi) Scheme : " << Yi.mesh().gradScheme("grad(" + Yi.name() + ')') << endl;
         auto alpha_mul_hai = thermo.alpha()*chemistry->hai(i);
         Info << alpha_mul_hai().name() << endl;
-        // "(thermo:alpha*hai_O)"
-        // "(thermo:alpha*hai_H2O)"
-        // Info << "fvc::laplacian(thermo.alpha()*chemistry->hai(i), Yi) Scheme : " <<  << endl;
 
-
-        hDiffCorrFlux += chemistry->hai(i)*(chemistry->rhoD(i)*fvc::grad(Yi) - Yi*sumYDiffError);
+        hDiffCorrFlux += chemistry->hai(i)*(chemistry->rhoD(i)*fvc::grad(Yi) - Yi * sumYDiffError);
         diffAlphaD += fvc::laplacian(alpha_mul_hai, Yi);
 
         Y_build_end = MPI_Wtime();
@@ -81,6 +76,7 @@ time_monitor_corrDiff += end - start;
         if (i != inertIndex)
         {
             Y_build_start = MPI_Wtime();
+#ifndef OPT_GenMatrix_Y
             tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
            
             fvScalarMatrix YiEqn
@@ -95,88 +91,11 @@ time_monitor_corrDiff += end - start;
                 :  (fvm::laplacian(DEff(), Yi) + combustion->R(Yi))
                 )
             );
-        
-            // fvScalarMatrix YiEqn
-            // (
-            //     EulerDdtSchemeFvmDdt(rho, Yi)
-            //   + gaussConvectionSchemeFvmDiv(phi, Yi, "div(phi,Yi_h)")
-            //   + gaussConvectionSchemeFvmDiv(phiUc, Yi, "div(phi,Yi_h)")
-            //  ==
-            //     (
-            //         splitting
-            //     ?   gaussLaplacianSchemeFvmLaplacian(DEff(), Yi)
-            //     :  (gaussLaplacianSchemeFvmLaplacian(DEff(), Yi) + combustion->R(Yi))
-            //     )
-            // );
-
-            // Y_build_ddt_start = MPI_Wtime();
-            // tmp<fvScalarMatrix> YiEqnDDT = fvm::ddt(rho, Yi);
-            // tmp<fvScalarMatrix> YiEqnDDT = EulerDdtSchemeFvmDdt(rho, Yi);
-            // Y_build_ddt_end = MPI_Wtime();
-            // Y_build_ddt_time += Y_build_ddt_end - Y_build_ddt_start;
-
-            // Y_build_div_start = MPI_Wtime();
-            // tmp<fvScalarMatrix> YiEqnDIV1 = gaussConvectionSchemeFvmDiv(phi, Yi, "div(phi,Yi_h)");
-            // tmp<fvScalarMatrix> YiEqnDIV2 = gaussConvectionSchemeFvmDiv(phiUc, Yi, "div(phi,Yi_h)");
-            // tmp<fvScalarMatrix> YiEqnDIV1 = mvConvection->fvmDiv(phi, Yi);
-            // tmp<fvScalarMatrix> YiEqnDIV2 = mvConvection->fvmDiv(phiUc, Yi);
-            // Y_build_div_end = MPI_Wtime();
-            // Y_build_div_time += Y_build_div_end - Y_build_div_start;
-
-            // Y_build_laplacian_start = MPI_Wtime();
-            // tmp<fvScalarMatrix> YiEqnLaplacian = splitting
-            //     ?   gaussLaplacianSchemeFvmLaplacian(DEff(), Yi)
-            //     :  (gaussLaplacianSchemeFvmLaplacian(DEff(), Yi) + combustion->R(Yi));
-            // tmp<fvScalarMatrix> YiEqnLaplacian = splitting
-            //     ?   fvm::laplacian(DEff(), Yi)
-            //     :  (fvm::laplacian(DEff(), Yi) + combustion->R(Yi));
-            // Y_build_laplacian_end = MPI_Wtime();
-            // Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
-
-            // Y_build_sum_start = MPI_Wtime();
-            // fvScalarMatrix YiEqn_new
-            // (
-            //     YiEqnDDT
-            //   + YiEqnDIV1
-            //   + YiEqnDIV2
-            //  ==
-            //     YiEqnLaplacian
-            // );
-
-            // Y_build_sum_end = MPI_Wtime();
-            // Y_build_sum_time += Y_build_sum_end - Y_build_sum_start;
-
-            // tmp<fvScalarMatrix> tYiEqn_new = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref());
-            // fvScalarMatrix& YiEqn_new = tYiEqn_new.ref();
-
-            // assert(YiEqn.source().begin() != YiEqn_new.source().begin());
-            // for(label i = 0; i < YiEqn.source().size(); ++i){
-            //     assert(abs(YiEqn.source()[i] - YiEqn_new.source()[i]) < 1e-12);
-            // }
-            // for(label i = 0; i < YiEqn.diag().size(); ++i){
-            //     assert(abs(YiEqn.diag()[i] - YiEqn_new.diag()[i]) < 1e-12);
-            // }
-            // for(label i = 0; i < YiEqn.lower().size(); ++i){
-            //     assert(abs(YiEqn.lower()[i] - YiEqn_new.lower()[i]) < 1e-12);
-            // }
-            // for(label i = 0; i < YiEqn.upper().size(); ++i){
-            //     assert(abs(YiEqn.upper()[i] - YiEqn_new.upper()[i]) < 1e-12);
-            // }
-
-            // forAll(Yi.boundaryField(), patchi)
-            // {
-            //     auto internalCoeffsDiffTmp = YiEqn.internalCoeffs()[patchi] - YiEqn_new.internalCoeffs()[patchi];
-            //     auto boundaryCoeffsDiffTmp = YiEqn.boundaryCoeffs()[patchi] - YiEqn_new.boundaryCoeffs()[patchi];
-            //     auto& internalCoeffsDiff = internalCoeffsDiffTmp.ref();
-            //     auto& boundaryCoeffsDiff = boundaryCoeffsDiffTmp.ref();
-
-            //     for(label i = 0; i < internalCoeffsDiff.size(); ++i){
-            //         assert(abs(internalCoeffsDiff[i]) < 1e-12);
-            //     }
-            //     for(label i = 0; i < YiEqn.boundaryCoeffs()[patchi].size(); ++i){
-            //         assert(abs(boundaryCoeffsDiff[i]) < 1e-12);
-            //     }
-            // }
+#else
+            tmp<fvScalarMatrix> tYiEqn = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref());
+            fvScalarMatrix& YiEqn = tYiEqn.ref();
+#endif
+            // check_fvmatrix_equal(YiEqn, YiEqn_new);
 
             YiEqn.relax();
             Y_build_end = MPI_Wtime();
