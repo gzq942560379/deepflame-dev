@@ -22,35 +22,27 @@ Info << "fvc::grad(p) Scheme : " << p.mesh().gradScheme("grad(" + p.name() + ')'
 double U_total_start = MPI_Wtime();
 
 U_build_start = MPI_Wtime();
-tmp<fvVectorMatrix> tUEqn
-(
-    fvm::ddt(rho, U) + fvm::div(phi, U)
-  + turbulence->divDevRhoReff(U)
-);
-
-// U_build_ddt_start = MPI_Wtime();
-// tmp<fvVectorMatrix> tUeqnDDT = EulerDdtSchemeFvmDdt(rho, U);
-// U_build_ddt_end = MPI_Wtime();
-// U_build_ddt_time += U_build_ddt_end - U_build_ddt_start;
-
-// U_build_div_start = MPI_Wtime();
-// tmp<fvVectorMatrix> tUeqnDIV = gaussConvectionSchemeFvmDiv(phi, U);
-// U_build_div_end = MPI_Wtime();
-// U_build_div_time += U_build_div_end - U_build_div_start;
-
-// U_build_turbulence_start=MPI_Wtime();
-// tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulence->divDevRhoReff(U);
-// // tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulenceModelLinearViscousStressDivDevRhoReff(U,turbulence());
-// U_build_turbulence_end=MPI_Wtime();
-// U_build_turbulence_time += U_build_turbulence_end - U_build_turbulence_start;
-
-// U_build_sum_start = MPI_Wtime();
 // tmp<fvVectorMatrix> tUEqn
 // (
-//     tUeqnDDT + tUeqnDIV + tUeqnDivDevRhoReff
+//     fvm::ddt(rho, U) + fvm::div(phi, U)
+//   + turbulence->divDevRhoReff(U)
 // );
-// U_build_sum_end = MPI_Wtime();
-// U_build_sum_time += U_build_sum_end - U_build_sum_start;
+
+U_build_ddt_start = MPI_Wtime();
+tmp<fvVectorMatrix> tUeqnDDT = EulerDdtSchemeFvmDdt(rho, U);
+U_build_ddt_end = MPI_Wtime();
+U_build_ddt_time += U_build_ddt_end - U_build_ddt_start;
+
+U_build_div_start = MPI_Wtime();
+tmp<fvVectorMatrix> tUeqnDIV = gaussConvectionSchemeFvmDiv(phi, U);
+U_build_div_end = MPI_Wtime();
+U_build_div_time += U_build_div_end - U_build_div_start;
+
+U_build_turbulence_start=MPI_Wtime();
+tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulence->divDevRhoReff(U);
+// tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulenceModelLinearViscousStressDivDevRhoReff(U,turbulence());
+U_build_turbulence_end=MPI_Wtime();
+U_build_turbulence_time += U_build_turbulence_end - U_build_turbulence_start;
 
 U_build_sum_start = MPI_Wtime();
 U_build_orig_start = MPI_Wtime();
@@ -113,8 +105,8 @@ U_build_sum_end = MPI_Wtime();
 U_build_sum_time += U_build_sum_end - U_build_sum_start;
 U_build_relax_start = MPI_Wtime();
 UEqn.relax();
-// U_build_relax_end = MPI_Wtime();
-// U_build_relax_time += U_build_relax_end - U_build_relax_start;
+U_build_relax_end = MPI_Wtime();
+U_build_relax_time += U_build_relax_end - U_build_relax_start;
 
 U_build_end = MPI_Wtime();
 U_build_time += U_build_end - U_build_start;
@@ -126,20 +118,20 @@ fvVectorMatrix turb_source
 
 if (pimple.momentumPredictor())
 {
-    // solve(UEqn_new);
+    solve(UEqn_new);
 
     U_build_start = MPI_Wtime();
 
-    // U_build_grad_start = MPI_Wtime();
-    // auto tGaussGradSchemeGrad = gaussGradSchemeGrad(p);
-    // U_build_grad_end = MPI_Wtime();
-    // U_build_grad_time += U_build_grad_end - U_build_grad_start;
+    U_build_grad_start = MPI_Wtime();
+    auto tGaussGradSchemeGrad = gaussGradSchemeGrad(p);
+    U_build_grad_end = MPI_Wtime();
+    U_build_grad_time += U_build_grad_end - U_build_grad_start;
 
-    // U_build_sum_start = MPI_Wtime();
-    // fvVectorMatrix UEqnTmp(UEqn == -tGaussGradSchemeGrad);
-    fvVectorMatrix UEqnTmp(UEqn == -fvc::grad(p));
-    // U_build_sum_end = MPI_Wtime();
-    // U_build_sum_time += U_build_sum_end - U_build_sum_start;
+    U_build_sum_start = MPI_Wtime();
+    fvVectorMatrix UEqnTmp(UEqn == -tGaussGradSchemeGrad);
+    fvVectorMatrix& UEqn = tUEqn.ref();
+    U_build_sum_end = MPI_Wtime();
+    U_build_sum_time += U_build_sum_end - U_build_sum_start;
 
     U_build_end = MPI_Wtime();
     U_build_time += U_build_end - U_build_start;
