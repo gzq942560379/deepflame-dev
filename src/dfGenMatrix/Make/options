@@ -1,4 +1,7 @@
+-include $(GENERAL_RULES)/mplibType
+
 EXE_INC = \
+    $(PFLAGS) $(PINC) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
     -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
@@ -21,7 +24,7 @@ EXE_INC = \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(CANTERA_ROOT)/include
 
-LIB_LIBS = \
+EXE_LIBS = \
     -lOpenFOAM \
     -ltriSurface \
     -lmeshTools
