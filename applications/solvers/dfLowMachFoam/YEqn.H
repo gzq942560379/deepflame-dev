@@ -55,8 +55,6 @@ time_monitor_corrDiff += end - start;
     double Y_build_laplacian_start, Y_build_laplacian_end, Y_build_laplacian_time = 0.;
     double Y_build_sum_start, Y_build_sum_end, Y_build_sum_time = 0.;
 
-    Info << "Y equation build scheme : " << endl;
-
     Y_total_start = MPI_Wtime();
     forAll(Y, i)
     {
@@ -65,7 +63,6 @@ time_monitor_corrDiff += end - start;
         volScalarField& Yi = Y[i];
 
         auto alpha_mul_hai = thermo.alpha()*chemistry->hai(i);
-        Info << alpha_mul_hai().name() << endl;
 
         hDiffCorrFlux += chemistry->hai(i)*(chemistry->rhoD(i)*fvc::grad(Yi) - Yi * sumYDiffError);
         diffAlphaD += fvc::laplacian(alpha_mul_hai, Yi);

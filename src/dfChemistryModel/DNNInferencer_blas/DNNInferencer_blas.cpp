@@ -70,6 +70,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
     const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2){
     
     assert(input_count0 + input_count1 + input_count2 <= total_samples_);
+
     assert(buffer_alloced_);
 
     if(input_count0 > 0){
