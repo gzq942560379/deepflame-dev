@@ -18,6 +18,7 @@ wmake src/dfCombustionModels
 wmake src/dynamicMesh
 wmake src/dynamicFvMesh
 
+wmake src/dfUtils
 wmake src/dfGenMatrix
 wmake src/dfMatrices
 wmake src/dfHPCGPrecon

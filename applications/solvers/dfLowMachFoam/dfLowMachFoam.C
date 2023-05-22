@@ -62,11 +62,11 @@ Description
 #include "CorrectPhi.H"
 
 #include <typeinfo>
+#include "env.H"
 #include "GenFvMatrix.H"
 
 // #define _CSR_
 // #define OPT_GenMatrix_Y
-
 
 #ifdef _CSR_
 #include "csrMatrix.H"
@@ -84,6 +84,8 @@ int main(int argc, char *argv[])
     // #include "setRootCaseLists.H"
     #include "listOptions.H"
     #include "setRootCase2.H"
+
+    env_show();
 
     double init_start = MPI_Wtime();
 
@@ -128,8 +130,6 @@ int main(int argc, char *argv[])
     Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
     Info << endl;
 
-    double total_start = MPI_Wtime();
-
     label timeIndex = 0;
 
     turbulence->validate();
@@ -140,25 +140,11 @@ int main(int argc, char *argv[])
         #include "setInitialDeltaT.H"
     }
 
-
-// #ifdef _CSR_
-//     csrMatrix csr(mesh);
-//     csr.analyze();
-// #endif
-
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-    bool first = true;
-    double first_iter_start, first_iter_end;
     double refine_start, refine_end;
     double intializeFields_start, intializeFields_end;
 
-    Info<< "\nStarting time loop\n" << endl;
-    while (runTime.run())
-    {
-        if(first){
-            refine_start = MPI_Wtime();
-        }
+    while (runTime.run()){
+        refine_start = MPI_Wtime();
         while (refineLevel)
         {
             double refine_one_step_start = MPI_Wtime();
@@ -167,24 +153,41 @@ int main(int argc, char *argv[])
             double refine_one_step_end = MPI_Wtime();
             Info << "refine one step time : " << refine_one_step_end - refine_one_step_start << endl; 
         }
-        if(first){
-            refine_end = MPI_Wtime();
-        }
+        refine_end = MPI_Wtime();
 
-        if(first){
-            intializeFields_start = MPI_Wtime();
-        }
-        if (!initialized)
-        {
-            #include "intializeFields.H"
-        }
-        if(first){
-            intializeFields_end = MPI_Wtime();
-        }
+        intializeFields_start = MPI_Wtime();
+        #include "intializeFields.H"
+        intializeFields_end = MPI_Wtime();
+
+        break;
+    }
+
+    double refine_time = refine_end - refine_start;
+    double intializeFields_time = intializeFields_end - intializeFields_start;
+
+    Info << "refine time : " << refine_end - refine_start << endl; 
+    Info << "intializeFields time : " << intializeFields_end - intializeFields_start << endl; 
+
+    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef _CSR_
+    csrMatrix csr(mesh);
+    csr.analyze();
+#endif
+
+    double total_start = MPI_Wtime();
+
+    bool first = true;
+    double first_iter_start, first_iter_end;
+
+    Info<< "\nStarting time loop\n" << endl;
+
+    while (runTime.run())
+    {
         if(first){
             first_iter_start = MPI_Wtime();
         }
-
+        
         timeIndex ++;
 
         double time_monitor_chem=0;
@@ -207,12 +210,6 @@ int main(int argc, char *argv[])
             #include "compressibleCourantNo.H"
             #include "setDeltaT.H"
         }
-        
-        // for (size_t j = 0; j < 2; j++)
-        // {
-        //     runTime ++;
-        //     #include "Refine.H"
-        // }
         
         runTime++;
 
@@ -363,16 +360,12 @@ int main(int argc, char *argv[])
         if(first){
             first_iter_end = MPI_Wtime();
             Info << "first Iter time : " << first_iter_end - first_iter_start << endl;
-            Info << "refine time : " << refine_end - refine_start << endl; 
-            Info << "intializeFields time : " << intializeFields_end - intializeFields_start << endl; 
             first = false;
         }
 
     }
     double total_end = MPI_Wtime();
 
-    double refine_time = refine_end - refine_start;
-    double intializeFields_time = intializeFields_end - intializeFields_start;
     double first_iter_time = first_iter_end - first_iter_start;
     double total_time = total_end - total_start;
     Info << "Total time : " << total_time - refine_time - intializeFields_time - first_iter_time << endl;
