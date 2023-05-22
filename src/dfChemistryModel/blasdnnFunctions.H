@@ -114,8 +114,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 
     double prepare_dnn_input_end = MPI_Wtime();
 
-
-    DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
     // module inference
     assert(mixture_.nSpecies() + 2 == 9);
     int output_dim = mixture_.nSpecies() + 2;

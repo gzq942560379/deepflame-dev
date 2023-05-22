@@ -140,8 +140,8 @@ int main(int argc, char *argv[])
         #include "setInitialDeltaT.H"
     }
 
-    double refine_start, refine_end;
-    double intializeFields_start, intializeFields_end;
+    double refine_start = 0., refine_end = 0.;
+    double intializeFields_start = 0., intializeFields_end = 0.;
 
     while (runTime.run()){
         refine_start = MPI_Wtime();
