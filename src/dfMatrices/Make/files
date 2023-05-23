@@ -18,6 +18,8 @@ $(csrMatrix)/smoothers/csrSymGaussSeidel/csrSymGaussSeidelSmoother.C
 
 lduMatrix=lduMatrix
 
+$(lduMatrix)/solvers/NBPBiCGStab/NBPBiCGStab.C
 $(lduMatrix)/solvers/PBiCGStab/PBiCGStab.C
+$(lduMatrix)/solvers/PCG/PCG.C
 
 LIB = $(DF_LIBBIN)/libdfMatrices
