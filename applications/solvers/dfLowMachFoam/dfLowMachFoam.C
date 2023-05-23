@@ -364,11 +364,12 @@ int main(int argc, char *argv[])
         }
 
     }
+    
     double total_end = MPI_Wtime();
 
     double first_iter_time = first_iter_end - first_iter_start;
     double total_time = total_end - total_start;
-    Info << "Total time : " << total_time - refine_time - intializeFields_time - first_iter_time << endl;
+    Info << "Total time : " << total_time - first_iter_time << endl;
     Info<< "End\n" << endl;
 
     return 0;
