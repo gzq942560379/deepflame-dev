@@ -170,11 +170,6 @@ int main(int argc, char *argv[])
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#ifdef _CSR_
-    csrMatrix csr(mesh);
-    csr.analyze();
-#endif
-
     double total_start = MPI_Wtime();
 
     bool first = true;

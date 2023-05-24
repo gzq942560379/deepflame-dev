@@ -23,7 +23,9 @@ namespace Foam{
 
 class csrMatrix{
 private:
-    const fvMesh& mesh_;
+    // const fvMesh& mesh_;
+    const lduMatrix& lduMatrix_;
+
     //- Coefficients (not including interfaces)
     label row_;
     label col_;
@@ -33,12 +35,12 @@ private:
     scalarField diag_value_;
     scalarField off_diag_value_;
 
-    // map from face to lower in off_diag_value_
-    // lower (nei,own)
-    labelList face2lower_;
-    // map from face to upper in off_diag_value_
-    // lower (own,nei)
-    labelList face2upper_;
+    // // map from face to lower in off_diag_value_
+    // // lower (nei,own)
+    // labelList face2lower_;
+    // // map from face to upper in off_diag_value_
+    // // lower (own,nei)
+    // labelList face2upper_;
 
     bool diagonal_;
     bool symmetric_;
@@ -50,21 +52,25 @@ public:
     ClassName("csrMatrix");
 
     // Constructors
-    csrMatrix(const fvMesh& mesh);
+    // csrMatrix(const fvMesh& mesh);
+
+    csrMatrix(const lduMatrix& lduMatrix);
 
     // Copy constructor
     csrMatrix(const csrMatrix& other) = delete;
 
     // Copy constructor
-    void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
+    // void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
 
     //- Destructor
     ~csrMatrix(){};
 
+    const lduMatrix& ldu() const {return lduMatrix_;}
+
     //- Return the LDU mesh from which the addressing is obtained
-    const fvMesh& mesh() const {return mesh_;}
+    const lduMesh& mesh() const {return lduMatrix_.mesh();}
     //- Return the LDU addressing
-    const lduAddressing& lduAddr() const {return mesh_.lduAddr();}
+    const lduAddressing& lduAddr() const {return lduMatrix_.lduAddr();}
 
     //- Return the patch evaluation schedule
     const lduSchedule& patchSchedule() const {return lduAddr().patchSchedule();}

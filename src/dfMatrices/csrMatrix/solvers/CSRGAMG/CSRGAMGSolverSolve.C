@@ -23,350 +23,135 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "HPCGSolver.H"
-//#include "PCG2.H"
+#include "CSRGAMGSolver.H"
+#include "PCG.H"
 #include "PBiCGStab.H"
 #include "SubField.H"
-#include"LUscalarMatrix.H"
-#include "scalarMatrices.H"
-#include "smoothSolver2.H"
-#include <mpi.h>
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-Foam::solverPerformance Foam::HPCGSolver::solve
+
+Foam::solverPerformance Foam::CSRGAMGSolver::solve
 (
     scalarField& psi,
     const scalarField& source,
     const direction cmpt
 ) const
 {
-    double hpcg_solve_start, hpcg_solve_end, hpcg_solve_time = 0.;
-    double hpcg_percondition_start, hpcg_percondition_end, hpcg_percondition_time = 0.;
-    double hpcg_mg_build_start, hpcg_mg_build_end, hpcg_mg_build_time = 0.;
+    Info << "Foam::CSRGAMGSolver::solve start" << endl;
 
-    if(matrix_.symmetric())
+    // Setup class containing solver performance data
+    solverPerformance solverPerf(typeName, fieldName_);
+
+    // Calculate A.psi used to calculate the initial residual
+    scalarField Apsi(psi.size());
+    matrix_.ldu().Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+
+    // Create the storage for the finestCorrection which may be used as a
+    // temporary in normFactor
+    scalarField finestCorrection(psi.size());
+
+    // Calculate normalisation factor
+    scalar normFactor = this->normFactor(psi, source, Apsi, finestCorrection);
+
+    if (debug >= 2)
     {
-        hpcg_solve_start = MPI_Wtime();
-
-        Info << "The Matrix is symmetrix, so using PCG solver" << endl;
-        // --- Setup class containing solver performance data
-        solverPerformance solverPerf
-        (
-            lduMatrix::preconditioner::getName(controlDict_) + typeName,
-            fieldName_
-        );
-
-        label nCells = psi.size();
-
-        scalar* __restrict__ psiPtr = psi.begin();
-
-        scalarField pA(nCells);
-        scalar* __restrict__ pAPtr = pA.begin();
-
-        scalarField wA(nCells);
-        scalar* __restrict__ wAPtr = wA.begin();
-
-        scalar wArA = solverPerf.great_;
-        scalar wArAold = wArA;
-
-        // --- Calculate A.psi
-        matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-
-        // --- Calculate initial residual field
-        scalarField rA(source - wA);
-        scalar* __restrict__ rAPtr = rA.begin();
-
-        // --- Calculate normalisation factor
-        scalar normFactor = this->normFactor(psi, source, wA, pA);
-
-        if (lduMatrix::debug >= 2)
-        {
-            Info<< "   Normalisation factor = " << normFactor << endl;
-        }
-
-        // --- Calculate normalised residual norm
-        solverPerf.initialResidual() =
-            gSumMag(rA, matrix().mesh().comm())
-        /normFactor;
-        solverPerf.finalResidual() = solverPerf.initialResidual();
-
-        // --- Check convergence, solve if not converged
-        if
-        (
-            minIter_ > 0
-        || !solverPerf.checkConvergence(tolerance_, relTol_)
-        )
-        {
-            hpcg_mg_build_start = MPI_Wtime();
-            // --- Select and construct the preconditioner
-            autoPtr<lduMatrix::preconditioner> preconPtr =
-            lduMatrix::preconditioner::New
-            (
-                *this,
-                controlDict_
-            );
-            hpcg_mg_build_end = MPI_Wtime();
-            hpcg_mg_build_time += hpcg_mg_build_end - hpcg_mg_build_start;
-
-            // --- Solver iteration
-            do
-            {
-                // --- Store previous wArA
-                wArAold = wArA;
-
-                // --- Precondition residual
-                hpcg_percondition_start = MPI_Wtime();
-                preconPtr->precondition(wA, rA, cmpt);
-                hpcg_percondition_end = MPI_Wtime();
-                hpcg_percondition_time += hpcg_percondition_end - hpcg_percondition_start;
-
-                // --- Update search directions:
-                wArA = gSumProd(wA, rA, matrix().mesh().comm());
-
-                if (solverPerf.nIterations() == 0)
-                {
-                    for (label cell=0; cell<nCells; cell++)
-                    {
-                        pAPtr[cell] = wAPtr[cell];
-                    }
-                }
-                else
-                {
-                    scalar beta = wArA/wArAold;
-
-                    for (label cell=0; cell<nCells; cell++)
-                    {
-                        pAPtr[cell] = wAPtr[cell] + beta*pAPtr[cell];
-                    }
-                }
-
-
-                // --- Update preconditioned residual
-                matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt);
-
-                scalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
-
-
-                // --- Test for singularity
-                if (solverPerf.checkSingularity(mag(wApA)/normFactor)) break;
-
-                // --- Update solution and residual:
-
-                scalar alpha = wArA/wApA;
-
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    psiPtr[cell] += alpha*pAPtr[cell];
-                    rAPtr[cell] -= alpha*wAPtr[cell];
-                }
-
-                solverPerf.finalResidual() =
-                    gSumMag(rA, matrix().mesh().comm())
-                /normFactor;
-
-            } while
-            (
-                (
-                ++solverPerf.nIterations() < maxIter_
-                && !solverPerf.checkConvergence(tolerance_, relTol_)
-                )
-            || solverPerf.nIterations() < minIter_
-            );
-        }
-
-        hpcg_solve_end = MPI_Wtime();
-
-        hpcg_solve_time += hpcg_solve_end - hpcg_solve_start;
-
-        Info << "hpcg solve time : " << hpcg_solve_time << endl;
-        Info << "hpcg mg build time : " << hpcg_mg_build_time << endl;
-        Info << "hpcg precondition time : " << hpcg_percondition_time << endl;
-
-        return solverPerf;
+        Pout<< "   Normalisation factor = " << normFactor << endl;
     }
 
-    else
+    // Calculate initial finest-grid residual field
+    scalarField finestResidual(source - Apsi);
+
+    // Calculate normalised residual for convergence test
+    solverPerf.initialResidual() = gSumMag
+    (
+        finestResidual,
+        matrix().mesh().comm()
+    )/normFactor;
+    solverPerf.finalResidual() = solverPerf.initialResidual();
+
+
+    // Check convergence, solve if not converged
+    if
+    (
+        minIter_ > 0
+     || !solverPerf.checkConvergence(tolerance_, relTol_)
+    )
     {
-        Info << "The Matrix is asymmetrix, so using PBiCGStab solver" << endl;
-        solverPerformance solverPerf
+        // Create coarse grid correction fields
+        PtrList<scalarField> coarseCorrFields;
+
+        // Create coarse grid sources
+        PtrList<scalarField> coarseSources;
+
+        // Create the smoothers for all levels
+        PtrList<lduMatrix::smoother> smoothers;
+
+        // Scratch fields if processor-agglomerated coarse level meshes
+        // are bigger than original. Usually not needed
+        scalarField scratch1;
+        scalarField scratch2;
+
+        // Initialise the above data structures
+        initVcycle
         (
-            lduMatrix::preconditioner::getName(controlDict_) + typeName,
-            fieldName_
+            coarseCorrFields,
+            coarseSources,
+            smoothers,
+            scratch1,
+            scratch2
         );
 
-        const label nCells = psi.size();
-
-        scalar* __restrict__ psiPtr = psi.begin();
-
-        scalarField pA(nCells);
-        scalar* __restrict__ pAPtr = pA.begin();
-
-        scalarField yA(nCells);
-        scalar* __restrict__ yAPtr = yA.begin();
-
-        // --- Calculate A.psi
-        matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-
-        // --- Calculate initial residual field
-        scalarField rA(source - yA);
-        scalar* __restrict__ rAPtr = rA.begin();
-
-        // --- Calculate normalisation factor
-        const scalar normFactor = this->normFactor(psi, source, yA, pA);
-
-        if (lduMatrix::debug >= 2)
+        do
         {
-            Info<< "   Normalisation factor = " << normFactor << endl;
-        }
-
-        // --- Calculate normalised residual norm
-        solverPerf.initialResidual() =
-            gSumMag(rA, matrix().mesh().comm())
-        /normFactor;
-        solverPerf.finalResidual() = solverPerf.initialResidual();
-
-        // --- Check convergence, solve if not converged
-        if
-        (
-            minIter_ > 0
-        || !solverPerf.checkConvergence(tolerance_, relTol_)
-        )
-        {
-            scalarField AyA(nCells);
-            scalar* __restrict__ AyAPtr = AyA.begin();
-
-            scalarField sA(nCells);
-            scalar* __restrict__ sAPtr = sA.begin();
-
-            scalarField zA(nCells);
-            scalar* __restrict__ zAPtr = zA.begin();
-
-            scalarField tA(nCells);
-            scalar* __restrict__ tAPtr = tA.begin();
-
-            // --- Store initial residual
-            const scalarField rA0(rA);
-
-            // --- Initial values not used
-            scalar rA0rA = 0;
-            scalar alpha = 0;
-            scalar omega = 0;
-
-            // --- Select and construct the preconditioner
-            autoPtr<lduMatrix::preconditioner> preconPtr =
-            lduMatrix::preconditioner::New
+            Vcycle
             (
-                *this,
-                controlDict_
+                smoothers,
+                psi,
+                source,
+                Apsi,
+                finestCorrection,
+                finestResidual,
+
+                (scratch1.size() ? scratch1 : Apsi),
+                (scratch2.size() ? scratch2 : finestCorrection),
+
+                coarseCorrFields,
+                coarseSources,
+                cmpt
             );
 
-            // --- Solver iteration
-            do
+            // Calculate finest level residual field
+            matrix_.ldu().Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            finestResidual = source;
+            finestResidual -= Apsi;
+
+            solverPerf.finalResidual() = gSumMag
+            (
+                finestResidual,
+                matrix().mesh().comm()
+            )/normFactor;
+
+            if (debug >= 2)
             {
-                // --- Store previous rA0rA
-                const scalar rA0rAold = rA0rA;
-
-                rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
-
-                // --- Test for singularity
-                if (solverPerf.checkSingularity(mag(rA0rA)))
-                {
-                    break;
-                }
-
-                // --- Update pA
-                if (solverPerf.nIterations() == 0)
-                {
-                    for (label cell=0; cell<nCells; cell++)
-                    {
-                        pAPtr[cell] = rAPtr[cell];
-                    }
-                }
-                else
-                {
-                    // --- Test for singularity
-                    if (solverPerf.checkSingularity(mag(omega)))
-                    {
-                        break;
-                    }
-
-                    const scalar beta = (rA0rA/rA0rAold)*(alpha/omega);
-
-                    for (label cell=0; cell<nCells; cell++)
-                    {
-                        pAPtr[cell] =
-                            rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
-                    }
-                }
-
-                // --- Precondition pA
-                preconPtr->precondition(yA, pA, cmpt);
-
-                // --- Calculate AyA
-                matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
-
-                const scalar rA0AyA = gSumProd(rA0, AyA, matrix().mesh().comm());
-
-                alpha = rA0rA/rA0AyA;
-
-                // --- Calculate sA
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    sAPtr[cell] = rAPtr[cell] - alpha*AyAPtr[cell];
-                }
-
-                // --- Test sA for convergence
-                solverPerf.finalResidual() =
-                    gSumMag(sA, matrix().mesh().comm())/normFactor;
-
-                if (solverPerf.checkConvergence(tolerance_, relTol_))
-                {
-                    for (label cell=0; cell<nCells; cell++)
-                    {
-                        psiPtr[cell] += alpha*yAPtr[cell];
-                    }
-
-                    solverPerf.nIterations()++;
-
-                    return solverPerf;
-                }
-
-                // --- Precondition sA
-                preconPtr->precondition(zA, sA, cmpt);
-
-                // --- Calculate tA
-                matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
-
-                const scalar tAtA = gSumSqr(tA, matrix().mesh().comm());
-
-                // --- Calculate omega from tA and sA
-                //     (cheaper than using zA with preconditioned tA)
-                omega = gSumProd(tA, sA, matrix().mesh().comm())/tAtA;
-
-                // --- Update solution and residual
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    psiPtr[cell] += alpha*yAPtr[cell] + omega*zAPtr[cell];
-                    rAPtr[cell] = sAPtr[cell] - omega*tAPtr[cell];
-                }
-
-                solverPerf.finalResidual() =
-                    gSumMag(rA, matrix().mesh().comm())
-                /normFactor;
-            } while
+                solverPerf.print(Info.masterStream(matrix().mesh().comm()));
+            }
+        } while
+        (
             (
-                (
-                ++solverPerf.nIterations() < maxIter_
-                && !solverPerf.checkConvergence(tolerance_, relTol_)
-                )
-            || solverPerf.nIterations() < minIter_
-            );
-        }
-        return solverPerf;
+              ++solverPerf.nIterations() < maxIter_
+            && !solverPerf.checkConvergence(tolerance_, relTol_)
+            )
+         || solverPerf.nIterations() < minIter_
+        );
     }
+
+    Info << "Foam::CSRGAMGSolver::solve end" << endl;
+
+    return solverPerf;
 }
 
-void Foam::HPCGSolver::Vcycle
+
+void Foam::CSRGAMGSolver::Vcycle
 (
     const PtrList<lduMatrix::smoother>& smoothers,
     scalarField& psi,
@@ -383,12 +168,23 @@ void Foam::HPCGSolver::Vcycle
     const direction cmpt
 ) const
 {
+    debug = 2;
+
     const label coarsestLevel = matrixLevels_.size() - 1;
+    
+    Info << "coarsestLevel : " << coarsestLevel << endl;
+
+    // Restrict finest grid residual for the next level up.
     agglomeration_.restrictField(coarseSources[0], finestResidual, 0, true);
+
+    if (debug >= 2 && nPreSweeps_)
+    {
+        Pout<< "Pre-smoothing scaling factors: ";
+    }
+
 
     // Residual restriction (going to coarser levels)
     for (label leveli = 0; leveli < coarsestLevel; leveli++)
-    //for (label leveli = 0; leveli <= coarsestLevel; leveli++)
     {
         if (coarseSources.set(leveli + 1))
         {
@@ -396,8 +192,6 @@ void Foam::HPCGSolver::Vcycle
             // smooth the coarse-grid field for the restricted source
             if (nPreSweeps_)
             {
-                //Info << "=====level=====" << leveli << endl;
-                //Info << "====num of cells====" << coarseSources[leveli].size() << endl;
                 coarseCorrFields[leveli] = 0.0;
 
                 smoothers[leveli + 1].smooth
@@ -464,8 +258,14 @@ void Foam::HPCGSolver::Vcycle
         }
     }
 
+    if (debug >= 2 && nPreSweeps_)
+    {
+        Pout<< endl;
+    }
 
-    if (coarseCorrFields.set(coarsestLevel) && solveCoarsestLevel_)
+
+    // Solve Coarsest level with either an iterative or direct solver
+    if (coarseCorrFields.set(coarsestLevel))
     {
         solveCoarsestLevel
         (
@@ -473,19 +273,10 @@ void Foam::HPCGSolver::Vcycle
             coarseSources[coarsestLevel]
         );
     }
-    
-    // Smooth the coareset level 
-    if (coarseCorrFields.set(coarsestLevel) && smoothCoarsestLevel_)
+
+    if (debug >= 2)
     {
-            
-            Info << "smoothing the coareset level" << endl;
-            smoothers[coarsestLevel + 1].smooth
-            (
-                coarseCorrFields[coarsestLevel],
-                coarseSources[coarsestLevel],
-                cmpt,
-                nCoarsestSweeps_
-            );
+        Pout<< "Post-smoothing scaling factors: ";
     }
 
     // Smoothing and prolongation of the coarse correction fields
@@ -529,13 +320,13 @@ void Foam::HPCGSolver::Vcycle
             // Create A.psi for this coarse level as a sub-field of Apsi
             scalarField::subField ACf
             (
-               scratch1,
+                scratch1,
                 coarseCorrFields[leveli].size()
             );
             scalarField& ACfRef =
                 const_cast<scalarField&>(ACf.operator const scalarField&());
 
-            if (interpolateCorrection_) // && leveli < coarsestLevel - 2)
+            if (interpolateCorrection_) //&& leveli < coarsestLevel - 2)
             {
                 if (coarseCorrFields.set(leveli+1))
                 {
@@ -621,7 +412,7 @@ void Foam::HPCGSolver::Vcycle
         (
             finestCorrection,
             Apsi,
-            matrix_,
+            matrix_.ldu(),
             interfaceBouCoeffs_,
             interfaces_,
             agglomeration_.restrictAddressing(0),
@@ -637,7 +428,7 @@ void Foam::HPCGSolver::Vcycle
         (
             finestCorrection,
             Apsi,
-            matrix_,
+            matrix_.ldu(),
             interfaceBouCoeffs_,
             interfaces_,
             finestResidual,
@@ -650,8 +441,6 @@ void Foam::HPCGSolver::Vcycle
         psi[i] += finestCorrection[i];
     }
 
-    //Info << "===before finest smooothing===" << psi << endl;
-    //Info << "===size of psi===" << psi.size() << endl;
     smoothers[0].smooth
     (
         psi,
@@ -659,12 +448,10 @@ void Foam::HPCGSolver::Vcycle
         cmpt,
         nFinestSweeps_
     );
-
-    // Info << "===after finest smooothing===" << psi << endl;
 }
 
 
-void Foam::HPCGSolver::initVcycle
+void Foam::CSRGAMGSolver::initVcycle
 (
     PtrList<scalarField>& coarseCorrFields,
     PtrList<scalarField>& coarseSources,
@@ -673,12 +460,11 @@ void Foam::HPCGSolver::initVcycle
     scalarField& scratch2
 ) const
 {
-    label maxSize = matrix_.diag().size();
+    label maxSize = matrix_.ldu().diag().size();
 
     coarseCorrFields.setSize(matrixLevels_.size());
     coarseSources.setSize(matrixLevels_.size());
     smoothers.setSize(matrixLevels_.size() + 1);
-    //Info << "The size of the smoother is" << matrixLevels_.size() + 1 << endl;
 
     // Create the smoother for the finest level
     smoothers.set
@@ -687,7 +473,7 @@ void Foam::HPCGSolver::initVcycle
         lduMatrix::smoother::New
         (
             fieldName_,
-            matrix_,
+            matrix_.ldu(),
             interfaceBouCoeffs_,
             interfaceIntCoeffs_,
             interfaces_,
@@ -730,7 +516,7 @@ void Foam::HPCGSolver::initVcycle
         }
     }
 
-    if (maxSize > matrix_.diag().size())
+    if (maxSize > matrix_.ldu().diag().size())
     {
         // Allocate some scratch storage
         scratch1.setSize(maxSize);
@@ -739,44 +525,35 @@ void Foam::HPCGSolver::initVcycle
 }
 
 
-// Foam::dictionary Foam::HPCGSolver::PCG2solverDict
-// (
-//     const scalar tol,
-//     const scalar relTol
-// ) const
-// {
-//     dictionary dict(IStringStream("solver PCG2; preconditioner DIC;")());
-//     dict.add("tolerance", tol);
-//     dict.add("relTol", relTol);
-
-//     return dict;
-// }
-
-
-// Foam::dictionary Foam::HPCGSolver::PBiCGStabSolverDict
-// (
-//     const scalar tol,
-//     const scalar relTol
-// ) const
-// {
-//     dictionary dict(IStringStream("solver PBiCGStab; preconditioner DILU;")());
-//     dict.add("tolerance", tol);
-//     dict.add("relTol", relTol);
-
-//     return dict;
-// }
-
-Foam::dictionary Foam::HPCGSolver::smoothSolver2Dict
+Foam::dictionary Foam::CSRGAMGSolver::PCGsolverDict
 (
+    const scalar tol,
+    const scalar relTol
 ) const
 {
-    dictionary dict(IStringStream("solver smoothSolver; smoother symGaussSeidel;")());
+    dictionary dict(IStringStream("solver PCG; preconditioner DIC;")());
+    dict.add("tolerance", tol);
+    dict.add("relTol", relTol);
 
     return dict;
 }
 
 
-void Foam::HPCGSolver::solveCoarsestLevel
+Foam::dictionary Foam::CSRGAMGSolver::PBiCGStabSolverDict
+(
+    const scalar tol,
+    const scalar relTol
+) const
+{
+    dictionary dict(IStringStream("solver PBiCGStab; preconditioner DILU;")());
+    dict.add("tolerance", tol);
+    dict.add("relTol", relTol);
+
+    return dict;
+}
+
+
+void Foam::CSRGAMGSolver::solveCoarsestLevel
 (
     scalarField& coarsestCorrField,
     const scalarField& coarsestSource
@@ -785,13 +562,10 @@ void Foam::HPCGSolver::solveCoarsestLevel
     const label coarsestLevel = matrixLevels_.size() - 1;
 
     label coarseComm = matrixLevels_[coarsestLevel].mesh().comm();
-    //convert(matrixLevels_[coarsestLevel],interfaceLevelsBouCoeffs_[coarsestLevel],interfaceLevels_[coarsestLevel]);
+
     if (directSolveCoarsest_)
     {
-        //label nCells = coarsestSource.size();
-        //Info << "====before solving======" << coarsestCorrField << endl;
         coarsestLUMatrixPtr_->solve(coarsestCorrField, coarsestSource);
-        //Info << "===after solving=======" << coarsestCorrField << endl;
     }
     // else if
     //(
@@ -897,62 +671,43 @@ void Foam::HPCGSolver::solveCoarsestLevel
         coarsestCorrField = 0;
         solverPerformance coarseSolverPerf;
 
-        if(smoothsolver_)
+        if (matrixLevels_[coarsestLevel].asymmetric())
         {
-            coarseSolverPerf = smoothSolver2
+            coarseSolverPerf = PBiCGStab
             (
                 "coarsestLevelCorr",
                 matrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],
-                smoothSolver2Dict()
+                PBiCGStabSolverDict(tolerance_, relTol_)
             ).solve
             (
                 coarsestCorrField,
                 coarsestSource
-            );            
-
+            );
         }
-        
-        
-        // else if (matrixLevels_[coarsestLevel].asymmetric())
-        // {
-        //     coarseSolverPerf = PBiCGStab
-        //     (
-        //         "coarsestLevelCorr",
-        //         matrixLevels_[coarsestLevel],
-        //         interfaceLevelsBouCoeffs_[coarsestLevel],
-        //         interfaceLevelsIntCoeffs_[coarsestLevel],
-        //         interfaceLevels_[coarsestLevel],
-        //         PBiCGStabSolverDict(tolerance_, relTol_)
-        //     ).solve
-        //     (
-        //         coarsestCorrField,
-        //         coarsestSource
-        //     );
-        // }
-        // else
-        // {
-        //     coarseSolverPerf = PCG2
-        //     (
-        //         "coarsestLevelCorr",
-        //         matrixLevels_[coarsestLevel],
-        //         interfaceLevelsBouCoeffs_[coarsestLevel],
-        //         interfaceLevelsIntCoeffs_[coarsestLevel],
-        //         interfaceLevels_[coarsestLevel],
-        //         PCG2solverDict(tolerance_, relTol_)
-        //     ).solve
-        //     (
-        //         coarsestCorrField,
-        //         coarsestSource
-        //     );
-        // }
+        else
+        {
+            coarseSolverPerf = PCG
+            (
+                "coarsestLevelCorr",
+                matrixLevels_[coarsestLevel],
+                interfaceLevelsBouCoeffs_[coarsestLevel],
+                interfaceLevelsIntCoeffs_[coarsestLevel],
+                interfaceLevels_[coarsestLevel],
+                PCGsolverDict(tolerance_, relTol_)
+            ).solve
+            (
+                coarsestCorrField,
+                coarsestSource
+            );
+        }
 
-        //if (debug >= 2)
-        //{
+        if (debug >= 2)
+        {
             coarseSolverPerf.print(Info.masterStream(coarseComm));
-        //}
+        }
     }
 }
 

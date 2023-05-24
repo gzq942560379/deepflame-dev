@@ -11,82 +11,142 @@ namespace Foam{
 defineTypeNameAndDebug(csrMatrix, 1);
 
 
-csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
-    const labelUList& owner = mesh.owner();
-    const labelUList& neighbour = mesh.neighbour();
-    assert(owner.size() == neighbour.size());
-    this->row_ = mesh.nCells();
-    this->col_ = mesh.nCells();
-    label face_count = neighbour.size();
-    this->off_diag_nnz_ = face_count * 2;
+// csrMatrix::csrMatrix(const Foam::fvMesh& mesh):mesh_(mesh){
+//     const labelUList& owner = mesh.owner();
+//     const labelUList& neighbour = mesh.neighbour();
+//     assert(owner.size() == neighbour.size());
+//     this->row_ = mesh.nCells();
+//     this->col_ = mesh.nCells();
+//     label face_count = neighbour.size();
+//     this->off_diag_nnz_ = face_count * 2;
+
+//     this->diag_value_.resize(row_);
+//     this->off_diag_rowptr_.resize(row_ + 1);
+//     this->off_diag_colidx_.resize(off_diag_nnz_);
+//     this->off_diag_value_.resize(off_diag_nnz_);
+//     this->face2lower_.resize(face_count);
+//     this->face2upper_.resize(face_count);
+
+//     // compute off_diag_count
+//     std::vector<label> off_diag_count(row_, 0);
+//     std::vector<label> off_diag_current_index(row_ + 1);
+//     for(label i = 0; i < face_count; ++i){
+//         auto own = owner[i];
+//         auto nei = neighbour[i];
+//         off_diag_count[own] += 1;
+//         off_diag_count[nei] += 1;
+//     }
+
+//     off_diag_rowptr_[0] = 0;
+//     off_diag_current_index[0] = 0;
+//     for(label i = 0; i < row_; ++i){
+//         off_diag_rowptr_[i + 1] = off_diag_rowptr_[i] + off_diag_count[i];
+//         off_diag_current_index[i + 1] = off_diag_rowptr_[i] + off_diag_count[i];
+//     }
+
+//     // compute map from face to lower
+//     // (nei, own)
+//     for(label i = 0; i < face_count; ++i){
+//         label r = neighbour[i];
+//         label c = owner[i];
+//         label index = off_diag_current_index[r];
+//         face2lower_[i] = index;
+//         off_diag_colidx_[index] = c;
+//         off_diag_current_index[r] += 1;
+//     }
+
+//     // (own, nei)
+//     for(label i = 0; i < face_count; ++i){
+//         label r = owner[i];
+//         label c = neighbour[i];
+//         label index = off_diag_current_index[r];
+//         face2upper_[i] = index;
+//         off_diag_colidx_[index] = c;
+//         off_diag_current_index[r] += 1;
+//     }
+// }
+
+// void csrMatrix::init_value_from_lduMatrix(const lduMatrix& ldu){
+//     diagonal_ = ldu.diagonal();
+//     symmetric_ = ldu.symmetric();
+//     asymmetric_ = ldu.asymmetric();
+
+//     const scalarField& ldu_diag_ = ldu.diag();
+//     const scalarField& ldu_lower = ldu.lower();
+//     const scalarField& ldu_upper_ = ldu.upper();
+
+//     assert(ldu_diag_.size() == diag_value_.size());
+//     std::copy(ldu_diag_.begin(),ldu_diag_.end(),diag_value_.begin());
+
+//     assert(ldu_lower.size() == face2lower_.size());
+//     assert(ldu_upper_.size() == face2upper_.size());
+
+//     label face_count = mesh().neighbour().size();
+
+//     #pragma omp parallel for
+//     for(label i = 0; i < face_count; ++i){
+//         off_diag_value_[face2lower_[i]] = ldu_lower[i];
+//         off_diag_value_[face2upper_[i]] = ldu_upper_[i];
+//     }
+// }
+
+csrMatrix::csrMatrix(const lduMatrix& ldu):lduMatrix_(ldu){
+    diagonal_ = ldu.diagonal();
+    symmetric_ = ldu.symmetric();
+    asymmetric_ = ldu.asymmetric();
+
+    const auto& lduDiag = ldu.diag();
+    const auto& lduLower = ldu.lower();
+    const auto& lduUpper = ldu.upper();
+    const auto& lduLowerAddr = ldu.lduAddr().lowerAddr();
+    const auto& lduUpperAddr = ldu.lduAddr().upperAddr();
+
+    this->row_ = lduDiag.size();
+    this->col_ = lduDiag.size();
+    this->off_diag_nnz_ = lduLower.size() + lduUpper.size();
 
     this->diag_value_.resize(row_);
     this->off_diag_rowptr_.resize(row_ + 1);
     this->off_diag_colidx_.resize(off_diag_nnz_);
     this->off_diag_value_.resize(off_diag_nnz_);
-    this->face2lower_.resize(face_count);
-    this->face2upper_.resize(face_count);
 
+    // fill diag value
+    for(label i = 0; i < row_; ++i){
+        diag_value_[i] = lduDiag[i];
+    }
     // compute off_diag_count
     std::vector<label> off_diag_count(row_, 0);
     std::vector<label> off_diag_current_index(row_ + 1);
-    for(label i = 0; i < face_count; ++i){
-        auto own = owner[i];
-        auto nei = neighbour[i];
-        off_diag_count[own] += 1;
-        off_diag_count[nei] += 1;
+    for(label i = 0; i < lduLower.size(); ++i){
+        label row = lduUpperAddr[i];
+        off_diag_count[row] += 1;
     }
-
+    for(label i = 0; i < lduUpper.size(); ++i){
+        label row = lduLowerAddr[i];
+        off_diag_count[row] += 1;
+    }
+    // compute off_diag_rowptr_
     off_diag_rowptr_[0] = 0;
     off_diag_current_index[0] = 0;
     for(label i = 0; i < row_; ++i){
         off_diag_rowptr_[i + 1] = off_diag_rowptr_[i] + off_diag_count[i];
         off_diag_current_index[i + 1] = off_diag_rowptr_[i] + off_diag_count[i];
     }
-
-    // compute map from face to lower
-    // (nei, own)
-    for(label i = 0; i < face_count; ++i){
-        label r = neighbour[i];
-        label c = owner[i];
-        label index = off_diag_current_index[r];
-        face2lower_[i] = index;
-        off_diag_colidx_[index] = c;
-        off_diag_current_index[r] += 1;
+    assert(off_diag_rowptr_[row_] == off_diag_nnz_);
+    // fill non-zero value
+    for(label i = 0; i < lduLower.size(); ++i){
+        label row = lduUpperAddr[i];
+        label index = off_diag_current_index[row];
+        off_diag_colidx_[index] = lduLowerAddr[i];
+        off_diag_value_[index] = lduLower[i];
+        off_diag_current_index[row] += 1;
     }
-
-    // (own, nei)
-    for(label i = 0; i < face_count; ++i){
-        label r = owner[i];
-        label c = neighbour[i];
-        label index = off_diag_current_index[r];
-        face2upper_[i] = index;
-        off_diag_colidx_[index] = c;
-        off_diag_current_index[r] += 1;
-    }
-}
-
-void csrMatrix::init_value_from_lduMatrix(const lduMatrix& lduMatrix){
-    diagonal_ = lduMatrix.diagonal();
-    symmetric_ = lduMatrix.symmetric();
-    asymmetric_ = lduMatrix.asymmetric();
-
-    const scalarField& ldu_diag_ = lduMatrix.diag();
-    const scalarField& ldu_lower = lduMatrix.lower();
-    const scalarField& ldu_upper_ = lduMatrix.upper();
-
-    assert(ldu_diag_.size() == diag_value_.size());
-    std::copy(ldu_diag_.begin(),ldu_diag_.end(),diag_value_.begin());
-
-    assert(ldu_lower.size() == face2lower_.size());
-    assert(ldu_upper_.size() == face2upper_.size());
-
-    label face_count = mesh().neighbour().size();
-
-    #pragma omp parallel for
-    for(label i = 0; i < face_count; ++i){
-        off_diag_value_[face2lower_[i]] = ldu_lower[i];
-        off_diag_value_[face2upper_[i]] = ldu_upper_[i];
+    for(label i = 0; i < lduUpper.size(); ++i){
+        label row = lduLowerAddr[i];
+        label index = off_diag_current_index[row];
+        off_diag_colidx_[index] = lduUpperAddr[i];
+        off_diag_value_[index] = lduUpper[i];
+        off_diag_current_index[row] += 1;
     }
 }
 

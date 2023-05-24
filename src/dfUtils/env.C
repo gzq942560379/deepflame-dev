@@ -34,7 +34,6 @@ void env_show(){
     
     std::cout << std::endl;
     std::cout << "env show --------------------------------" << std::endl;
-    
     std::cout << "dnn_batch_size : " << dnn_batch_size << std::endl;
     std::cout << "max_threads : " << omp_get_max_threads() << std::endl;
     std::cout << "-----------------------------------------" << std::endl;
