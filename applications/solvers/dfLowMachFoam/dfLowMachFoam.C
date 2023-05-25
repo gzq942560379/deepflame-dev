@@ -165,24 +165,20 @@ int main(int argc, char *argv[])
     double refine_time = refine_end - refine_start;
     double intializeFields_time = intializeFields_end - intializeFields_start;
 
-    Info << "refine time : " << refine_end - refine_start << endl; 
-    Info << "intializeFields time : " << intializeFields_end - intializeFields_start << endl; 
+    Info << "Refine time : " << refine_end - refine_start << endl; 
+    Info << "IntializeFields time : " << intializeFields_end - intializeFields_start << endl; 
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-    double total_start = MPI_Wtime();
+    std::vector<double> step_timer;
 
-    bool first = true;
-    double first_iter_start, first_iter_end;
+    double total_start = MPI_Wtime();
 
     Info<< "\nStarting time loop\n" << endl;
 
     while (runTime.run())
     {
-        if(first){
-            first_iter_start = MPI_Wtime();
-        }
-        
+        double step_start = MPI_Wtime();
         timeIndex ++;
 
         double time_monitor_chem=0;
@@ -352,19 +348,23 @@ int main(int argc, char *argv[])
             << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl;
         }
 #endif
-        if(first){
-            first_iter_end = MPI_Wtime();
-            Info << "first Iter time : " << first_iter_end - first_iter_start << endl;
-            first = false;
-        }
 
+        double step_end = MPI_Wtime();
+        double step_time = step_end - step_start;
+        Info << "Step time : " << step_time << endl;
+        step_timer.push_back(step_time);
     }
     
     double total_end = MPI_Wtime();
+    double total_time = total_end - total_start - step_timer[0] - step_timer[1];
 
-    double first_iter_time = first_iter_end - first_iter_start;
-    double total_time = total_end - total_start;
-    Info << "Total time : " << total_time - first_iter_time << endl;
+    Info << "Init time : " << init_end - init_start << endl;
+    Info << "Refine time : " << refine_end - refine_start << endl;
+    Info << "IntializeFields time : " << intializeFields_end - intializeFields_start << endl;
+    Info << "First Step time : " << step_timer[0] << endl;
+    Info << "Second Step time : " << step_timer[1] << endl;
+    Info << "Total step : " << step_timer.size() - 2 << endl;
+    Info << "Total time : " << total_time << endl;
     Info<< "End\n" << endl;
 
     return 0;
