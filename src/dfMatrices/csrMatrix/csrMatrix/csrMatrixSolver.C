@@ -25,6 +25,8 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
     const dictionary& solverControls
 )
 {
+    Info << "Foam::csrMatrix::solver::New start" << endl;
+
     const word name(solverControls.lookup("solver"));
 
     if (matrix.diagonal())
@@ -44,45 +46,21 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
     }
     else if (matrix.symmetric())
     {
-        // symMatrixConstructorTable::iterator constructorIter =
-        //     symMatrixConstructorTablePtr_->find(name);
+        symMatrixConstructorTable::iterator constructorIter =
+            symMatrixConstructorTablePtr_->find(name);
 
-        // if (constructorIter == symMatrixConstructorTablePtr_->end())
-        // {
-        //     FatalIOErrorInFunction(solverControls)
-        //         << "Unknown symmetric matrix solver " << name << nl << nl
-        //         << "Valid symmetric matrix solvers are :" << endl
-        //         << symMatrixConstructorTablePtr_->sortedToc()
-        //         << exit(FatalIOError);
-        // }
+        if (constructorIter == symMatrixConstructorTablePtr_->end())
+        {
+            FatalIOErrorInFunction(solverControls)
+                << "Unknown symmetric matrix solver " << name << nl << nl
+                << "Valid symmetric matrix solvers are :" << endl
+                << symMatrixConstructorTablePtr_->sortedToc()
+                << exit(FatalIOError);
+        }
 
-        // return autoPtr<csrMatrix::solver>
-        // (
-        //     constructorIter()
-        //     (
-        //         fieldName,
-        //         matrix,
-        //         interfaceBouCoeffs,
-        //         interfaceIntCoeffs,
-        //         interfaces,
-        //         solverControls
-        //     )
-        // );
-        // return autoPtr<csrMatrix::solver>
-        // (
-        //     new CSRPCG
-        //     (
-        //         fieldName,
-        //         matrix,
-        //         interfaceBouCoeffs,
-        //         interfaceIntCoeffs,
-        //         interfaces,
-        //         solverControls
-        //     )
-        // );
         return autoPtr<csrMatrix::solver>
         (
-            new CSRSmootherPCG
+            constructorIter()
             (
                 fieldName,
                 matrix,
@@ -92,24 +70,36 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
                 solverControls
             )
         );
+
+        // return autoPtr<csrMatrix::solver>
+        // (
+        //     new CSRSmootherPCG
+        //     (
+        //         fieldName,
+        //         matrix,
+        //         interfaceBouCoeffs,
+        //         interfaceIntCoeffs,
+        //         interfaces,
+        //         solverControls
+        //     )
+        // );
     }
     else if (matrix.asymmetric())
     {
-        // asymMatrixConstructorTable::iterator constructorIter =
-        //     asymMatrixConstructorTablePtr_->find(name);
+        asymMatrixConstructorTable::iterator constructorIter =
+            asymMatrixConstructorTablePtr_->find(name);
 
-        // if (constructorIter == asymMatrixConstructorTablePtr_->end())
-        // {
-        //     FatalIOErrorInFunction(solverControls)
-        //         << "Unknown asymmetric matrix solver " << name << nl << nl
-        //         << "Valid asymmetric matrix solvers are :" << endl
-        //         << asymMatrixConstructorTablePtr_->sortedToc()
-        //         << exit(FatalIOError);
-        // }
-
+        if (constructorIter == asymMatrixConstructorTablePtr_->end())
+        {
+            FatalIOErrorInFunction(solverControls)
+                << "Unknown asymmetric matrix solver " << name << nl << nl
+                << "Valid asymmetric matrix solvers are :" << endl
+                << asymMatrixConstructorTablePtr_->sortedToc()
+                << exit(FatalIOError);
+        }
         return autoPtr<csrMatrix::solver>
         (
-            new CSRPBiCGStab
+            constructorIter()
             (
                 fieldName,
                 matrix,
@@ -119,6 +109,18 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
                 solverControls
             )
         );
+        // return autoPtr<csrMatrix::solver>
+        // (
+        //     new CSRPBiCGStab
+        //     (
+        //         fieldName,
+        //         matrix,
+        //         interfaceBouCoeffs,
+        //         interfaceIntCoeffs,
+        //         interfaces,
+        //         solverControls
+        //     )
+        // );
     }
     else
     {

@@ -27,6 +27,7 @@ License
 #include "UniformField.H"
 #include "clockTime.H"
 #include "runtime_assert.H"
+#include <omp.h>
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -586,24 +587,55 @@ template<class ThermoType>
 void Foam::dfChemistryModel<ThermoType>::correctThermo()
 {
     psi_.oldTime();
+    
+    double t0 = omp_get_wtime();
+    double t0_setState_PY, t1_setState_PY, tsum_setState_PY = 0;
+    double t0_setState_HP, t1_setState_HP, tsum_setState_HP = 0;
 
+    int nThreads = omp_get_max_threads();
+    std::vector<std::shared_ptr<Cantera::Solution>> sols;
+    const word mechanismFile = this->lookup("CanteraMechanismFile");
+    Info << "omp thread number = " << nThreads << endl;
+
+    for (int i = 0; i < nThreads; i++) {
+        auto sol = Cantera::newSolution(mechanismFile, "");
+        sols.emplace_back(sol);
+    }
+    
+    #pragma omp parallel for schedule(static, 1)
     forAll(T_, celli)
     {
+        scalarList yTemp(mixture_.nSpecies());
+        scalarList dTemp(mixture_.nSpecies());
+        scalarList hrtTemp(mixture_.nSpecies());
+        
+        size_t tid = omp_get_thread_num();
+
+        auto CanteraGas = sols[tid]->thermo();
+
         forAll(Y_, i)
         {
-            yTemp_[i] = Y_[i][celli];
+            yTemp[i] = Y_[i][celli];
         }
-        CanteraGas_->setState_PY(p_[celli], yTemp_.begin());
-        CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
 
-        T_[celli] = CanteraGas_->temperature();
+        t0_setState_PY = omp_get_wtime();
+        CanteraGas->setState_PY(p_[celli], yTemp.begin());
+        t1_setState_PY = omp_get_wtime();
+        tsum_setState_PY += t1_setState_PY - t0_setState_PY;
+
+        t0_setState_HP = omp_get_wtime();
+        CanteraGas->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
+        t1_setState_HP = omp_get_wtime();
+        tsum_setState_HP += t1_setState_HP - t0_setState_HP;
+
+        T_[celli] = CanteraGas->temperature();
 
         // meanMolecularWeight() kg/kmol    RT() Joules/kmol
-        psi_[celli] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+        psi_[celli] = CanteraGas->meanMolecularWeight()/CanteraGas->RT();
 
         mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
 
-        alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass()); // kg/(m*s)
+        alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas->cp_mass()); // kg/(m*s)
         // thermalConductivity() W/m/K
         // cp_mass()   J/kg/K
 
@@ -616,20 +648,25 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         }
         else
         {
-            mixture_.CanteraTransport()->getMixDiffCoeffsMass(dTemp_.begin()); // m2/s
+            mixture_.CanteraTransport()->getMixDiffCoeffsMass(dTemp.begin()); // m2/s
 
-            CanteraGas_->getEnthalpy_RT(hrtTemp_.begin()); //hrtTemp_=m_h0_RT non-dimension
+            CanteraGas->getEnthalpy_RT(hrtTemp.begin()); //hrtTemp_=m_h0_RT non-dimension
             // constant::physicoChemical::R.value()   J/(mol·k)
             const scalar RT = constant::physicoChemical::R.value()*1e3*T_[celli]; // J/kmol/K
             forAll(rhoD_, i)
             {
-                rhoD_[i][celli] = rho_[celli]*dTemp_[i];
+                rhoD_[i][celli] = rho_[celli]*dTemp[i];
 
-                // CanteraGas_->molecularWeight(i)    kg/kmol
-                hai_[i][celli] = hrtTemp_[i]*RT/CanteraGas_->molecularWeight(i);
+                // CanteraGas->molecularWeight(i)    kg/kmol
+                hai_[i][celli] = hrtTemp[i]*RT/CanteraGas->molecularWeight(i);
             }
         }
     }
+    double t1 = omp_get_wtime();
+    Info << "correct Thermo time = " << t1-t0 << endl;
+    Info << "setState_PY time = " << tsum_setState_PY << endl;
+    Info << "setState_HP time = " << tsum_setState_HP << endl;
+
 
 
     const volScalarField::Boundary& pBf = p_.boundaryField();

@@ -62,8 +62,12 @@ Description
 #include "CorrectPhi.H"
 
 #include <typeinfo>
+#include "env.H"
 #include "GenFvMatrix.H"
+
 // #define _CSR_
+// #define OPT_GenMatrix_Y
+
 #ifdef _CSR_
 #include "csrMatrix.H"
 #endif
@@ -81,6 +85,8 @@ int main(int argc, char *argv[])
     // #include "setRootCaseLists.H"
     #include "listOptions.H"
     #include "setRootCase2.H"
+
+    env_show();
 
     double init_start = MPI_Wtime();
 
@@ -125,8 +131,6 @@ int main(int argc, char *argv[])
     Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
     Info << endl;
 
-    double total_start = MPI_Wtime();
-
     label timeIndex = 0;
 
     turbulence->validate();
@@ -137,25 +141,11 @@ int main(int argc, char *argv[])
         #include "setInitialDeltaT.H"
     }
 
+    double refine_start = 0., refine_end = 0.;
+    double intializeFields_start = 0., intializeFields_end = 0.;
 
-// #ifdef _CSR_
-//     csrMatrix csr(mesh);
-//     csr.analyze();
-// #endif
-
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-    bool first = true;
-    double first_iter_start, first_iter_end;
-    double refine_start, refine_end;
-    double intializeFields_start, intializeFields_end;
-
-    Info<< "\nStarting time loop\n" << endl;
-    while (runTime.run())
-    {
-        if(first){
-            refine_start = MPI_Wtime();
-        }
+    while (runTime.run()){
+        refine_start = MPI_Wtime();
         while (refineLevel)
         {
             double refine_one_step_start = MPI_Wtime();
@@ -164,24 +154,32 @@ int main(int argc, char *argv[])
             double refine_one_step_end = MPI_Wtime();
             Info << "refine one step time : " << refine_one_step_end - refine_one_step_start << endl; 
         }
-        if(first){
-            refine_end = MPI_Wtime();
-        }
+        refine_end = MPI_Wtime();
 
-        if(first){
-            intializeFields_start = MPI_Wtime();
-        }
-        if (!initialized)
-        {
-            #include "intializeFields.H"
-        }
-        if(first){
-            intializeFields_end = MPI_Wtime();
-        }
-        if(first){
-            first_iter_start = MPI_Wtime();
-        }
+        intializeFields_start = MPI_Wtime();
+        #include "intializeFields.H"
+        intializeFields_end = MPI_Wtime();
 
+        break;
+    }
+
+    double refine_time = refine_end - refine_start;
+    double intializeFields_time = intializeFields_end - intializeFields_start;
+
+    Info << "Refine time : " << refine_end - refine_start << endl; 
+    Info << "IntializeFields time : " << intializeFields_end - intializeFields_start << endl; 
+
+    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+    std::vector<double> step_timer;
+
+    double total_start = MPI_Wtime();
+
+    Info<< "\nStarting time loop\n" << endl;
+
+    while (runTime.run())
+    {
+        double step_start = MPI_Wtime();
         timeIndex ++;
 
         double time_monitor_chem=0;
@@ -204,12 +202,6 @@ int main(int argc, char *argv[])
             #include "compressibleCourantNo.H"
             #include "setDeltaT.H"
         }
-        
-        // for (size_t j = 0; j < 2; j++)
-        // {
-        //     runTime ++;
-        //     #include "Refine.H"
-        // }
         
         runTime++;
 
@@ -357,22 +349,23 @@ int main(int argc, char *argv[])
             << "    updateSolutionBufferTime = " << chemistry->time_updateSolutionBuffer() << " s" << nl;
         }
 #endif
-        if(first){
-            first_iter_end = MPI_Wtime();
-            Info << "first Iter time : " << first_iter_end - first_iter_start << endl;
-            Info << "refine time : " << refine_end - refine_start << endl; 
-            Info << "intializeFields time : " << intializeFields_end - intializeFields_start << endl; 
-            first = false;
-        }
 
+        double step_end = MPI_Wtime();
+        double step_time = step_end - step_start;
+        Info << "Step time : " << step_time << endl;
+        step_timer.push_back(step_time);
     }
+    
     double total_end = MPI_Wtime();
+    double total_time = total_end - total_start - step_timer[0] - step_timer[1];
 
-    double refine_time = refine_end - refine_start;
-    double intializeFields_time = intializeFields_end - intializeFields_start;
-    double first_iter_time = first_iter_end - first_iter_start;
-    double total_time = total_end - total_start;
-    Info << "Total time : " << total_time - refine_time - intializeFields_time - first_iter_time << endl;
+    Info << "Init time : " << init_end - init_start << endl;
+    Info << "Refine time : " << refine_end - refine_start << endl;
+    Info << "IntializeFields time : " << intializeFields_end - intializeFields_start << endl;
+    Info << "First Step time : " << step_timer[0] << endl;
+    Info << "Second Step time : " << step_timer[1] << endl;
+    Info << "Total step : " << step_timer.size() - 2 << endl;
+    Info << "Total time : " << total_time << endl;
     Info<< "End\n" << endl;
 
     return 0;

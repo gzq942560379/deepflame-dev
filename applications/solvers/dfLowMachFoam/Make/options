@@ -22,6 +22,7 @@ EXE_INC = -std=c++14 \
     -I$(DF_SRC)/dfCanteraMixture/lnInclude \
     -I$(DF_SRC)/dfChemistryModel/lnInclude \
     -I$(DF_SRC)/dfCombustionModels/lnInclude \
+    -I$(DF_SRC)/dfUtils/lnInclude \
     -I$(DF_SRC)/dfGenMatrix/lnInclude \
     -I$(DF_SRC)/dfMatrices/lnInclude \
     -I$(CANTERA_ROOT)/include \
@@ -41,7 +42,6 @@ EXE_INC = -std=c++14 \
 EXE_LIBS = \
     -lcompressibleTransportModels \
     -lturbulenceModels \
-    -ldfGenMatrix \
     -lfiniteVolume \
     -ldynamicFvMesh \
     -lmeshTools \
@@ -52,6 +52,8 @@ EXE_LIBS = \
     -ldfCanteraMixture \
     -ldfChemistryModel \
     -ldfCombustionModels  \
+    -ldfUtils \
+    -ldfGenMatrix \
     -ldfMatrices \
     $(CANTERA_ROOT)/lib/libcantera.so \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \

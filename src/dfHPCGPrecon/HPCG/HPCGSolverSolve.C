@@ -30,6 +30,7 @@ License
 #include"LUscalarMatrix.H"
 #include "scalarMatrices.H"
 #include "smoothSolver2.H"
+#include <mpi.h>
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 Foam::solverPerformance Foam::HPCGSolver::solve
@@ -39,311 +40,329 @@ Foam::solverPerformance Foam::HPCGSolver::solve
     const direction cmpt
 ) const
 {
+    double hpcg_solve_start, hpcg_solve_end, hpcg_solve_time = 0.;
+    double hpcg_percondition_start, hpcg_percondition_end, hpcg_percondition_time = 0.;
+    double hpcg_mg_build_start, hpcg_mg_build_end, hpcg_mg_build_time = 0.;
+
     if(matrix_.symmetric())
     {
+        hpcg_solve_start = MPI_Wtime();
+
         Info << "The Matrix is symmetrix, so using PCG solver" << endl;
-    // --- Setup class containing solver performance data
-    solverPerformance solverPerf
-    (
-        lduMatrix::preconditioner::getName(controlDict_) + typeName,
-        fieldName_
-    );
-
-    label nCells = psi.size();
-
-    scalar* __restrict__ psiPtr = psi.begin();
-
-    scalarField pA(nCells);
-    scalar* __restrict__ pAPtr = pA.begin();
-
-    scalarField wA(nCells);
-    scalar* __restrict__ wAPtr = wA.begin();
-
-    scalar wArA = solverPerf.great_;
-    scalar wArAold = wArA;
-
-    // --- Calculate A.psi
-    matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-
-    // --- Calculate initial residual field
-    scalarField rA(source - wA);
-    scalar* __restrict__ rAPtr = rA.begin();
-
-    // --- Calculate normalisation factor
-    scalar normFactor = this->normFactor(psi, source, wA, pA);
-
-    if (lduMatrix::debug >= 2)
-    {
-        Info<< "   Normalisation factor = " << normFactor << endl;
-    }
-
-    // --- Calculate normalised residual norm
-    solverPerf.initialResidual() =
-        gSumMag(rA, matrix().mesh().comm())
-       /normFactor;
-    solverPerf.finalResidual() = solverPerf.initialResidual();
-
-    // --- Check convergence, solve if not converged
-    if
-    (
-        minIter_ > 0
-     || !solverPerf.checkConvergence(tolerance_, relTol_)
-    )
-    {
-        // --- Select and construct the preconditioner
-        autoPtr<lduMatrix::preconditioner> preconPtr =
-        lduMatrix::preconditioner::New
+        // --- Setup class containing solver performance data
+        solverPerformance solverPerf
         (
-            *this,
-            controlDict_
+            lduMatrix::preconditioner::getName(controlDict_) + typeName,
+            fieldName_
         );
 
-        // --- Solver iteration
-        do
+        label nCells = psi.size();
+
+        scalar* __restrict__ psiPtr = psi.begin();
+
+        scalarField pA(nCells);
+        scalar* __restrict__ pAPtr = pA.begin();
+
+        scalarField wA(nCells);
+        scalar* __restrict__ wAPtr = wA.begin();
+
+        scalar wArA = solverPerf.great_;
+        scalar wArAold = wArA;
+
+        // --- Calculate A.psi
+        matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+
+        // --- Calculate initial residual field
+        scalarField rA(source - wA);
+        scalar* __restrict__ rAPtr = rA.begin();
+
+        // --- Calculate normalisation factor
+        scalar normFactor = this->normFactor(psi, source, wA, pA);
+
+        if (lduMatrix::debug >= 2)
         {
-            // --- Store previous wArA
-            wArAold = wArA;
+            Info<< "   Normalisation factor = " << normFactor << endl;
+        }
 
-            // --- Precondition residual
-            preconPtr->precondition(wA, rA, cmpt);
+        // --- Calculate normalised residual norm
+        solverPerf.initialResidual() =
+            gSumMag(rA, matrix().mesh().comm())
+        /normFactor;
+        solverPerf.finalResidual() = solverPerf.initialResidual();
 
-            // --- Update search directions:
-            wArA = gSumProd(wA, rA, matrix().mesh().comm());
-
-            if (solverPerf.nIterations() == 0)
-            {
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    pAPtr[cell] = wAPtr[cell];
-                }
-            }
-            else
-            {
-                scalar beta = wArA/wArAold;
-
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    pAPtr[cell] = wAPtr[cell] + beta*pAPtr[cell];
-                }
-            }
-
-
-            // --- Update preconditioned residual
-            matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt);
-
-            scalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
-
-
-            // --- Test for singularity
-            if (solverPerf.checkSingularity(mag(wApA)/normFactor)) break;
-
-
-            // --- Update solution and residual:
-
-            scalar alpha = wArA/wApA;
-
-            for (label cell=0; cell<nCells; cell++)
-            {
-                psiPtr[cell] += alpha*pAPtr[cell];
-                rAPtr[cell] -= alpha*wAPtr[cell];
-            }
-
-            solverPerf.finalResidual() =
-                gSumMag(rA, matrix().mesh().comm())
-               /normFactor;
-
-        } while
+        // --- Check convergence, solve if not converged
+        if
         (
+            minIter_ > 0
+        || !solverPerf.checkConvergence(tolerance_, relTol_)
+        )
+        {
+            hpcg_mg_build_start = MPI_Wtime();
+            // --- Select and construct the preconditioner
+            autoPtr<lduMatrix::preconditioner> preconPtr =
+            lduMatrix::preconditioner::New
             (
-              ++solverPerf.nIterations() < maxIter_
-            && !solverPerf.checkConvergence(tolerance_, relTol_)
-            )
-         || solverPerf.nIterations() < minIter_
-        );
-    }
+                *this,
+                controlDict_
+            );
+            hpcg_mg_build_end = MPI_Wtime();
+            hpcg_mg_build_time += hpcg_mg_build_end - hpcg_mg_build_start;
 
-    return solverPerf;
+            // --- Solver iteration
+            do
+            {
+                // --- Store previous wArA
+                wArAold = wArA;
+
+                // --- Precondition residual
+                hpcg_percondition_start = MPI_Wtime();
+                preconPtr->precondition(wA, rA, cmpt);
+                hpcg_percondition_end = MPI_Wtime();
+                hpcg_percondition_time += hpcg_percondition_end - hpcg_percondition_start;
+
+                // --- Update search directions:
+                wArA = gSumProd(wA, rA, matrix().mesh().comm());
+
+                if (solverPerf.nIterations() == 0)
+                {
+                    for (label cell=0; cell<nCells; cell++)
+                    {
+                        pAPtr[cell] = wAPtr[cell];
+                    }
+                }
+                else
+                {
+                    scalar beta = wArA/wArAold;
+
+                    for (label cell=0; cell<nCells; cell++)
+                    {
+                        pAPtr[cell] = wAPtr[cell] + beta*pAPtr[cell];
+                    }
+                }
+
+
+                // --- Update preconditioned residual
+                matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt);
+
+                scalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
+
+
+                // --- Test for singularity
+                if (solverPerf.checkSingularity(mag(wApA)/normFactor)) break;
+
+                // --- Update solution and residual:
+
+                scalar alpha = wArA/wApA;
+
+                for (label cell=0; cell<nCells; cell++)
+                {
+                    psiPtr[cell] += alpha*pAPtr[cell];
+                    rAPtr[cell] -= alpha*wAPtr[cell];
+                }
+
+                solverPerf.finalResidual() =
+                    gSumMag(rA, matrix().mesh().comm())
+                /normFactor;
+
+            } while
+            (
+                (
+                ++solverPerf.nIterations() < maxIter_
+                && !solverPerf.checkConvergence(tolerance_, relTol_)
+                )
+            || solverPerf.nIterations() < minIter_
+            );
+        }
+
+        hpcg_solve_end = MPI_Wtime();
+
+        hpcg_solve_time += hpcg_solve_end - hpcg_solve_start;
+
+        Info << "hpcg solve time : " << hpcg_solve_time << endl;
+        Info << "hpcg mg build time : " << hpcg_mg_build_time << endl;
+        Info << "hpcg precondition time : " << hpcg_percondition_time << endl;
+
+        return solverPerf;
     }
 
     else
     {
-    Info << "The Matrix is asymmetrix, so using PBiCGStab solver" << endl;
-    solverPerformance solverPerf
-    (
-        lduMatrix::preconditioner::getName(controlDict_) + typeName,
-        fieldName_
-    );
-
-    const label nCells = psi.size();
-
-    scalar* __restrict__ psiPtr = psi.begin();
-
-    scalarField pA(nCells);
-    scalar* __restrict__ pAPtr = pA.begin();
-
-    scalarField yA(nCells);
-    scalar* __restrict__ yAPtr = yA.begin();
-
-    // --- Calculate A.psi
-    matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-
-    // --- Calculate initial residual field
-    scalarField rA(source - yA);
-    scalar* __restrict__ rAPtr = rA.begin();
-
-    // --- Calculate normalisation factor
-    const scalar normFactor = this->normFactor(psi, source, yA, pA);
-
-    if (lduMatrix::debug >= 2)
-    {
-        Info<< "   Normalisation factor = " << normFactor << endl;
-    }
-
-    // --- Calculate normalised residual norm
-    solverPerf.initialResidual() =
-        gSumMag(rA, matrix().mesh().comm())
-       /normFactor;
-    solverPerf.finalResidual() = solverPerf.initialResidual();
-
-    // --- Check convergence, solve if not converged
-    if
-    (
-        minIter_ > 0
-     || !solverPerf.checkConvergence(tolerance_, relTol_)
-    )
-    {
-        scalarField AyA(nCells);
-        scalar* __restrict__ AyAPtr = AyA.begin();
-
-        scalarField sA(nCells);
-        scalar* __restrict__ sAPtr = sA.begin();
-
-        scalarField zA(nCells);
-        scalar* __restrict__ zAPtr = zA.begin();
-
-        scalarField tA(nCells);
-        scalar* __restrict__ tAPtr = tA.begin();
-
-        // --- Store initial residual
-        const scalarField rA0(rA);
-
-        // --- Initial values not used
-        scalar rA0rA = 0;
-        scalar alpha = 0;
-        scalar omega = 0;
-
-        // --- Select and construct the preconditioner
-        autoPtr<lduMatrix::preconditioner> preconPtr =
-        lduMatrix::preconditioner::New
+        Info << "The Matrix is asymmetrix, so using PBiCGStab solver" << endl;
+        solverPerformance solverPerf
         (
-            *this,
-            controlDict_
+            lduMatrix::preconditioner::getName(controlDict_) + typeName,
+            fieldName_
         );
 
-        // --- Solver iteration
-        do
+        const label nCells = psi.size();
+
+        scalar* __restrict__ psiPtr = psi.begin();
+
+        scalarField pA(nCells);
+        scalar* __restrict__ pAPtr = pA.begin();
+
+        scalarField yA(nCells);
+        scalar* __restrict__ yAPtr = yA.begin();
+
+        // --- Calculate A.psi
+        matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+
+        // --- Calculate initial residual field
+        scalarField rA(source - yA);
+        scalar* __restrict__ rAPtr = rA.begin();
+
+        // --- Calculate normalisation factor
+        const scalar normFactor = this->normFactor(psi, source, yA, pA);
+
+        if (lduMatrix::debug >= 2)
         {
-            // --- Store previous rA0rA
-            const scalar rA0rAold = rA0rA;
+            Info<< "   Normalisation factor = " << normFactor << endl;
+        }
 
-            rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
+        // --- Calculate normalised residual norm
+        solverPerf.initialResidual() =
+            gSumMag(rA, matrix().mesh().comm())
+        /normFactor;
+        solverPerf.finalResidual() = solverPerf.initialResidual();
 
-            // --- Test for singularity
-            if (solverPerf.checkSingularity(mag(rA0rA)))
-            {
-                break;
-            }
+        // --- Check convergence, solve if not converged
+        if
+        (
+            minIter_ > 0
+        || !solverPerf.checkConvergence(tolerance_, relTol_)
+        )
+        {
+            scalarField AyA(nCells);
+            scalar* __restrict__ AyAPtr = AyA.begin();
 
-            // --- Update pA
-            if (solverPerf.nIterations() == 0)
+            scalarField sA(nCells);
+            scalar* __restrict__ sAPtr = sA.begin();
+
+            scalarField zA(nCells);
+            scalar* __restrict__ zAPtr = zA.begin();
+
+            scalarField tA(nCells);
+            scalar* __restrict__ tAPtr = tA.begin();
+
+            // --- Store initial residual
+            const scalarField rA0(rA);
+
+            // --- Initial values not used
+            scalar rA0rA = 0;
+            scalar alpha = 0;
+            scalar omega = 0;
+
+            // --- Select and construct the preconditioner
+            autoPtr<lduMatrix::preconditioner> preconPtr =
+            lduMatrix::preconditioner::New
+            (
+                *this,
+                controlDict_
+            );
+
+            // --- Solver iteration
+            do
             {
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    pAPtr[cell] = rAPtr[cell];
-                }
-            }
-            else
-            {
+                // --- Store previous rA0rA
+                const scalar rA0rAold = rA0rA;
+
+                rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
+
                 // --- Test for singularity
-                if (solverPerf.checkSingularity(mag(omega)))
+                if (solverPerf.checkSingularity(mag(rA0rA)))
                 {
                     break;
                 }
 
-                const scalar beta = (rA0rA/rA0rAold)*(alpha/omega);
-
-                for (label cell=0; cell<nCells; cell++)
+                // --- Update pA
+                if (solverPerf.nIterations() == 0)
                 {
-                    pAPtr[cell] =
-                        rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
+                    for (label cell=0; cell<nCells; cell++)
+                    {
+                        pAPtr[cell] = rAPtr[cell];
+                    }
                 }
-            }
-
-            // --- Precondition pA
-            preconPtr->precondition(yA, pA, cmpt);
-
-            // --- Calculate AyA
-            matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
-
-            const scalar rA0AyA = gSumProd(rA0, AyA, matrix().mesh().comm());
-
-            alpha = rA0rA/rA0AyA;
-
-            // --- Calculate sA
-            for (label cell=0; cell<nCells; cell++)
-            {
-                sAPtr[cell] = rAPtr[cell] - alpha*AyAPtr[cell];
-            }
-
-            // --- Test sA for convergence
-            solverPerf.finalResidual() =
-                gSumMag(sA, matrix().mesh().comm())/normFactor;
-
-            if (solverPerf.checkConvergence(tolerance_, relTol_))
-            {
-                for (label cell=0; cell<nCells; cell++)
+                else
                 {
-                    psiPtr[cell] += alpha*yAPtr[cell];
+                    // --- Test for singularity
+                    if (solverPerf.checkSingularity(mag(omega)))
+                    {
+                        break;
+                    }
+
+                    const scalar beta = (rA0rA/rA0rAold)*(alpha/omega);
+
+                    for (label cell=0; cell<nCells; cell++)
+                    {
+                        pAPtr[cell] =
+                            rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
+                    }
                 }
 
-                solverPerf.nIterations()++;
+                // --- Precondition pA
+                preconPtr->precondition(yA, pA, cmpt);
 
-                return solverPerf;
-            }
+                // --- Calculate AyA
+                matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
 
-            // --- Precondition sA
-            preconPtr->precondition(zA, sA, cmpt);
+                const scalar rA0AyA = gSumProd(rA0, AyA, matrix().mesh().comm());
 
-            // --- Calculate tA
-            matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
+                alpha = rA0rA/rA0AyA;
 
-            const scalar tAtA = gSumSqr(tA, matrix().mesh().comm());
+                // --- Calculate sA
+                for (label cell=0; cell<nCells; cell++)
+                {
+                    sAPtr[cell] = rAPtr[cell] - alpha*AyAPtr[cell];
+                }
 
-            // --- Calculate omega from tA and sA
-            //     (cheaper than using zA with preconditioned tA)
-            omega = gSumProd(tA, sA, matrix().mesh().comm())/tAtA;
+                // --- Test sA for convergence
+                solverPerf.finalResidual() =
+                    gSumMag(sA, matrix().mesh().comm())/normFactor;
 
-            // --- Update solution and residual
-            for (label cell=0; cell<nCells; cell++)
-            {
-                psiPtr[cell] += alpha*yAPtr[cell] + omega*zAPtr[cell];
-                rAPtr[cell] = sAPtr[cell] - omega*tAPtr[cell];
-            }
+                if (solverPerf.checkConvergence(tolerance_, relTol_))
+                {
+                    for (label cell=0; cell<nCells; cell++)
+                    {
+                        psiPtr[cell] += alpha*yAPtr[cell];
+                    }
 
-            solverPerf.finalResidual() =
-                gSumMag(rA, matrix().mesh().comm())
-               /normFactor;
-        } while
-        (
+                    solverPerf.nIterations()++;
+
+                    return solverPerf;
+                }
+
+                // --- Precondition sA
+                preconPtr->precondition(zA, sA, cmpt);
+
+                // --- Calculate tA
+                matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
+
+                const scalar tAtA = gSumSqr(tA, matrix().mesh().comm());
+
+                // --- Calculate omega from tA and sA
+                //     (cheaper than using zA with preconditioned tA)
+                omega = gSumProd(tA, sA, matrix().mesh().comm())/tAtA;
+
+                // --- Update solution and residual
+                for (label cell=0; cell<nCells; cell++)
+                {
+                    psiPtr[cell] += alpha*yAPtr[cell] + omega*zAPtr[cell];
+                    rAPtr[cell] = sAPtr[cell] - omega*tAPtr[cell];
+                }
+
+                solverPerf.finalResidual() =
+                    gSumMag(rA, matrix().mesh().comm())
+                /normFactor;
+            } while
             (
-              ++solverPerf.nIterations() < maxIter_
-            && !solverPerf.checkConvergence(tolerance_, relTol_)
-            )
-         || solverPerf.nIterations() < minIter_
-        );
-    }
-
-    return solverPerf;
+                (
+                ++solverPerf.nIterations() < maxIter_
+                && !solverPerf.checkConvergence(tolerance_, relTol_)
+                )
+            || solverPerf.nIterations() < minIter_
+            );
+        }
+        return solverPerf;
     }
 }
 

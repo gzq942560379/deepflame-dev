@@ -38,24 +38,20 @@ GenMatrix_Y(
     tmp<surfaceInterpolationScheme<scalar>> tinterpGammaScheme_(new linear<scalar>(mesh));
     tmp<fv::snGradScheme<scalar>> tsnGradScheme_(new fv::orthogonalSnGrad<scalar>(mesh));
     tmp<volScalarField> gammaScalarVol = rhoD + mut/Sct;
-    Info << "gammaScalarVol size : " << gammaScalarVol().size() << endl;
 
     tmp<surfaceScalarField> tgamma = tinterpGammaScheme_().interpolate(gammaScalarVol);
     const surfaceScalarField& gamma = tgamma.ref();
     const surfaceScalarField& deltaCoeffs = tsnGradScheme_().deltaCoeffs(Yi)();
 
-    Info << "gamma size : " << gamma.size() << endl;
-    Info << "mesh.magSf() size : " << mesh.magSf().size() << endl;
+    const label specieI = combustion.chemistry()->species()[Yi.member()];
+    const DimensionedField<scalar, volMesh>& su = combustion.chemistry()->RR(specieI);
 
     surfaceScalarField gammaMagSf
     (
         gamma * mesh.magSf()
     );
 
-    // ddt div
-    // -------------------------------------------------------
-
-    tmp<fvScalarMatrix> tfvm_DDT
+    tmp<fvScalarMatrix> tfvm
     (
         new fvScalarMatrix
         (
@@ -63,22 +59,22 @@ GenMatrix_Y(
             rho.dimensions()*Yi.dimensions()*dimVol/dimTime
         )
     );
-    fvScalarMatrix& fvm_DDT = tfvm_DDT.ref();
+    fvScalarMatrix& fvm = tfvm.ref();
 
     scalar rDeltaT = 1.0/mesh.time().deltaTValue();
 
-    // fvm_DDT.diag() = rDeltaT*rho.primitiveField()*mesh.Vsc();
-    // fvm_DDT.source() = rDeltaT
+    // fvm.diag() = rDeltaT*rho.primitiveField()*mesh.Vsc();
+    // fvm.source() = rDeltaT
     //     *rho.oldTime().primitiveField()
     //     *Yi.oldTime().primitiveField()*mesh.Vsc();
 
-    scalar* __restrict__ diagPtr_ddt = fvm_DDT.diag().begin();
-    scalar* __restrict__ sourcePtr_ddt = fvm_DDT.source().begin();
-    scalar* __restrict__ lowerPtr_ddt = fvm_DDT.lower().begin();
-    scalar* __restrict__ upperPtr_ddt = fvm_DDT.upper().begin();
+    scalar* __restrict__ diagPtr_ddt = fvm.diag().begin();
+    scalar* __restrict__ sourcePtr_ddt = fvm.source().begin();
+    scalar* __restrict__ lowerPtr_ddt = fvm.lower().begin();
+    scalar* __restrict__ upperPtr_ddt = fvm.upper().begin();
 
-    const labelUList& l = fvm_DDT.lduAddr().lowerAddr();
-    const labelUList& u = fvm_DDT.lduAddr().upperAddr();
+    const labelUList& l = fvm.lduAddr().lowerAddr();
+    const labelUList& u = fvm.lduAddr().upperAddr();
 
     // ddt
     const scalar* const __restrict__ rhoPtr = rho.primitiveField().begin();
@@ -95,7 +91,13 @@ GenMatrix_Y(
     // deltaCoeffs.primitiveField()*gammaMagSf.primitiveField();
     const scalar* const __restrict__ deltaCoeffsPtr = deltaCoeffs.primitiveField().begin();
     const scalar* const __restrict__ gammaMagSfPtr = gammaMagSf.primitiveField().begin();
+    // const scalar* const __restrict__ gammaPtr = gamma.primitiveField().begin();
+    // const scalar* const __restrict__ meshMagSfPtr = mesh.magSf().primitiveField().begin();
 
+    // combustion->R(Yi)
+    // fvm.source() += su.mesh().V()*su.field();
+    const scalar* const __restrict__ meshVPtr = mesh.V().begin();
+    const scalar* const __restrict__ suFieldVPtr = su.field().begin();
 
 
     #pragma omp parallel for
@@ -103,32 +105,27 @@ GenMatrix_Y(
     #pragma clang loop vectorize(enable)
     for(label c = 0; c < nCells; ++c){
         diagPtr_ddt[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
-        sourcePtr_ddt[c] = rDeltaT * rhoOldTimePtr[c] * YiOldTimePtr[c] * meshVscPtr[c];
+        sourcePtr_ddt[c] = rDeltaT * rhoOldTimePtr[c] * YiOldTimePtr[c] * meshVscPtr[c] + meshVPtr[c] * suFieldVPtr[c];
     }
 
     // fvm_div1.lower() = -weights.primitiveField()*phi.primitiveField();
     // fvm_div1.upper() = fvm_div1.lower() + phi.primitiveField();
-
     // fvm_laplacian.upper() = deltaCoeffs.primitiveField()*gammaMagSf.primitiveField();
-
-    // fvm_div1.negSumDiag();
     
     #pragma omp parallel for
     #pragma clang loop unroll_count(4)
     #pragma clang loop vectorize(enable)
     for(label f = 0; f < nFaces; ++f){
-        lowerPtr_ddt[f] = - weightsPtr[f] * (phiPtr[f] + phiUcPtr[f]);
-        upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]);
-        // upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]) - deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+        lowerPtr_ddt[f] = - weightsPtr[f] * (phiPtr[f] + phiUcPtr[f]) - deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+        // upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]);
+        upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]) - deltaCoeffsPtr[f] * gammaMagSfPtr[f];
     }
-   
-
-    // fvm_laplacian.negSumDiag();
 
     // #pragma omp parallel for
     // #pragma clang loop unroll_count(4)
     // #pragma clang loop vectorize(enable)
 
+    // fvm_laplacian.negSumDiag();
     for (label face=0; face< nFaces; ++face)
     {
         diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
@@ -138,58 +135,81 @@ GenMatrix_Y(
     forAll(Yi.boundaryField(), patchi)
     {
         const fvPatchField<scalar>& psf = Yi.boundaryField()[patchi];
+
+        const fvsPatchScalarField& pw = weights.boundaryField()[patchi];
+        const fvsPatchScalarField& pDeltaCoeffs = deltaCoeffs.boundaryField()[patchi];
+
+        const auto& psfValueInternalCoeffs = psf.valueInternalCoeffs(pw);
+        const auto& psfValueBoundaryCoeffs = psf.valueBoundaryCoeffs(pw);
+
+
         const fvsPatchScalarField& patchFlux_phi = phi.boundaryField()[patchi];
         const fvsPatchScalarField& patchFlux_phiUc = phiUc.boundaryField()[patchi];
-        const fvsPatchScalarField& pw = weights.boundaryField()[patchi];
 
         const fvsPatchScalarField& pGamma = gammaMagSf.boundaryField()[patchi];
-        const fvsPatchScalarField& pDeltaCoeffs = deltaCoeffs.boundaryField()[patchi];
+
+        const scalar* const __restrict__ patchFlux_phiPtr = patchFlux_phi.begin();
+        const scalar* const __restrict__ patchFlux_phiUcPtr = patchFlux_phiUc.begin();
+        const scalar* const __restrict__ pGammaPtr = pGamma.begin();
+        const scalar* const __restrict__ psfValueInternalCoeffsPtr = psfValueInternalCoeffs->begin();
+        const scalar* const __restrict__ psfValueBoundaryCoeffsPtr = psfValueBoundaryCoeffs->begin();
+
+
+        auto& internalCoeffs = fvm.internalCoeffs()[patchi];
+        auto& boundaryCoeffs = fvm.boundaryCoeffs()[patchi];
+
+        scalar* __restrict__ internalCoeffsPtr = internalCoeffs.begin();
+        scalar* __restrict__ boundaryCoeffsPtr = boundaryCoeffs.begin();
+    
 
         if (psf.coupled())
         {
+            const auto& psfGradientInternalCoeffs = psf.gradientInternalCoeffs(pDeltaCoeffs);
+            const auto& psfGradientBoundaryCoeffs = psf.gradientBoundaryCoeffs(pDeltaCoeffs);
+            const scalar* const __restrict__ psfGradientInternalCoeffsPtr = psfGradientInternalCoeffs->begin();
+            const scalar* const __restrict__ psfGradientBoundaryCoeffsPtr = psfGradientBoundaryCoeffs->begin();
+
             Info << "psf.coupled()" << endl;
-            // fvm_DDT.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs(pDeltaCoeffs);
-            // fvm_DDT.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs(pDeltaCoeffs);
-            fvm_DDT.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw);
-            fvm_DDT.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw);
+
+            // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs(pDeltaCoeffs);
+            // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs(pDeltaCoeffs);
+            #pragma omp parallel for
+            #pragma clang loop unroll_count(4)
+            #pragma clang loop vectorize(enable)
+            for(label i = 0; i < internalCoeffs.size(); ++i){
+                internalCoeffsPtr[i] = (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueInternalCoeffsPtr[i] - pGammaPtr[i] * psfGradientInternalCoeffsPtr[i];
+                boundaryCoeffsPtr[i] =  - (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueBoundaryCoeffsPtr[i] + pGammaPtr[i] * psfGradientBoundaryCoeffsPtr[i];
+            }
         }
         else
         {
             Info << "not psf.coupled()" << endl;
-            // fvm_DDT.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs();
-            // fvm_DDT.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs();
-            fvm_DDT.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw);
-            fvm_DDT.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw);
+            const auto& psfGradientInternalCoeffs = psf.gradientInternalCoeffs();
+            const auto& psfGradientBoundaryCoeffs = psf.gradientBoundaryCoeffs();
+            const scalar* const __restrict__ psfGradientInternalCoeffsPtr = psfGradientInternalCoeffs->begin();
+            const scalar* const __restrict__ psfGradientBoundaryCoeffsPtr = psfGradientBoundaryCoeffs->begin();
+            // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs();
+            // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs();
+            #pragma omp parallel for
+            #pragma clang loop unroll_count(4)
+            #pragma clang loop vectorize(enable)
+            for(label i = 0; i < internalCoeffs.size(); ++i){
+                internalCoeffsPtr[i] = (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueInternalCoeffsPtr[i] - pGammaPtr[i] * psfGradientInternalCoeffsPtr[i];
+                boundaryCoeffsPtr[i] =  - (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueBoundaryCoeffsPtr[i] + pGammaPtr[i] * psfGradientBoundaryCoeffsPtr[i];
+            }
         }
-        // const auto& psfValueInternalCoeffs = psf.valueInternalCoeffs(pw)();
-        // const auto& psfValueBoundaryCoeffs = psf.valueBoundaryCoeffs(pw)();
-
-        // const scalar* const __restrict__ patchFluxPtr_div1 = patchFlux.begin();
-        // const scalar* const __restrict__ psfValueInternalCoeffsPtr_div1 = psfValueInternalCoeffs.begin();
-        // const scalar* const __restrict__ psfValueBoundaryCoeffsPtr_div1 = psfValueBoundaryCoeffs.begin();
-
-        // scalar* __restrict__ internalCoeffsPtr_div1 = fvm_div1.internalCoeffs()[patchi].begin();
-        // scalar* __restrict__ boundaryCoeffsPtr_div1 = fvm_div1.boundaryCoeffs()[patchi].begin();
-
-        // #pragma omp parallel for
-        // #pragma clang loop unroll_count(4)
-        // #pragma clang loop vectorize(enable)
-        // for(label i = 0; i < patchFlux.size(); ++i){
-        //     internalCoeffsPtr_div1[i] = patchFluxPtr_div1[i] * psfValueInternalCoeffsPtr_div1[i];
-        //     boundaryCoeffsPtr_div1[i] = - patchFluxPtr_div1[i] * psfValueBoundaryCoeffsPtr_div1[i];
-        // }
     }
 
     // if (tinterpScheme_().corrected())
     // {
     //     Info << "tinterpScheme_().corrected() 1" << endl;
-    //     fvm_DDT += fvc::surfaceIntegrate(phi*tinterpScheme_().correction(Yi));
+    //     fvm += fvc::surfaceIntegrate(phi*tinterpScheme_().correction(Yi));
     // }
 
     // if (tinterpScheme_().corrected())
     // {
     //     Info << "tinterpScheme_().corrected() 2" << endl;
-    //     fvm_DDT += fvc::surfaceIntegrate(phiUc*tinterpScheme_().correction(Yi));
+    //     fvm += fvc::surfaceIntegrate(phiUc*tinterpScheme_().correction(Yi));
     // }
 
     // if (tsnGradScheme_().corrected())
@@ -223,36 +243,6 @@ GenMatrix_Y(
     //             )().primitiveField();
     //     }
     // }
-
-    // -------------------------------------------------------
-
-    tmp<volScalarField> DEff = rhoD + mut/Sct;
-
-    tmp<fvScalarMatrix> tfvm
-    (
-        new fvScalarMatrix
-        (
-            (tfvm_DDT
-            - gaussLaplacianSchemeFvmLaplacian(DEff(), Yi))
-            // + tfvm_div1
-            // + tfvm_div2
-            // + mvConvection.fvmDiv(phi, Yi)
-            // + mvConvection.fvmDiv(phiUc, Yi)
-            // ==
-            // (
-            //     splitting
-            // ?   gaussLaplacianSchemeFvmLaplacian(DEff(), Yi)
-            // :  (gaussLaplacianSchemeFvmLaplacian(DEff(), Yi) + combustion.R(Yi))
-            // )
-            // (
-            //     splitting
-            // ?   tfvm_laplacian
-            // :  (tfvm_laplacian + combustion.R(Yi))
-            // )
-            == 
-            (combustion.R(Yi))
-        )
-    );
 
     return tfvm;
 }

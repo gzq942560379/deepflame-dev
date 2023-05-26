@@ -10,6 +10,9 @@
 #include "fvMesh.H"
 #include "turbulentFluidThermoModel.H"
 #include "CombustionModel.H"
+#include <mpi.h>
+#include <algorithm>
+#include "PstreamGlobals.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -114,6 +117,8 @@ GenMatrix_Y(
     fv::convectionScheme<scalar>& mvConvection
 );
 
+
+void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
 
 
 } // End namespace Foam

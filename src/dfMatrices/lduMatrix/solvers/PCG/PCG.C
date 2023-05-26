@@ -27,13 +27,13 @@ License
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-namespace Foam
-{
-    defineTypeNameAndDebug(PCG, 0);
+// namespace Foam
+// {
+//     defineTypeNameAndDebug(PCG, 0);
 
-    lduMatrix::solver::addsymMatrixConstructorToTable<PCG>
-        addPCGSymMatrixConstructorToTable_;
-}
+//     lduMatrix::solver::addsymMatrixConstructorToTable<PCG>
+//         addPCGSymMatrixConstructorToTable_;
+// }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //

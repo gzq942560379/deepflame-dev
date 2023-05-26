@@ -83,71 +83,71 @@ Foam::csrMatrix::preconditioner::New
 
     if (sol.matrix().symmetric())
     {
-        // symMatrixConstructorTable::iterator constructorIter =
-        //     symMatrixConstructorTablePtr_->find(name);
+        symMatrixConstructorTable::iterator constructorIter =
+            symMatrixConstructorTablePtr_->find(name);
 
-        // if (constructorIter == symMatrixConstructorTablePtr_->end())
-        // {
-        //     FatalIOErrorInFunction
-        //     (
-        //         controls
-        //     )   << "Unknown symmetric matrix preconditioner "
-        //         << name << nl << nl
-        //         << "Valid symmetric matrix preconditioners :" << endl
-        //         << symMatrixConstructorTablePtr_->sortedToc()
-        //         << exit(FatalIOError);
-        // }
+        if (constructorIter == symMatrixConstructorTablePtr_->end())
+        {
+            FatalIOErrorInFunction
+            (
+                controls
+            )   << "Unknown symmetric matrix preconditioner "
+                << name << nl << nl
+                << "Valid symmetric matrix preconditioners :" << endl
+                << symMatrixConstructorTablePtr_->sortedToc()
+                << exit(FatalIOError);
+        }
 
-        // return autoPtr<csrMatrix::preconditioner>
-        // (
-        //     constructorIter()
-        //     (
-        //         sol,
-        //         controls
-        //     )
-        // );
         return autoPtr<csrMatrix::preconditioner>
         (
-            new csrNoPreconditioner
+            constructorIter()
             (
                 sol,
                 controls
             )
         );
+        // return autoPtr<csrMatrix::preconditioner>
+        // (
+        //     new csrNoPreconditioner
+        //     (
+        //         sol,
+        //         controls
+        //     )
+        // );
     }
     else if (sol.matrix().asymmetric())
     {
-        // asymMatrixConstructorTable::iterator constructorIter =
-        //     asymMatrixConstructorTablePtr_->find(name);
+        asymMatrixConstructorTable::iterator constructorIter =
+            asymMatrixConstructorTablePtr_->find(name);
 
-        // if (constructorIter == asymMatrixConstructorTablePtr_->end())
-        // {
-        //     FatalIOErrorInFunction
-        //     (
-        //         controls
-        //     )   << "Unknown asymmetric matrix preconditioner "
-        //         << name << nl << nl
-        //         << "Valid asymmetric matrix preconditioners :" << endl
-        //         << asymMatrixConstructorTablePtr_->sortedToc()
-        //         << exit(FatalIOError);
-        // }
+        if (constructorIter == asymMatrixConstructorTablePtr_->end())
+        {
+            FatalIOErrorInFunction
+            (
+                controls
+            )   << "Unknown asymmetric matrix preconditioner "
+                << name << nl << nl
+                << "Valid asymmetric matrix preconditioners :" << endl
+                << asymMatrixConstructorTablePtr_->sortedToc()
+                << exit(FatalIOError);
+        }
 
-        // return autoPtr<csrMatrix::preconditioner>
-        // (
-        //     constructorIter()
-        //     (
-        //         sol,
-        //         controls
-        //     )
-        // );
         return autoPtr<csrMatrix::preconditioner>
         (
-            new csrNoPreconditioner
+            constructorIter()
             (
                 sol,
                 controls
             )
         );
+        // return autoPtr<csrMatrix::preconditioner>
+        // (
+        //     new csrNoPreconditioner
+        //     (
+        //         sol,
+        //         controls
+        //     )
+        // );
     }
     else
     {

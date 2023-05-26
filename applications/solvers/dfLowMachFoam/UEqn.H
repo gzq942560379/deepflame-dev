@@ -136,12 +136,12 @@ if (pimple.momentumPredictor())
     U_build_end = MPI_Wtime();
     U_build_time += U_build_end - U_build_start;
 
-#ifdef _CSR_
-    U_convert_start = MPI_Wtime();
-    csr.init_value_from_lduMatrix(UEqnTmp);
-    U_convert_end = MPI_Wtime();
-    U_convert_time += U_convert_end - U_convert_start;
-#endif
+// #ifdef _CSR_
+//     U_convert_start = MPI_Wtime();
+//     csr.init_value_from_lduMatrix(UEqnTmp);
+//     U_convert_end = MPI_Wtime();
+//     U_convert_time += U_convert_end - U_convert_start;
+// #endif
 
 
     U_solve_start = MPI_Wtime();
