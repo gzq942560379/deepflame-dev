@@ -16,8 +16,33 @@ $(csrMatrix)/solvers/CSRSmootherPCG/CSRSmootherPCG.C
 $(csrMatrix)/solvers/CSRPCG/CSRPCG.C
 $(csrMatrix)/smoothers/csrSymGaussSeidel/csrSymGaussSeidelSmoother.C
 
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverScale.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverAgglomerateMatrix.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverInterpolate.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGProcAgglomerations/CSRGAMGProcAgglomeration/CSRGAMGProcAgglomeration.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGProcAgglomerations/noneCSRGAMGProcAgglomeration/noneCSRGAMGProcAgglomeration.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolver.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaces/CSRGAMGInterface/CSRGAMGInterface.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaces/CSRGAMGInterface/CSRGAMGInterfaceNew.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaces/processorCSRGAMGInterface/processorCSRGAMGInterface.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaces/processorCyclicCSRGAMGInterface/processorCyclicCSRGAMGInterface.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaces/cyclicCSRGAMGInterface/cyclicCSRGAMGInterface.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverSolve.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGAgglomerations/CSRGAMGAgglomeration/CSRGAMGAgglomerateLduAddressing.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGAgglomerations/CSRGAMGAgglomeration/CSRGAMGAgglomeration.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGAgglomerations/pairCSRGAMGAgglomeration/pairCSRGAMGAgglomeration.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGAgglomerations/pairCSRGAMGAgglomeration/pairCSRGAMGAgglomerate.C
+$(csrMatrix)/solvers/CSRGAMG/CSRGAMGAgglomerations/faceAreaPairCSRGAMGAgglomeration/faceAreaPairCSRGAMGAgglomeration.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/processorCSRGAMGInterfaceField/processorCSRGAMGInterfaceField.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/cyclicCSRGAMGInterfaceField/cyclicCSRGAMGInterfaceField.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/CSRGAMGInterfaceField/CSRGAMGInterfaceFieldNew.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/CSRGAMGInterfaceField/CSRGAMGInterfaceField.C
+$(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/processorCyclicCSRGAMGInterfaceField/processorCyclicCSRGAMGInterfaceField.C
+
 lduMatrix=lduMatrix
 
+$(lduMatrix)/solvers/NBPBiCGStab/NBPBiCGStab.C
 $(lduMatrix)/solvers/PBiCGStab/PBiCGStab.C
+$(lduMatrix)/solvers/PCG/PCG.C
 
 LIB = $(DF_LIBBIN)/libdfMatrices

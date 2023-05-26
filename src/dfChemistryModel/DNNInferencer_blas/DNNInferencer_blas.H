@@ -17,15 +17,24 @@ private:
     std::vector<Layer<float>*> model1_;
     std::vector<Layer<float>*> model2_;
 
+    double FLOPs_per_sample_;
+
     int64_t total_samples_;
     bool buffer_alloced_ = false;
+    int64_t batch_size_;
     std::vector<std::vector<float>> output_buffer_;
 public:
+
+    int64_t input_dim() const {return layers_[0]; }
+    int64_t output_dim() const {return layers_[4]; }
+
+    int64_t batch_size() const {return batch_size_; }
+
     DNNInferencer_blas();
     ~DNNInferencer_blas();
 
     void load_models(const std::string dir);
-    void alloc_buffer(int64_t total_samples);
+    
     // Inference
     void Inference_multiDNNs(
         const std::vector<float>& input0, std::vector<double>& output0, int64_t input_count0,

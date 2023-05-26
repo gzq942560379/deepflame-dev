@@ -484,23 +484,21 @@ GenMatrix_U(
     // cell loop
     GenMatrix_U_loop_start = MPI_Wtime();
     #pragma omp parallel for
-    #pragma clang loop unroll_count(4)
-    #pragma clang loop vectorize(enable)
+    // #pragma clang loop unroll_count(4)
+    // #pragma clang loop vectorize(enable)
     for(label c = 0; c < nCells; ++c){
         diagPtr_ddt[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
         sourcePtr_ddt[c] = rDeltaT * rhoOldTimePtr[c] * UOldTimePtr[c] * meshVscPtr[c];
         // grad(p)
-        sourcePtr_ddt[c] += igGrad[c];
+        sourcePtr_ddt[c] -= igGrad[c];
         // turbulence div
         sourcePtr_ddt[c] += igDivGradUCoeff[c];
-        // turbulence laplacian
-
     }
 
     // face loop to assign face
     #pragma omp parallel for
-    #pragma clang loop unroll_count(4)
-    #pragma clang loop vectorize(enable)
+    // #pragma clang loop unroll_count(4)
+    // #pragma clang loop vectorize(enable)
     for(label f = 0; f < nFaces; ++f){
         lowerPtr_ddt[f] = - weightsPtr[f] * phiPtr[f];
         upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * phiPtr[f];

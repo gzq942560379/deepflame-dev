@@ -18,6 +18,9 @@ SolverPerformance<Type> csrMatrix::solve(
     const FieldField<Field, Type>& boundaryCoeffs,
     const dictionary& solverControls
 ){
+
+    
+
     SolverPerformance<Type> solverPerfVec
     (
         "csrMatrix::solve",
@@ -121,8 +124,11 @@ solverPerformance csrMatrix::solve
     const dictionary& solverControls
 )
 {
+    Info << "csrMatrix::solve start" << endl;
+
     scalarField saveDiag(diag());
     addBoundaryDiag(diag(), internalCoeffs, 0);
+    const_cast<scalarField&>(ldu().diag()) = diag();
 
     scalarField sourceCpy(source);
     addBoundarySource(sourceCpy, psi, boundaryCoeffs, false);
@@ -144,11 +150,13 @@ solverPerformance csrMatrix::solve
     }
 
     diag() = saveDiag;
+    const_cast<scalarField&>(ldu().diag()) = saveDiag;
 
     psi.correctBoundaryConditions();
 
     Residuals<scalar>::append(psi.mesh(), solverPerf);
 
+    Info << "csrMatrix::solve end" << endl;
     return solverPerf;
 }
 

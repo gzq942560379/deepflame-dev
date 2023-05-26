@@ -68,10 +68,12 @@ if (pimple.transonic())
         p_build_end = MPI_Wtime();
         p_build_time += p_build_end - p_build_start;
 
-
 #ifdef _CSR_
         p_convert_start = MPI_Wtime();
-        csr.init_value_from_lduMatrix(pEqn);
+        
+        csrMatrix csr(pEqn);
+        csr.analyze();
+
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
 #endif   
@@ -98,13 +100,6 @@ if (pimple.transonic())
 else
 {
     Info << "not pimple.transonic()" << endl;
-
-    Info << "p equation build scheme : " << endl;
-    Info << "fvc::ddt(rho) Scheme : " << rho.mesh().ddtScheme("ddt(" + rho.name() + ')') << endl;
-    Info << "fvm::ddt(p) Scheme : " << p.mesh().ddtScheme("ddt(" + p.name() + ')') << endl;
-    // Info << "fvc::div(phiHbyA) Scheme : " <<  << endl;
-    Info << "fvm::laplacian(rhorAUf, p) Scheme : " << p.mesh().laplacianScheme("laplacian(" + rhorAUf.name() + ',' + p.name() + ')') << endl;
-    
     p_build_start = MPI_Wtime();
     
     fvScalarMatrix pDDtEqn
@@ -126,7 +121,10 @@ else
 
 #ifdef _CSR_
         p_convert_start = MPI_Wtime();
-        csr.init_value_from_lduMatrix(pEqn);
+        
+        csrMatrix csr(pEqn);
+        csr.analyze();
+
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
 #endif   

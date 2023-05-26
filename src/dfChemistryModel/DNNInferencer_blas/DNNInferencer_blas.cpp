@@ -1,7 +1,26 @@
 #include "DNNInferencer_blas.H"
 #include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <mpi.h>
+#include <omp.h>
 
-DNNInferencer_blas::DNNInferencer_blas() {}
+DNNInferencer_blas::DNNInferencer_blas() {
+    char* env_tmp = getenv("DNN_BATCH_SIZE");
+    if(env_tmp == NULL){
+        this->batch_size_ = 131072;
+    }else{
+        this->batch_size_ = std::atol(env_tmp);;
+    }
+
+    buffer_alloced_ = true;
+    output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[1]));
+    output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[2]));
+    output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[3]));
+    output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[4]));
+
+    FLOPs_per_sample_ = 2. * (layers_[0] * layers_[1] + layers_[1] * layers_[2] + layers_[2] * layers_[3] + layers_[3] * layers_[4]);
+}
 
 DNNInferencer_blas::~DNNInferencer_blas() {
     for(int i = 0;i < model0_.size(); ++i){
@@ -47,93 +66,117 @@ void DNNInferencer_blas::load_models(const std::string dir){
     }
 }
 
-void DNNInferencer_blas::alloc_buffer(int64_t total_samples){
-    if(buffer_alloced_){
-        if(total_samples <= total_samples_){
-            return;
-        }else{
-            assert(false);
-        }
-    }
-    total_samples_ = total_samples;
-    buffer_alloced_ = true;
-    output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[1]));
-    output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[2]));
-    output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[3]));
-    output_buffer_.emplace_back(std::vector<float>(total_samples * layers_[4]));
-
-}
-
 void DNNInferencer_blas::Inference_multiDNNs(
     const std::vector<float>& input0, std::vector<double>& output0, int64_t input_count0,
     const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
-    const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2){
+    const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2
+){
     
-    assert(input_count0 + input_count1 + input_count2 <= total_samples_);
-    assert(buffer_alloced_);
+    double dnn_infer_start = MPI_Wtime();
 
     if(input_count0 > 0){
-        int offset0 = 0;
-        Tensor<float> input0_0({input_count0, layers_[0]}, const_cast<float*>(input0.data()));
-        Tensor<float> output0_1({input_count0, layers_[1]}, output_buffer_[0].data() + offset0 * layers_[1]);
-        Tensor<float> output0_2({input_count0, layers_[2]}, output_buffer_[1].data() + offset0 * layers_[2]);
-        Tensor<float> output0_3({input_count0, layers_[3]}, output_buffer_[2].data() + offset0 * layers_[3]);
-        Tensor<float> output0_4({input_count0, layers_[4]}, output_buffer_[3].data() + offset0 * layers_[4]);
+        output0.resize(input_count0 * output_dim());
 
+        for(int64_t sample_start = 0; sample_start < input_count0; sample_start += batch_size_){
+            int64_t sample_end = std::min(input_count0, sample_start + batch_size_);
+            int64_t sample_len = sample_end - sample_start;
 
-        model0_[0]->forward(input0_0, output0_1);
-        model0_[1]->forward(output0_1, output0_2);
-        model0_[2]->forward(output0_2, output0_3);
-        model0_[3]->forward(output0_3, output0_4);
+            Tensor<float> input_tensor_0({sample_len, layers_[0]}, const_cast<float*>(input0.data()) + sample_start * input_dim());
+            Tensor<float> input_tensor_1({sample_len, layers_[1]}, output_buffer_[0].data());
+            Tensor<float> input_tensor_2({sample_len, layers_[2]}, output_buffer_[1].data());
+            Tensor<float> input_tensor_3({sample_len, layers_[3]}, output_buffer_[2].data());
+            Tensor<float> input_tensor_4({sample_len, layers_[4]}, output_buffer_[3].data());
 
-        assert(output0_4.element_num() == output0.size());
-        output0.resize(output0_4.element_num());
-        for(int i = 0; i < output0_4.element_num(); ++i){
-            output0[i] = output0_4.data()[i];
+            model0_[0]->forward(input_tensor_0, input_tensor_1);
+            model0_[1]->forward(input_tensor_1, input_tensor_2);
+            model0_[2]->forward(input_tensor_2, input_tensor_3);
+            model0_[3]->forward(input_tensor_3, input_tensor_4);
+
+            double* __restrict__ output0_ptr = output0.data() + sample_start * output_dim();
+            const float* const __restrict__ input_tensor_4_ptr = input_tensor_4.data();
+
+            for(int i = 0; i < input_tensor_4.element_num(); ++i){
+                output0_ptr[i] = input_tensor_4_ptr[i];
+            }
         }
-
     }
 
     if(input_count1 > 0){
-        int offset1 = input_count0;
-        Tensor<float> input1_0({input_count1, layers_[0]}, const_cast<float*>(input1.data()));
-        Tensor<float> output1_1({input_count1, layers_[1]}, output_buffer_[0].data() + offset1 * layers_[1]);
-        Tensor<float> output1_2({input_count1, layers_[2]}, output_buffer_[1].data() + offset1 * layers_[2]);
-        Tensor<float> output1_3({input_count1, layers_[3]}, output_buffer_[2].data() + offset1 * layers_[3]);
-        Tensor<float> output1_4({input_count1, layers_[4]}, output_buffer_[3].data() + offset1 * layers_[4]);
+        output1.resize(input_count1 * output_dim());
 
-        model1_[0]->forward(input1_0, output1_1);
-        model1_[1]->forward(output1_1, output1_2);
-        model1_[2]->forward(output1_2, output1_3);
-        model1_[3]->forward(output1_3, output1_4);
+        for(int64_t sample_start = 0; sample_start < input_count1; sample_start += batch_size_){
+            int64_t sample_end = std::min(input_count1, sample_start + batch_size_);
+            int64_t sample_len = sample_end - sample_start;
 
-        assert(output1_4.element_num() == output1.size());
-        output1.resize(output1_4.element_num());
-        for(int i = 0; i < output1_4.element_num(); ++i){
-            output1[i] = output1_4.data()[i];
+            Tensor<float> input_tensor_0({sample_len, layers_[0]}, const_cast<float*>(input1.data()) + sample_start * input_dim());
+            Tensor<float> input_tensor_1({sample_len, layers_[1]}, output_buffer_[0].data());
+            Tensor<float> input_tensor_2({sample_len, layers_[2]}, output_buffer_[1].data());
+            Tensor<float> input_tensor_3({sample_len, layers_[3]}, output_buffer_[2].data());
+            Tensor<float> input_tensor_4({sample_len, layers_[4]}, output_buffer_[3].data());
+
+            model1_[0]->forward(input_tensor_0, input_tensor_1);
+            model1_[1]->forward(input_tensor_1, input_tensor_2);
+            model1_[2]->forward(input_tensor_2, input_tensor_3);
+            model1_[3]->forward(input_tensor_3, input_tensor_4);
+
+            double* __restrict__ output1_ptr = output1.data() + sample_start * output_dim();
+            const float* const __restrict__ input_tensor_4_ptr = input_tensor_4.data();
+
+            for(int i = 0; i < input_tensor_4.element_num(); ++i){
+                output1_ptr[i] = input_tensor_4_ptr[i];
+            }
         }
     }
 
     if(input_count2 > 0){
-        int offset2 = input_count0 + input_count1;
-        Tensor<float> input2_0({input_count2, layers_[0]}, const_cast<float*>(input2.data()));
-        Tensor<float> output2_1({input_count2, layers_[1]}, output_buffer_[0].data() + offset2 * layers_[1]);
-        Tensor<float> output2_2({input_count2, layers_[2]}, output_buffer_[1].data() + offset2 * layers_[2]);
-        Tensor<float> output2_3({input_count2, layers_[3]}, output_buffer_[2].data() + offset2 * layers_[3]);
-        Tensor<float> output2_4({input_count2, layers_[4]}, output_buffer_[3].data() + offset2 * layers_[4]);
+        output2.resize(input_count2 * output_dim());
 
-        model2_[0]->forward(input2_0, output2_1);
-        model2_[1]->forward(output2_1, output2_2);
-        model2_[2]->forward(output2_2, output2_3);
-        model2_[3]->forward(output2_3, output2_4);
+        for(int64_t sample_start = 0; sample_start < input_count2; sample_start += batch_size_){
+            int64_t sample_end = std::min(input_count2, sample_start + batch_size_);
+            int64_t sample_len = sample_end - sample_start;
 
-        assert(output2_4.element_num() == output2.size());
-        output2.resize(output2_4.element_num());
-        for(int i = 0; i < output2_4.element_num(); ++i){
-            output2[i] = output2_4.data()[i];
+            Tensor<float> input_tensor_0({sample_len, layers_[0]}, const_cast<float*>(input2.data()) + sample_start * input_dim());
+            Tensor<float> input_tensor_1({sample_len, layers_[1]}, output_buffer_[0].data());
+            Tensor<float> input_tensor_2({sample_len, layers_[2]}, output_buffer_[1].data());
+            Tensor<float> input_tensor_3({sample_len, layers_[3]}, output_buffer_[2].data());
+            Tensor<float> input_tensor_4({sample_len, layers_[4]}, output_buffer_[3].data());
+
+            model2_[0]->forward(input_tensor_0, input_tensor_1);
+            model2_[1]->forward(input_tensor_1, input_tensor_2);
+            model2_[2]->forward(input_tensor_2, input_tensor_3);
+            model2_[3]->forward(input_tensor_3, input_tensor_4);
+
+            double* __restrict__ output2_ptr = output2.data() + sample_start * output_dim();
+            const float* const __restrict__ input_tensor_4_ptr = input_tensor_4.data();
+
+            for(int i = 0; i < input_tensor_4.element_num(); ++i){
+                output2_ptr[i] = input_tensor_4_ptr[i];
+            }
         }
     }
 
+    double dnn_infer_end = MPI_Wtime();
+    double dnn_infer_time = dnn_infer_end - dnn_infer_start;
+    double FLOPs = (input_count0 + input_count1 + input_count2) * FLOPs_per_sample_;
+    int num_threads = omp_get_max_threads();
+    double theoretical_peak = 3.3792 / 48. * 2. * num_threads;
+    double FLOPS = FLOPs / dnn_infer_time;
+    double TFLOPS = FLOPS * 1e-12;
+    double peak = TFLOPS * 100. / theoretical_peak;
+
+    int mpirank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+
+    if(mpirank == 0){
+        std::cout << "Inference Performance ---------------" << std::endl;
+        std::cout << "samples : " << (input_count0 + input_count1 + input_count2) << std::endl;
+        std::cout << "batch size : " << batch_size_ << std::endl;
+        std::cout << "Time : " << dnn_infer_time << std::endl;
+        std::cout << "FLOPS : " << FLOPs << std::endl;
+        std::cout << "TFLOPS : " << TFLOPS << std::endl;
+        std::cout << "Peak : " << peak << std::endl;
+        std::cout << "-------------------------------------" << std::endl;
+    } 
 }
 
 
