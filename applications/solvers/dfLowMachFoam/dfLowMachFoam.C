@@ -71,6 +71,7 @@ Description
 #ifdef _CSR_
 #include "csrMatrix.H"
 #endif
+#include <assert.h>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -15,9 +15,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-chemistry            on;
+chemistry            off;
 
-CanteraMechanismFile "h2_12s.yaml";
+CanteraMechanismFile "ES80_H2-7-16.yaml";
 
 transportModel       "Mix";
 
@@ -25,6 +25,13 @@ odeCoeffs
 {
     "relTol"         1e-6;
     "absTol"         1e-10;
+}
+
+RefineSettings
+{
+    filePath "adiabatic_64.txt";
+    girdSize 64;
+    refineLevel 0;
 }
 
 inertSpecie          "N2";

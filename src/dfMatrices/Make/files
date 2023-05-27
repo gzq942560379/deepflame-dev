@@ -1,5 +1,5 @@
 
-dfMatrix/dfMatrix.cpp
+dfMatrix/dfMatrix.C
 
 csrMatrix=csrMatrix
 $(csrMatrix)/csrMatrix/csrMatrix.C

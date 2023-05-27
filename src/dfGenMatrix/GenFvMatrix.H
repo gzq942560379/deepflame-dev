@@ -94,6 +94,14 @@ turbulenceModelLinearViscousStressDivDevRhoReff
     compressible::turbulenceModel& turbulence
 );
 
+tmp<fvVectorMatrix>
+GenMatrix_U(
+    const volScalarField& rho,
+    volVectorField& U,
+    const surfaceScalarField& phi,
+    const volScalarField& p, 
+    compressible::turbulenceModel& turbulence
+);
 
 tmp<fvScalarMatrix>
 GenMatrix_Y(
