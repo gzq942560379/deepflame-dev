@@ -33,8 +33,7 @@ if [ ! -z "$LIBTORCH_ROOT"  ]; then
     cd "$DF_SRC/dfChemistryModel/DNNInferencer"
     mkdir build
     cd build
-    cmake .. -DCMAKE_CXX_COMPILER=mpiFCC -DCMAKE_CXX_FLAGS="-Nclang -Ofast -g -fopenmp -std=c++11"
-    make VERBOSE=1
+    cmake .. -DCMAKE_CXX_COMPILER=mpiFCC -DCMAKE_CXX_FLAGS="-Nclang -Ofast -g -mlittle-endian" -DLIBTENSORFLOW_ROOT=$LIBTENSORFLOW_ROOT
     cp ./libDNNInferencer.so $DF_ROOT/lib/
 fi
 if [ ! -z "$USE_TENSORFLOW"  ]; then
@@ -49,7 +48,7 @@ if [ ! -z "$USE_BLASDNN" ]; then
     cd "$DF_SRC/dfChemistryModel/DNNInferencer_blas"
     mkdir build
     cd build
-    cmake .. -DCMAKE_CXX_FLAGS="-Nclang -Ofast -g -fopenmp -Nfjomplib -std=c++11"
+    cmake .. -DCMAKE_CXX_COMPILER=mpiFCC -DCMAKE_CXX_FLAGS="-Nclang -Ofast -march=armv8.2-a+sve -mcpu=a64fx -g -fopenmp -Nfjomplib -std=c++11"
     make VERBOSE=1
     cp ./libDNNInferencer_blas.so $DF_ROOT/lib/
 fi

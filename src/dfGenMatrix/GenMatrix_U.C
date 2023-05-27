@@ -406,7 +406,7 @@ GenMatrix_U(
 
     // laplacian
     // 1. interpolation
-    volScalarField gamma = turbulence.rho()*turbulence.nuEff();
+    volScalarField gamma = (turbulence.rho()*turbulence.nuEff()).ref();
     tmp<surfaceScalarField> tgammaf(
         new GeometricField<scalar, fvsPatchField, surfaceMesh>
         (
@@ -448,7 +448,7 @@ GenMatrix_U(
     }
     GenMatrix_U_loop_end = MPI_Wtime();
     GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
-    surfaceScalarField gammaMagSf = gammaf*mesh.magSf();
+    surfaceScalarField gammaMagSf = (gammaf * mesh.magSf()).ref();
     const surfaceScalarField& deltaCoeffs = mesh.nonOrthDeltaCoeffs();
 
     // fvm.upper() = deltaCoeffs.primitiveField()*gammaMagSf.primitiveField();

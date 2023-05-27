@@ -14,11 +14,6 @@ double U_build_sum_start, U_build_sum_end, U_build_sum_time = 0.;
 double U_build_orig_start, U_build_orig_end, U_build_orig_time = 0.;
 double U_build_new_start, U_build_new_end, U_build_new_time = 0.;
 
-Info << "U equation build scheme : " << endl;
-Info << "fvm::ddt(rho, U) Scheme : " << U.mesh().ddtScheme("ddt(" + U.name() + ')') << endl;
-Info << "fvm::div(phi, U) Scheme : " << U.mesh().divScheme("div(" + phi.name() + ',' + U.name() + ')') << endl;
-Info << "fvc::grad(p) Scheme : " << p.mesh().gradScheme("grad(" + p.name() + ')') << endl;
-
 double U_total_start = MPI_Wtime();
 
 U_build_start = MPI_Wtime();
@@ -53,8 +48,7 @@ tmp<fvVectorMatrix> tUEqn
     == 
     -fvc::grad(p)
 );
-U_build_orig_end = MPI_Wtime();
-U_build_orig_time = U_build_orig_end - U_build_orig_start;
+
 fvVectorMatrix& UEqn = tUEqn.ref();
 U_build_new_start = MPI_Wtime();
 tmp<fvVectorMatrix> tUEqn_new = GenMatrix_U(rho, U, phi, p, turbulence());
@@ -101,12 +95,7 @@ for (direction cmpt=0; cmpt<vector::nComponents; ++cmpt)
     }
 }
 
-U_build_sum_end = MPI_Wtime();
-U_build_sum_time += U_build_sum_end - U_build_sum_start;
-U_build_relax_start = MPI_Wtime();
 UEqn.relax();
-U_build_relax_end = MPI_Wtime();
-U_build_relax_time += U_build_relax_end - U_build_relax_start;
 
 U_build_end = MPI_Wtime();
 U_build_time += U_build_end - U_build_start;
@@ -122,16 +111,7 @@ if (pimple.momentumPredictor())
 
     U_build_start = MPI_Wtime();
 
-    U_build_grad_start = MPI_Wtime();
-    auto tGaussGradSchemeGrad = gaussGradSchemeGrad(p);
-    U_build_grad_end = MPI_Wtime();
-    U_build_grad_time += U_build_grad_end - U_build_grad_start;
-
-    U_build_sum_start = MPI_Wtime();
-    fvVectorMatrix UEqnTmp(UEqn == -tGaussGradSchemeGrad);
-    fvVectorMatrix& UEqn = tUEqn.ref();
-    U_build_sum_end = MPI_Wtime();
-    U_build_sum_time += U_build_sum_end - U_build_sum_start;
+    fvVectorMatrix UEqnTmp(UEqn == -fvc::grad(p));
 
     U_build_end = MPI_Wtime();
     U_build_time += U_build_end - U_build_start;
@@ -142,18 +122,24 @@ if (pimple.momentumPredictor())
 //     U_convert_end = MPI_Wtime();
 //     U_convert_time += U_convert_end - U_convert_start;
 // #endif
+// #ifdef _CSR_
+//     U_convert_start = MPI_Wtime();
+//     csr.init_value_from_lduMatrix(UEqnTmp);
+//     U_convert_end = MPI_Wtime();
+//     U_convert_time += U_convert_end - U_convert_start;
+// #endif
 
 
     U_solve_start = MPI_Wtime();
-#ifdef _CSR_
-    auto& psi = const_cast<GeometricField<vector, fvPatchField, volMesh>&>(UEqnTmp.psi());
-    auto& source = UEqnTmp.source();
-    auto& internalCoeffs = UEqnTmp.internalCoeffs();
-    auto& boundaryCoeffs = UEqnTmp.boundaryCoeffs();
-    csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
-    // UEqnTmp.solve();
-#endif
+// #ifdef _CSR_
+//     auto& psi = const_cast<GeometricField<vector, fvPatchField, volMesh>&>(UEqnTmp.psi());
+//     auto& source = UEqnTmp.source();
+//     auto& internalCoeffs = UEqnTmp.internalCoeffs();
+//     auto& boundaryCoeffs = UEqnTmp.boundaryCoeffs();
+//     csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
+// #else
+    UEqnTmp.solve();
+// #endif
 
     U_solve_end = MPI_Wtime();
     U_solve_time = U_solve_end - U_solve_start;

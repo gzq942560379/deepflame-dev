@@ -58,7 +58,6 @@ postProcessing/
 *.out
 output.*
 
-processor*/
 chemkin/
 *.foam
 0.*/
