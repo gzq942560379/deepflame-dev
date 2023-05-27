@@ -6,10 +6,7 @@ gaussLaplacianScheme.C
 linearViscousStress.C
 
 GenMatrix_Y.C
-<<<<<<< HEAD
-=======
 GenMatrix_U.C
->>>>>>> 4aea299718a1f66273060aeeea3f67fa3fb00f94
 utils.C
 
 LIB = $(DF_LIBBIN)/libdfGenMatrix
