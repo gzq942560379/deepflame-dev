@@ -32,7 +32,7 @@ void Foam::CSRGAMGSolver::scale
 (
     scalarField& field,
     scalarField& Acf,
-    const lduMatrix& A,
+    const csrMatrix& A,
     const FieldField<Field, scalar>& interfaceLevelBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaceLevel,
     const scalarField& source,

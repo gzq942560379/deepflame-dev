@@ -232,9 +232,9 @@ Foam::CSRGAMGAgglomeration::CSRGAMGAgglomeration
 )
 :
     MeshObject<lduMesh, Foam::GeometricMeshObject, CSRGAMGAgglomeration>(mesh),
-
-    maxLevels_(50),
-
+    maxLevels_(
+        controlDict.lookupOrDefault<label>("maxLevels", 50)
+    ),
     nCellsInCoarsestLevel_
     (
         controlDict.lookupOrDefault<label>("nCellsInCoarsestLevel", 10)

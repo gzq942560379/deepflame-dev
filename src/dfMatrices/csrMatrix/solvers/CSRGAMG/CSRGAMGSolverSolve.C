@@ -44,7 +44,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
 
     // Calculate A.psi used to calculate the initial residual
     scalarField Apsi(psi.size());
-    matrix_.ldu().Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+    matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
 
     // Create the storage for the finestCorrection which may be used as a
     // temporary in normFactor
@@ -84,7 +84,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
         PtrList<scalarField> coarseSources;
 
         // Create the smoothers for all levels
-        PtrList<lduMatrix::smoother> smoothers;
+        PtrList<csrMatrix::smoother> smoothers;
 
         // Scratch fields if processor-agglomerated coarse level meshes
         // are bigger than original. Usually not needed
@@ -121,7 +121,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
             );
 
             // Calculate finest level residual field
-            matrix_.ldu().Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
             finestResidual = source;
             finestResidual -= Apsi;
 
@@ -153,7 +153,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
 
 void Foam::CSRGAMGSolver::Vcycle
 (
-    const PtrList<lduMatrix::smoother>& smoothers,
+    const PtrList<csrMatrix::smoother>& smoothers,
     scalarField& psi,
     const scalarField& source,
     scalarField& Apsi,
@@ -181,7 +181,6 @@ void Foam::CSRGAMGSolver::Vcycle
     {
         Pout<< "Pre-smoothing scaling factors: ";
     }
-
 
     // Residual restriction (going to coarser levels)
     for (label leveli = 0; leveli < coarsestLevel; leveli++)
@@ -223,7 +222,7 @@ void Foam::CSRGAMGSolver::Vcycle
                         (
                             ACf.operator const scalarField&()
                         ),
-                        matrixLevels_[leveli],
+                        csrMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         coarseSources[leveli],
@@ -231,8 +230,7 @@ void Foam::CSRGAMGSolver::Vcycle
                     );
                 }
 
-                // Correct the residual with the new solution
-                matrixLevels_[leveli].Amul
+                csrMatrixLevels_[leveli].Amul
                 (
                     const_cast<scalarField&>
                     (
@@ -260,12 +258,24 @@ void Foam::CSRGAMGSolver::Vcycle
 
     if (debug >= 2 && nPreSweeps_)
     {
-        Pout<< endl;
+        Pout << "." << endl;
     }
 
+    Info << "smoothers.size() : " << smoothers.size() << endl;
+    
+    // smooth Coarsest level
+    if(nCoarsestSweeps_ > 0){
+        smoothers[coarsestLevel + 1].smooth
+        (
+            coarseCorrFields[coarsestLevel],
+            coarseSources[coarsestLevel],
+            cmpt,
+            nCoarsestSweeps_
+        );
+    }
 
     // Solve Coarsest level with either an iterative or direct solver
-    if (coarseCorrFields.set(coarsestLevel))
+    if (solveCoarsest_ && coarseCorrFields.set(coarsestLevel))
     {
         solveCoarsestLevel
         (
@@ -334,7 +344,7 @@ void Foam::CSRGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        matrixLevels_[leveli],
+                        csrMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         agglomeration_.restrictAddressing(leveli + 1),
@@ -348,7 +358,7 @@ void Foam::CSRGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        matrixLevels_[leveli],
+                        csrMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         cmpt
@@ -368,7 +378,7 @@ void Foam::CSRGAMGSolver::Vcycle
                 (
                     coarseCorrFields[leveli],
                     ACfRef,
-                    matrixLevels_[leveli],
+                    csrMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevels_[leveli],
                     coarseSources[leveli],
@@ -397,6 +407,11 @@ void Foam::CSRGAMGSolver::Vcycle
         }
     }
 
+    if (debug >= 2)
+    {
+        Pout << "." << endl;
+    }
+
     // Prolong the finest level correction
     agglomeration_.prolongField
     (
@@ -412,7 +427,7 @@ void Foam::CSRGAMGSolver::Vcycle
         (
             finestCorrection,
             Apsi,
-            matrix_.ldu(),
+            matrix_,
             interfaceBouCoeffs_,
             interfaces_,
             agglomeration_.restrictAddressing(0),
@@ -428,7 +443,7 @@ void Foam::CSRGAMGSolver::Vcycle
         (
             finestCorrection,
             Apsi,
-            matrix_.ldu(),
+            matrix_,
             interfaceBouCoeffs_,
             interfaces_,
             finestResidual,
@@ -441,26 +456,27 @@ void Foam::CSRGAMGSolver::Vcycle
         psi[i] += finestCorrection[i];
     }
 
-    smoothers[0].smooth
-    (
-        psi,
-        source,
-        cmpt,
-        nFinestSweeps_
-    );
+    if(nFinestSweeps_ > 0){
+        smoothers[0].smooth
+        (
+            psi,
+            source,
+            cmpt,
+            nFinestSweeps_
+        );
+    }
 }
-
 
 void Foam::CSRGAMGSolver::initVcycle
 (
     PtrList<scalarField>& coarseCorrFields,
     PtrList<scalarField>& coarseSources,
-    PtrList<lduMatrix::smoother>& smoothers,
+    PtrList<csrMatrix::smoother>& smoothers,
     scalarField& scratch1,
     scalarField& scratch2
 ) const
 {
-    label maxSize = matrix_.ldu().diag().size();
+    label maxSize = matrix_.diag().size();
 
     coarseCorrFields.setSize(matrixLevels_.size());
     coarseSources.setSize(matrixLevels_.size());
@@ -470,10 +486,10 @@ void Foam::CSRGAMGSolver::initVcycle
     smoothers.set
     (
         0,
-        lduMatrix::smoother::New
+        csrMatrix::smoother::New
         (
             fieldName_,
-            matrix_.ldu(),
+            matrix_,
             interfaceBouCoeffs_,
             interfaceIntCoeffs_,
             interfaces_,
@@ -503,10 +519,10 @@ void Foam::CSRGAMGSolver::initVcycle
             smoothers.set
             (
                 leveli + 1,
-                lduMatrix::smoother::New
+                csrMatrix::smoother::New
                 (
                     fieldName_,
-                    matrixLevels_[leveli],
+                    csrMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevelsIntCoeffs_[leveli],
                     interfaceLevels_[leveli],
@@ -516,7 +532,7 @@ void Foam::CSRGAMGSolver::initVcycle
         }
     }
 
-    if (maxSize > matrix_.ldu().diag().size())
+    if (maxSize > matrix_.diag().size())
     {
         // Allocate some scratch storage
         scratch1.setSize(maxSize);

@@ -31,48 +31,48 @@ void Foam::CSRGAMGSolver::interpolate
 (
     scalarField& psi,
     scalarField& Apsi,
-    const lduMatrix& m,
+    const csrMatrix& m,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
     const direction cmpt
 ) const
 {
     scalar* __restrict__ psiPtr = psi.begin();
-
-    const label* const __restrict__ uPtr = m.lduAddr().upperAddr().begin();
-    const label* const __restrict__ lPtr = m.lduAddr().lowerAddr().begin();
-
-    const scalar* const __restrict__ diagPtr = m.diag().begin();
-    const scalar* const __restrict__ upperPtr = m.upper().begin();
-    const scalar* const __restrict__ lowerPtr = m.lower().begin();
-
     Apsi = 0;
     scalar* __restrict__ ApsiPtr = Apsi.begin();
+    const scalar* const __restrict__ diagPtr = m.diag().begin();
 
-    m.initMatrixInterfaces
-    (
-        interfaceBouCoeffs,
-        interfaces,
-        psi,
-        Apsi,
-        cmpt
-    );
+    // const label* const __restrict__ uPtr = m.lduAddr().upperAddr().begin();
+    // const label* const __restrict__ lPtr = m.lduAddr().lowerAddr().begin();
+    // const scalar* const __restrict__ upperPtr = m.upper().begin();
+    // const scalar* const __restrict__ lowerPtr = m.lower().begin();
 
-    const label nFaces = m.upper().size();
-    for (label face=0; face<nFaces; face++)
-    {
-        ApsiPtr[uPtr[face]] += lowerPtr[face]*psiPtr[lPtr[face]];
-        ApsiPtr[lPtr[face]] += upperPtr[face]*psiPtr[uPtr[face]];
-    }
 
-    m.updateMatrixInterfaces
-    (
-        interfaceBouCoeffs,
-        interfaces,
-        psi,
-        Apsi,
-        cmpt
-    );
+    // m.initMatrixInterfaces
+    // (
+    //     interfaceBouCoeffs,
+    //     interfaces,
+    //     psi,
+    //     Apsi,
+    //     cmpt
+    // );
+
+    // const label nFaces = m.upper().size();
+    // for (label face=0; face<nFaces; face++)
+    // {
+    //     ApsiPtr[uPtr[face]] += lowerPtr[face]*psiPtr[lPtr[face]];
+    //     ApsiPtr[lPtr[face]] += upperPtr[face]*psiPtr[uPtr[face]];
+    // }
+
+    // m.updateMatrixInterfaces
+    // (
+    //     interfaceBouCoeffs,
+    //     interfaces,
+    //     psi,
+    //     Apsi,
+    //     cmpt
+    // );
+    m.Amul(Apsi, psi, interfaceBouCoeffs, interfaces, cmpt);
 
     const label nCells = m.diag().size();
     for (label celli=0; celli<nCells; celli++)
@@ -86,7 +86,7 @@ void Foam::CSRGAMGSolver::interpolate
 (
     scalarField& psi,
     scalarField& Apsi,
-    const lduMatrix& m,
+    const csrMatrix& m,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
     const labelList& restrictAddressing,

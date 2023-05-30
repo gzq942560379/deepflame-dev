@@ -41,7 +41,7 @@ Description
 void Foam::csrMatrix::Amul
 (
     scalarField& Apsi,
-    const tmp<scalarField>& tpsi,
+    const scalarField& psi,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
     const direction cmpt
@@ -49,7 +49,6 @@ void Foam::csrMatrix::Amul
 {
     scalar* __restrict__ ApsiPtr = Apsi.begin();
 
-    const scalarField& psi = tpsi();
     const scalar* const __restrict__ psiPtr = psi.begin();
     const scalar* const __restrict__ diagPtr = diag_value_.begin();
 
@@ -85,8 +84,6 @@ void Foam::csrMatrix::Amul
         Apsi,
         cmpt
     );
-
-    tpsi.clear();
 }
 #endif
 
@@ -94,7 +91,7 @@ void Foam::csrMatrix::Amul
 void Foam::csrMatrix::Amul
 (
     scalarField& Apsi,
-    const tmp<scalarField>& tpsi,
+    const scalarField& psi,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
     const direction cmpt
@@ -102,7 +99,6 @@ void Foam::csrMatrix::Amul
 {
     scalar* __restrict__ ApsiPtr = Apsi.begin();
 
-    const scalarField& psi = tpsi();
     const scalar* const __restrict__ psiPtr = psi.begin();
     const scalar* const __restrict__ diagPtr = diag_value_.begin();
 
@@ -168,10 +164,23 @@ void Foam::csrMatrix::Amul
         cmpt
     );
 
-    tpsi.clear();
 }
 #endif
 
+
+void Foam::csrMatrix::Amul
+(
+    scalarField& Apsi,
+    const tmp<scalarField>& tpsi,
+    const FieldField<Field, scalar>& interfaceBouCoeffs,
+    const lduInterfaceFieldPtrsList& interfaces,
+    const direction cmpt
+) const
+{
+    Amul(Apsi, tpsi(), interfaceBouCoeffs, interfaces, cmpt);
+    tpsi.clear();
+    return;
+}
 
 
 // void Foam::csrMatrix::Tmul

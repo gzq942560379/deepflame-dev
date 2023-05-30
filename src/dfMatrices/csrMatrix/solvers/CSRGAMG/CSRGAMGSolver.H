@@ -98,6 +98,9 @@ class CSRGAMGSolver
         //- Number of smoothing sweeps on finest mesh
         label nFinestSweeps_;
 
+        //- Number of smoothing sweeps on coarsest mesh
+        label nCoarsestSweeps_;
+        
         //- Choose if the corrections should be interpolated after injection.
         //  By default corrections are not interpolated.
         bool interpolateCorrection_;
@@ -106,6 +109,9 @@ class CSRGAMGSolver
         //  By default corrections for symmetric matrices are scaled
         //  but not for asymmetric matrices.
         bool scaleCorrection_;
+
+        //- solve the coarsest level
+        bool solveCoarsest_;
 
         //- Direct or iteratively solve the coarsest level
         bool directSolveCoarsest_;
@@ -135,9 +141,6 @@ class CSRGAMGSolver
 
 
     // Private Member Functions
-
-        //- Read control parameters from the control dictionary
-        virtual void readControls();
 
         //- Simplified access to interface level
         const lduInterfaceFieldPtrsList& interfaceLevel
@@ -233,7 +236,7 @@ class CSRGAMGSolver
         (
             scalarField& psi,
             scalarField& Apsi,
-            const lduMatrix& m,
+            const csrMatrix& m,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const lduInterfaceFieldPtrsList& interfaces,
             const direction cmpt
@@ -245,7 +248,7 @@ class CSRGAMGSolver
         (
             scalarField& psi,
             scalarField& Apsi,
-            const lduMatrix& m,
+            const csrMatrix& m,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const lduInterfaceFieldPtrsList& interfaces,
             const labelList& restrictAddressing,
@@ -262,41 +265,14 @@ class CSRGAMGSolver
         (
             scalarField& field,
             scalarField& Acf,
-            const lduMatrix& A,
+            const csrMatrix& A,
             const FieldField<Field, scalar>& interfaceLevelBouCoeffs,
             const lduInterfaceFieldPtrsList& interfaceLevel,
             const scalarField& source,
             const direction cmpt
         ) const;
 
-        //- Initialise the data structures for the V-cycle
-        void initVcycle
-        (
-            PtrList<scalarField>& coarseCorrFields,
-            PtrList<scalarField>& coarseSources,
-            PtrList<lduMatrix::smoother>& smoothers,
-            scalarField& scratch1,
-            scalarField& scratch2
-        ) const;
 
-
-        //- Perform a single GAMG V-cycle with pre, post and finest smoothing.
-        void Vcycle
-        (
-            const PtrList<lduMatrix::smoother>& smoothers,
-            scalarField& psi,
-            const scalarField& source,
-            scalarField& Apsi,
-            scalarField& finestCorrection,
-            scalarField& finestResidual,
-
-            scalarField& scratch1,
-            scalarField& scratch2,
-
-            PtrList<scalarField>& coarseCorrFields,
-            PtrList<scalarField>& coarseSources,
-            const direction cmpt=0
-        ) const;
 
         //- Create and return the dictionary to specify the PCG solver
         //  to solve the coarsest level
@@ -321,6 +297,38 @@ class CSRGAMGSolver
             const scalarField& coarsestSource
         ) const;
 
+protected:
+
+        //- Read control parameters from the control dictionary
+        virtual void readControls();
+
+        //- Initialise the data structures for the V-cycle
+        void initVcycle
+        (
+            PtrList<scalarField>& coarseCorrFields,
+            PtrList<scalarField>& coarseSources,
+            PtrList<csrMatrix::smoother>& smoothers,
+            scalarField& scratch1,
+            scalarField& scratch2
+        ) const;
+
+        //- Perform a single GAMG V-cycle with pre, post and finest smoothing.
+        void Vcycle
+        (
+            const PtrList<csrMatrix::smoother>& smoothers,
+            scalarField& psi,
+            const scalarField& source,
+            scalarField& Apsi,
+            scalarField& finestCorrection,
+            scalarField& finestResidual,
+
+            scalarField& scratch1,
+            scalarField& scratch2,
+
+            PtrList<scalarField>& coarseCorrFields,
+            PtrList<scalarField>& coarseSources,
+            const direction cmpt=0
+        ) const;
 
 public:
 

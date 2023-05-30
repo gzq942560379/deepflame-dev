@@ -602,7 +602,7 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         sols.emplace_back(sol);
     }
     
-    #pragma omp parallel for schedule(static, 1)
+    // #pragma omp parallel for schedule(static, 1)
     forAll(T_, celli)
     {
         scalarList yTemp(mixture_.nSpecies());

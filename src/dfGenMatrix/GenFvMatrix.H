@@ -119,6 +119,7 @@ GenMatrix_Y(
 
 
 void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
+void check_fvmatrix_equal(fvVectorMatrix& a,fvVectorMatrix& b);
 
 
 } // End namespace Foam

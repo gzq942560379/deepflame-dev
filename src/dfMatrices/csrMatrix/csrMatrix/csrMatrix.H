@@ -101,6 +101,14 @@ public:
         const lduInterfaceFieldPtrsList&,
         const direction cmpt
     ) const;
+    void Amul
+    (
+        scalarField&,
+        const scalarField&,
+        const FieldField<Field, scalar>&,
+        const lduInterfaceFieldPtrsList&,
+        const direction cmpt
+    ) const;
     
     //- Sum the coefficients on each row of the matrix
     void sumA

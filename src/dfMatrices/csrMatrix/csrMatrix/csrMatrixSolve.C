@@ -18,9 +18,6 @@ SolverPerformance<Type> csrMatrix::solve(
     const FieldField<Field, Type>& boundaryCoeffs,
     const dictionary& solverControls
 ){
-
-    
-
     SolverPerformance<Type> solverPerfVec
     (
         "csrMatrix::solve",

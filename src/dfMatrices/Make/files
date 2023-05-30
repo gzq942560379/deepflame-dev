@@ -10,6 +10,7 @@ $(csrMatrix)/csrMatrix/csrMatrixPreconditioner.C
 $(csrMatrix)/csrMatrix/csrMatrixSmoother.C
 $(csrMatrix)/csrMatrix/csrMatrixUpdateMatrixInterfaces.C
 $(csrMatrix)/preconditioners/csrNoPreconditioner/csrNoPreconditioner.C
+$(csrMatrix)/preconditioners/CSRGAMGPreconditioner/CSRGAMGPreconditioner.C
 $(csrMatrix)/solvers/csrDiagonalSolver/csrDiagonalSolver.C
 $(csrMatrix)/solvers/CSRPBiCGStab/CSRPBiCGStab.C
 $(csrMatrix)/solvers/CSRSmootherPCG/CSRSmootherPCG.C
