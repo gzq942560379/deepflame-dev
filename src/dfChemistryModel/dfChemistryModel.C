@@ -588,11 +588,8 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 {
     psi_.oldTime();
     
-    double t0 = omp_get_wtime();
-    double t0_setState_PY, t1_setState_PY, tsum_setState_PY = 0;
-    double t0_setState_HP, t1_setState_HP, tsum_setState_HP = 0;
-
-    int nThreads = omp_get_max_threads();
+    // int nThreads = omp_get_max_threads();
+    int nThreads = 1;
     std::vector<std::shared_ptr<Cantera::Solution>> sols;
     const word mechanismFile = this->lookup("CanteraMechanismFile");
     Info << "omp thread number = " << nThreads << endl;
@@ -618,15 +615,9 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
             yTemp[i] = Y_[i][celli];
         }
 
-        t0_setState_PY = omp_get_wtime();
         CanteraGas->setState_PY(p_[celli], yTemp.begin());
-        t1_setState_PY = omp_get_wtime();
-        tsum_setState_PY += t1_setState_PY - t0_setState_PY;
 
-        t0_setState_HP = omp_get_wtime();
         CanteraGas->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
-        t1_setState_HP = omp_get_wtime();
-        tsum_setState_HP += t1_setState_HP - t0_setState_HP;
 
         T_[celli] = CanteraGas->temperature();
 
@@ -662,12 +653,6 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
             }
         }
     }
-    double t1 = omp_get_wtime();
-    Info << "correct Thermo time = " << t1-t0 << endl;
-    Info << "setState_PY time = " << tsum_setState_PY << endl;
-    Info << "setState_HP time = " << tsum_setState_HP << endl;
-
-
 
     const volScalarField::Boundary& pBf = p_.boundaryField();
 

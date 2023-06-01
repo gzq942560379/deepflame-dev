@@ -337,7 +337,6 @@ const Foam::CSRGAMGAgglomeration& Foam::CSRGAMGAgglomeration::New
     const dictionary& controlDict
 )
 {
-    Info << "Foam::CSRGAMGAgglomeration::New start" << endl;
     const lduMesh& mesh = matrix.mesh();
 
     if
@@ -383,7 +382,6 @@ const Foam::CSRGAMGAgglomeration& Foam::CSRGAMGAgglomeration::New
             CSRGAMGAgglomeration::typeName
         );
     }
-    Info << "Foam::CSRGAMGAgglomeration::New end" << endl;
 }
 
 

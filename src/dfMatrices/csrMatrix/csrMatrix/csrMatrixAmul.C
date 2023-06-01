@@ -33,8 +33,8 @@ Description
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 
-// #ifdef Amul_NAIVE
-#define Amul_UNLOOP
+#define Amul_NAIVE
+// #define Amul_UNLOOP
 
 
 #ifdef Amul_NAIVE

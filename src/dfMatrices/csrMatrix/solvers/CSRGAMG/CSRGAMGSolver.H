@@ -139,8 +139,7 @@ class CSRGAMGSolver
         //- LU decompsed coarsest matrix
         autoPtr<LUscalarMatrix> coarsestLUMatrixPtr_;
 
-
-    // Private Member Functions
+        // Private Member Functions
 
         //- Simplified access to interface level
         const lduInterfaceFieldPtrsList& interfaceLevel
@@ -365,6 +364,17 @@ public:
             const scalarField& source,
             const direction cmpt=0
         ) const;
+
+        // profiling
+        mutable double Vcycle_time = 0.;
+        mutable double spmv_time = 0.;
+        mutable double smooth_time = 0.;
+        mutable double scale_time = 0.;
+        mutable double scale_spmv_time = 0.;
+        mutable double interpolate_spmv_time = 0.;
+        mutable double interpolate_time = 0.;
+        mutable double restrictField_time = 0.;
+        mutable double prolongField_time = 0.;
 };
 
 

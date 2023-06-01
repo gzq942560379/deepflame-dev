@@ -324,6 +324,8 @@ public:
             scalarField& tmpField
         ) const;
 
+        virtual void print_time() const {}
+
     };
 
     //- Abstract base-class for csrMatrix smoothers
@@ -454,6 +456,9 @@ public:
             const direction cmpt,
             const label nSweeps
         ) const = 0;
+
+        virtual void print_time() const {}
+
     };
 
 
@@ -557,6 +562,8 @@ public:
         {
             NotImplemented;
         }
+
+        virtual void print_time() const {}
     };
 
 };

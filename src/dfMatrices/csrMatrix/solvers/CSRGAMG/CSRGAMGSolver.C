@@ -85,8 +85,6 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
     interfaceLevelsBouCoeffs_(agglomeration_.size()),
     interfaceLevelsIntCoeffs_(agglomeration_.size())
 {
-    Info << "Foam::CSRGAMGSolver::CSRGAMGSolver start" << endl;
-
     readControls();
 
     if (agglomeration_.processorAgglomerate())
@@ -209,8 +207,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
     }
 
 
-    // if (debug)
-    if (1)
+    if (debug)
     {
         for
         (
@@ -280,8 +277,6 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
             << exit(FatalError);
     }
 
-    Info << "Foam::CSRGAMGSolver::CSRGAMGSolver end" << endl;
-
 }
 
 
@@ -324,8 +319,7 @@ void Foam::CSRGAMGSolver::readControls()
     controlDict_.readIfPresent("solveCoarsest", solveCoarsest_);
     controlDict_.readIfPresent("directSolveCoarsest", directSolveCoarsest_);
 
-    // if (debug)
-    if (1)
+    if (debug)
     {
         Pout<< "CSRGAMGSolver settings :" << endl
             << "    cacheAgglomeration:" << cacheAgglomeration_ << endl

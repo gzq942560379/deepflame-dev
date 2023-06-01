@@ -24,6 +24,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "CSRGAMGPreconditioner.H"
+#include <mpi.h>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -85,6 +86,9 @@ void Foam::CSRGAMGPreconditioner::precondition
     const direction cmpt
 ) const
 {
+    double start ,end;
+
+    double procondition_start = MPI_Wtime();
     wA = 0.0;
     scalarField AwA(wA.size());
     scalarField finestCorrection(wA.size());
@@ -105,6 +109,7 @@ void Foam::CSRGAMGPreconditioner::precondition
     scalarField finestCorrectionScratch;
 
     // Initialise the above data structures
+    start = MPI_Wtime();
     initVcycle
     (
         coarseCorrFields,
@@ -113,7 +118,11 @@ void Foam::CSRGAMGPreconditioner::precondition
         ApsiScratch,
         finestCorrectionScratch
     );
+    end = MPI_Wtime();
+    initVcycle_time += end - start;
 
+
+    start = MPI_Wtime();
     for (label cycle=0; cycle<nVcycles_; cycle++)
     {
         Vcycle
@@ -145,6 +154,11 @@ void Foam::CSRGAMGPreconditioner::precondition
             finestResidual -= AwA;
         }
     }
+    end = MPI_Wtime();
+    Vcycle_time += end - start;
+
+    double procondition_end = MPI_Wtime();
+    procondition_time += procondition_end - procondition_start;
 }
 
 
