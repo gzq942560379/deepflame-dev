@@ -189,8 +189,8 @@ void csrMatrix::analyze(){
     }
 
     Info << "sparse matrix analyze : " << endl;
-    Info << "row(col) : " << row_ << max_col_count << endl;
-    Info << "nnz : " << off_diag_nnz_ + row_ << max_col_count << endl;
+    Info << "row(col) : " << row_ << endl;
+    Info << "nnz : " << off_diag_nnz_ + row_ << endl;
     Info << "sparsity : " << (off_diag_nnz_ + row_) * 1.0 / row_ / row_ * 100  << "%" << endl;
     Info << "max colume count : " << max_col_count << endl;
     Info << "colume frequency : " << endl;

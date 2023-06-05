@@ -16,6 +16,7 @@ $(csrMatrix)/solvers/CSRPBiCGStab/CSRPBiCGStab.C
 $(csrMatrix)/solvers/CSRSmootherPCG/CSRSmootherPCG.C
 $(csrMatrix)/solvers/CSRPCG/CSRPCG.C
 $(csrMatrix)/smoothers/csrSymGaussSeidel/csrSymGaussSeidelSmoother.C
+$(csrMatrix)/smoothers/csrSymJacobi/csrSymJacobiSmoother.C
 
 $(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverScale.C
 $(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverAgglomerateMatrix.C
