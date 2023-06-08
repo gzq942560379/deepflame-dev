@@ -154,22 +154,25 @@ void csrMatrix::write_pattern(const std::string& filename){
     int mpisize, mpirank;
     MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
     MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
-    std::stringstream ss;
-    ss << filename << "_" << mpirank << ".mtx";
-    FILE* file = fopen(ss.str().c_str(),"w");
-    if(file == NULL){
-        std::cout << "open file error !!! " << ss.str() << std::endl;
-        std::abort();
-    }
-    fprintf(file,"%s\n", "%%MatrixMarket matrix coordinate pattern general");
-    fprintf(file, "%d %d %d\n", row_, col_, off_diag_nnz_);
-    for(label r = 0; r < row_; ++r){
-        for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
-            label c = off_diag_colidx_[index];
-            fprintf(file, "%d %d\n", r + 1, c + 1);
+    if(mpirank == 0){
+        std::stringstream ss;
+        ss << filename << "_" << mpirank << ".mtx";
+        FILE* fr = fopen(ss.str().c_str(),"r");
+        if(fr != NULL){
+            fclose(fr);
+            return;
         }
+        FILE* fw = fopen(ss.str().c_str(),"w");
+        fprintf(fw,"%s\n", "%%MatrixMarket matrix coordinate pattern general");
+        fprintf(fw, "%d %d %d\n", row_, col_, off_diag_nnz_);
+        for(label r = 0; r < row_; ++r){
+            for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
+                label c = off_diag_colidx_[index];
+                fprintf(fw, "%d %d\n", r + 1, c + 1);
+            }
+        }
+        fclose(fw);
     }
-    fclose(file);
 }
 
 void csrMatrix::analyze(){

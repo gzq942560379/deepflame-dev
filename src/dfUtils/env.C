@@ -25,7 +25,7 @@ int env_get_int(const char* name, int default_value){
     return std::atoi(tmp);
 }
 
-int dnn_batch_size = env_get_int("DNN_BATCH_SIZE", 131072);
+int dnn_batch_size = env_get_int("DNN_BATCH_SIZE", 16384);
 
 void env_show(){
     int mpirank;

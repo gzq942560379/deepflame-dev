@@ -9,14 +9,17 @@ $(csrMatrix)/csrMatrix/csrMatrixSolver.C
 $(csrMatrix)/csrMatrix/csrMatrixPreconditioner.C
 $(csrMatrix)/csrMatrix/csrMatrixSmoother.C
 $(csrMatrix)/csrMatrix/csrMatrixUpdateMatrixInterfaces.C
-$(csrMatrix)/preconditioners/csrNoPreconditioner/csrNoPreconditioner.C
-$(csrMatrix)/preconditioners/CSRGAMGPreconditioner/CSRGAMGPreconditioner.C
-$(csrMatrix)/solvers/csrDiagonalSolver/csrDiagonalSolver.C
-$(csrMatrix)/solvers/CSRPBiCGStab/CSRPBiCGStab.C
-$(csrMatrix)/solvers/CSRSmootherPCG/CSRSmootherPCG.C
-$(csrMatrix)/solvers/CSRPCG/CSRPCG.C
+
 $(csrMatrix)/smoothers/csrSymGaussSeidel/csrSymGaussSeidelSmoother.C
 $(csrMatrix)/smoothers/csrSymJacobi/csrSymJacobiSmoother.C
+
+$(csrMatrix)/preconditioners/csrNoPreconditioner/csrNoPreconditioner.C
+$(csrMatrix)/preconditioners/CSRGAMGPreconditioner/CSRGAMGPreconditioner.C
+
+$(csrMatrix)/solvers/csrDiagonalSolver/csrDiagonalSolver.C
+$(csrMatrix)/solvers/CSRPCG/CSRPCG.C
+$(csrMatrix)/solvers/CSRPBiCGStab/CSRPBiCGStab.C
+$(csrMatrix)/solvers/CSRSmootherPCG/CSRSmootherPCG.C
 
 $(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverScale.C
 $(csrMatrix)/solvers/CSRGAMG/CSRGAMGSolverAgglomerateMatrix.C
@@ -40,6 +43,9 @@ $(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/cyclicCSRGAMGInterfaceField/cycl
 $(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/CSRGAMGInterfaceField/CSRGAMGInterfaceFieldNew.C
 $(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/CSRGAMGInterfaceField/CSRGAMGInterfaceField.C
 $(csrMatrix)/solvers/CSRGAMG/csrInterfaceFields/processorCyclicCSRGAMGInterfaceField/processorCyclicCSRGAMGInterfaceField.C
+
+divMatrix=divMatrix
+$(divMatrix)/divMatrix/divMatrix.C
 
 lduMatrix=lduMatrix
 
