@@ -8,7 +8,8 @@ if (!(timeIndex % 2))
     start = MPI_Wtime();
     combustion->correct();
 
-    label flag_mpi_init;
+    //label flag_mpi_init;
+    int flag_mpi_init;
     MPI_Initialized(&flag_mpi_init);
     if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
     end = MPI_Wtime();
