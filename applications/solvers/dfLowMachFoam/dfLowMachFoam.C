@@ -65,13 +65,37 @@ Description
 #include "env.H"
 #include "GenFvMatrix.H"
 
-// #define _CSR_
+#define _CSR_
 // #define OPT_GenMatrix_Y
 
 #ifdef _CSR_
 #include "csrMatrix.H"
 #endif
 #include <assert.h>
+
+// renumber
+#include "argList.H"
+#include "IOobjectList.H"
+#include "fvMesh.H"
+#include "polyTopoChange.H"
+#include "ReadFields.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "SortableList.H"
+#include "decompositionMethod.H"
+#include "renumberMethod.H"
+#include "zeroGradientFvPatchFields.H"
+#include "CuthillMcKeeRenumber.H"
+#include "fvMeshSubset.H"
+#include "cellSet.H"
+#include "faceSet.H"
+#include "pointSet.H"
+
+#ifdef FOAM_USE_ZOLTAN
+    #include "zoltanRenumber.H"
+#endif
+
+#include "renumberMeshFuncs.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -159,6 +183,8 @@ int main(int argc, char *argv[])
         intializeFields_start = MPI_Wtime();
         #include "intializeFields.H"
         intializeFields_end = MPI_Wtime();
+
+        #include "renumberMesh.H"
 
         break;
     }
@@ -355,7 +381,7 @@ int main(int argc, char *argv[])
         Info << "Step time : " << step_time << endl;
         step_timer.push_back(step_time);
     }
-    
+
     double total_end = MPI_Wtime();
     double total_time = total_end - total_start - step_timer[0] - step_timer[1];
 

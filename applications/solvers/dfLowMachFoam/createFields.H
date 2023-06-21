@@ -166,6 +166,7 @@ volVectorField sumYDiffError
 const Switch splitting = CanteraTorchProperties.lookupOrDefault("splittingStrategy", false);
 // switch for field initialization
 bool initialized = false;
+bool renumberMesh = false;
 int refineLevel = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("refineLevel", 0);
 
 
