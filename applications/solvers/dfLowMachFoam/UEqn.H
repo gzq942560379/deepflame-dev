@@ -48,7 +48,8 @@ tmp<fvVectorMatrix> tUEqn
     == 
     -fvc::grad(p)
 );
-
+U_build_orig_end = MPI_Wtime();
+U_build_orig_time = U_build_orig_end - U_build_orig_start;
 fvVectorMatrix& UEqn = tUEqn.ref();
 U_build_new_start = MPI_Wtime();
 tmp<fvVectorMatrix> tUEqn_new = GenMatrix_U(rho, U, phi, p, turbulence());
@@ -57,6 +58,7 @@ U_build_new_time = U_build_new_end - U_build_new_start;
 fvVectorMatrix& UEqn_new = tUEqn_new.ref();
 
 // assert
+
 assert(UEqn.source().begin() != UEqn_new.source().begin());
 for (direction cmpt=0; cmpt<vector::nComponents; ++cmpt)
 {
@@ -111,7 +113,7 @@ if (pimple.momentumPredictor())
 
     U_build_start = MPI_Wtime();
 
-    fvVectorMatrix UEqnTmp(UEqn == -fvc::grad(p));
+    // fvVectorMatrix UEqnTmp(UEqn == -fvc::grad(p));
 
     U_build_end = MPI_Wtime();
     U_build_time += U_build_end - U_build_start;
@@ -130,7 +132,7 @@ if (pimple.momentumPredictor())
 // #endif
 
 
-    U_solve_start = MPI_Wtime();
+    // U_solve_start = MPI_Wtime();
 // #ifdef _CSR_
 //     auto& psi = const_cast<GeometricField<vector, fvPatchField, volMesh>&>(UEqnTmp.psi());
 //     auto& source = UEqnTmp.source();
@@ -138,7 +140,7 @@ if (pimple.momentumPredictor())
 //     auto& boundaryCoeffs = UEqnTmp.boundaryCoeffs();
 //     csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
 // #else
-    UEqnTmp.solve();
+    // UEqnTmp.solve();
 // #endif
 
     U_solve_end = MPI_Wtime();

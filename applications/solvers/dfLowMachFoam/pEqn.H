@@ -124,6 +124,7 @@ else
         
         csrMatrix csr(pEqn);
         csr.analyze();
+        csr.write_pattern("128mtx");
 
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
