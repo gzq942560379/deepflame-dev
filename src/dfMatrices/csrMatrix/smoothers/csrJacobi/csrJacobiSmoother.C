@@ -23,25 +23,25 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "csrSymJacobiSmoother.H"
+#include "csrJacobiSmoother.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(csrSymJacobiSmoother, 0);
+    defineTypeNameAndDebug(csrJacobiSmoother, 0);
 
-    csrMatrix::smoother::addsymMatrixConstructorToTable<csrSymJacobiSmoother>
-        addcsrSymJacobiSmootherSymMatrixConstructorToTable_;
+    csrMatrix::smoother::addsymMatrixConstructorToTable<csrJacobiSmoother>
+        addcsrJacobiSmootherSymMatrixConstructorToTable_;
 
-    csrMatrix::smoother::addasymMatrixConstructorToTable<csrSymJacobiSmoother>
-        addcsrSymJacobiSmootherAsymMatrixConstructorToTable_;
+    csrMatrix::smoother::addasymMatrixConstructorToTable<csrJacobiSmoother>
+        addcsrJacobiSmootherAsymMatrixConstructorToTable_;
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::csrSymJacobiSmoother::csrSymJacobiSmoother
+Foam::csrJacobiSmoother::csrJacobiSmoother
 (
     const word& fieldName,
     const csrMatrix& matrix,
@@ -63,7 +63,7 @@ Foam::csrSymJacobiSmoother::csrSymJacobiSmoother
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::csrSymJacobiSmoother::smooth
+void Foam::csrJacobiSmoother::smooth
 (
     const word& fieldName_,
     scalarField& psi,
@@ -153,18 +153,6 @@ void Foam::csrSymJacobiSmoother::smooth
                 }
                 psiPtr[r] = sum / diagPtr[r];
             }
-            #pragma omp for
-            for(label r = 0; r < nCells; ++r){
-                psiCopyPtr[r] = psi[r];
-            }
-            #pragma omp for
-            for(label r = nCells - 1; r >= 0; --r){
-                scalar sum = bPrimePtr[r];
-                for(label index = off_diag_rowptr_Ptr[r]; index < off_diag_rowptr_Ptr[r+1]; ++index){
-                    sum -= off_diag_value_Ptr[index] * psiCopyPtr[off_diag_colidx_Ptr[index]];
-                }
-                psiPtr[r] = sum / diagPtr[r];
-            }
         }
     }
 
@@ -179,7 +167,7 @@ void Foam::csrSymJacobiSmoother::smooth
 }
 
 
-void Foam::csrSymJacobiSmoother::smooth
+void Foam::csrJacobiSmoother::smooth
 (
     scalarField& psi,
     const scalarField& source,

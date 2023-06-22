@@ -70,22 +70,35 @@ if (pimple.transonic())
 
 #ifdef _CSR_
         p_convert_start = MPI_Wtime();
-        
         csrMatrix csr(pEqn);
-        csr.analyze();
-
+        p_convert_end = MPI_Wtime();
+        p_convert_time += p_convert_end - p_convert_start;
+#endif   
+#ifdef _ELL_
+        p_convert_start = MPI_Wtime();
+        ellMatrix ell(pEqn);
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
 #endif   
 
         p_solve_start = MPI_Wtime();
+
 #ifdef _CSR_
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
         auto& internalCoeffs = pEqn.internalCoeffs();
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
+#endif
+#ifdef _ELL_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+
+#if !defined(_CSR_) && !defined(_ELL_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();
@@ -121,10 +134,13 @@ else
 
 #ifdef _CSR_
         p_convert_start = MPI_Wtime();
-        
         csrMatrix csr(pEqn);
-        csr.analyze();
-
+        p_convert_end = MPI_Wtime();
+        p_convert_time += p_convert_end - p_convert_start;
+#endif   
+#ifdef _ELL_
+        p_convert_start = MPI_Wtime();
+        ellMatrix ell(pEqn);
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
 #endif   
@@ -136,7 +152,16 @@ else
         auto& internalCoeffs = pEqn.internalCoeffs();
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
+#endif
+#ifdef _ELL_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+
+#if !defined(_CSR_) && !defined(_ELL_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();

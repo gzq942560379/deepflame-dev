@@ -197,7 +197,7 @@ void csrMatrix::analyze(){
     Info << "sparsity : " << (off_diag_nnz_ + row_) * 1.0 / row_ / row_ * 100  << "%" << endl;
     Info << "max colume count : " << max_col_count << endl;
     Info << "colume frequency : " << endl;
-    for(label i = 0; i < col_count_frequency.size(); ++i){
+    for(size_t i = 0; i < col_count_frequency.size(); ++i){
         if(col_count_frequency[i] > 0){
             Info << "\t" << i << " : " << col_count_frequency[i] << endl;
         }

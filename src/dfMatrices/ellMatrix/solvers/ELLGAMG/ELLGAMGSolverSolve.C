@@ -23,22 +23,22 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "CSRGAMGSolver.H"
-#include "CSRPCG.H"
-#include "CSRPBiCGStab.H"
+#include "ELLGAMGSolver.H"
+#include "ELLPCG.H"
+#include "ELLPBiCGStab.H"
 #include "SubField.H"
 #include <mpi.h>
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::solverPerformance Foam::CSRGAMGSolver::solve
+Foam::solverPerformance Foam::ELLGAMGSolver::solve
 (
     scalarField& psi,
     const scalarField& source,
     const direction cmpt
 ) const
 {
-    Info << "Foam::CSRGAMGSolver::solve start" << endl;
+    Info << "Foam::ELLGAMGSolver::solve start" << endl;
 
     // Setup class containing solver performance data
     solverPerformance solverPerf(typeName, fieldName_);
@@ -85,7 +85,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
         PtrList<scalarField> coarseSources;
 
         // Create the smoothers for all levels
-        PtrList<csrMatrix::smoother> smoothers;
+        PtrList<ellMatrix::smoother> smoothers;
 
         // Scratch fields if processor-agglomerated coarse level meshes
         // are bigger than original. Usually not needed
@@ -146,15 +146,15 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
         );
     }
 
-    Info << "Foam::CSRGAMGSolver::solve end" << endl;
+    Info << "Foam::ELLGAMGSolver::solve end" << endl;
 
     return solverPerf;
 }
 
 
-void Foam::CSRGAMGSolver::Vcycle
+void Foam::ELLGAMGSolver::Vcycle
 (
-    const PtrList<csrMatrix::smoother>& smoothers,
+    const PtrList<ellMatrix::smoother>& smoothers,
     scalarField& psi,
     const scalarField& source,
     scalarField& Apsi,
@@ -175,6 +175,7 @@ void Foam::CSRGAMGSolver::Vcycle
     double interpolate_start, interpolate_end;
     double restrictField_start, restrictField_end;
     double prolongField_start, prolongField_end;
+    double solveCoarsest_start, solveCoarsest_end;
 
     double Vcycle_start = MPI_Wtime();
 
@@ -230,7 +231,7 @@ void Foam::CSRGAMGSolver::Vcycle
                         (
                             ACf.operator const scalarField&()
                         ),
-                        csrMatrixLevels_[leveli],
+                        ellMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         coarseSources[leveli],
@@ -241,7 +242,7 @@ void Foam::CSRGAMGSolver::Vcycle
                 scale_time += scale_end - scale_start;
 
                 spmv_start = MPI_Wtime();
-                csrMatrixLevels_[leveli].Amul
+                ellMatrixLevels_[leveli].Amul
                 (
                     const_cast<scalarField&>
                     (
@@ -286,7 +287,9 @@ void Foam::CSRGAMGSolver::Vcycle
     smooth_end = MPI_Wtime();
     smooth_time += smooth_end - smooth_start;
 
+
     // Solve Coarsest level with either an iterative or direct solver
+    solveCoarsest_start = MPI_Wtime();
     if (solveCoarsest_ && coarseCorrFields.set(coarsestLevel))
     {
         solveCoarsestLevel
@@ -295,7 +298,8 @@ void Foam::CSRGAMGSolver::Vcycle
             coarseSources[coarsestLevel]
         );
     }
-
+    solveCoarsest_end = MPI_Wtime();
+    solveCoarsest_time += solveCoarsest_end - solveCoarsest_start;
     // Smoothing and prolongation of the coarse correction fields
     // (going to finer levels)
 
@@ -354,7 +358,7 @@ void Foam::CSRGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        csrMatrixLevels_[leveli],
+                        ellMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         agglomeration_.restrictAddressing(leveli + 1),
@@ -368,7 +372,7 @@ void Foam::CSRGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        csrMatrixLevels_[leveli],
+                        ellMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         cmpt
@@ -391,7 +395,7 @@ void Foam::CSRGAMGSolver::Vcycle
                 (
                     coarseCorrFields[leveli],
                     ACfRef,
-                    csrMatrixLevels_[leveli],
+                    ellMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevels_[leveli],
                     coarseSources[leveli],
@@ -498,11 +502,11 @@ void Foam::CSRGAMGSolver::Vcycle
 
 }
 
-void Foam::CSRGAMGSolver::initVcycle
+void Foam::ELLGAMGSolver::initVcycle
 (
     PtrList<scalarField>& coarseCorrFields,
     PtrList<scalarField>& coarseSources,
-    PtrList<csrMatrix::smoother>& smoothers,
+    PtrList<ellMatrix::smoother>& smoothers,
     scalarField& scratch1,
     scalarField& scratch2
 ) const
@@ -517,7 +521,7 @@ void Foam::CSRGAMGSolver::initVcycle
     smoothers.set
     (
         0,
-        csrMatrix::smoother::New
+        ellMatrix::smoother::New
         (
             fieldName_,
             matrix_,
@@ -527,7 +531,7 @@ void Foam::CSRGAMGSolver::initVcycle
             controlDict_
         )
     );
-
+    
     forAll(matrixLevels_, leveli)
     {
         if (agglomeration_.nCells(leveli) >= 0)
@@ -550,10 +554,10 @@ void Foam::CSRGAMGSolver::initVcycle
             smoothers.set
             (
                 leveli + 1,
-                csrMatrix::smoother::New
+                ellMatrix::smoother::New
                 (
                     fieldName_,
-                    csrMatrixLevels_[leveli],
+                    ellMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevelsIntCoeffs_[leveli],
                     interfaceLevels_[leveli],
@@ -572,14 +576,14 @@ void Foam::CSRGAMGSolver::initVcycle
 }
 
 
-Foam::dictionary Foam::CSRGAMGSolver::PCGsolverDict
+Foam::dictionary Foam::ELLGAMGSolver::PCGsolverDict
 (
     const scalar tol,
     const scalar relTol
 ) const
 {
-    // dictionary dict(IStringStream("solver PCG; preconditioner DIC;")());
-    dictionary dict(IStringStream("solver PCG; preconditioner none;")());
+    // dictionary dict(IStringStream("solver ELLPCG; preconditioner DIC;")());
+    dictionary dict(IStringStream("solver ELLPCG; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -587,14 +591,14 @@ Foam::dictionary Foam::CSRGAMGSolver::PCGsolverDict
 }
 
 
-Foam::dictionary Foam::CSRGAMGSolver::PBiCGStabSolverDict
+Foam::dictionary Foam::ELLGAMGSolver::PBiCGStabSolverDict
 (
     const scalar tol,
     const scalar relTol
 ) const
 {
-    // dictionary dict(IStringStream("solver PBiCGStab; preconditioner DILU;")());
-    dictionary dict(IStringStream("solver PBiCGStab; preconditioner none;")());
+    // dictionary dict(IStringStream("solver ELLPBiCGStab; preconditioner DILU;")());
+    dictionary dict(IStringStream("solver ELLPBiCGStab; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -602,7 +606,7 @@ Foam::dictionary Foam::CSRGAMGSolver::PBiCGStabSolverDict
 }
 
 
-void Foam::CSRGAMGSolver::solveCoarsestLevel
+void Foam::ELLGAMGSolver::solveCoarsestLevel
 (
     scalarField& coarsestCorrField,
     const scalarField& coarsestSource
@@ -722,10 +726,10 @@ void Foam::CSRGAMGSolver::solveCoarsestLevel
 
         if (matrixLevels_[coarsestLevel].asymmetric())
         {
-            coarseSolverPerf = CSRPBiCGStab
+            coarseSolverPerf = ELLPBiCGStab
             (
                 "coarsestLevelCorr",
-                csrMatrixLevels_[coarsestLevel],
+                ellMatrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],
@@ -738,10 +742,10 @@ void Foam::CSRGAMGSolver::solveCoarsestLevel
         }
         else
         {
-            coarseSolverPerf = CSRPCG
+            coarseSolverPerf = ELLPCG
             (
                 "coarsestLevelCorr",
-                csrMatrixLevels_[coarsestLevel],
+                ellMatrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],
@@ -755,7 +759,7 @@ void Foam::CSRGAMGSolver::solveCoarsestLevel
 
         // if (debug >= 2)
         // {
-            coarseSolverPerf.print(Info.masterStream(coarseComm));
+        coarseSolverPerf.print(Info.masterStream(coarseComm));
         // }
     }
 }

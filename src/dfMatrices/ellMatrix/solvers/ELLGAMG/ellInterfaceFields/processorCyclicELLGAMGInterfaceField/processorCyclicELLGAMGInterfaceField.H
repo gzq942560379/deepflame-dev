@@ -2,7 +2,7 @@
   =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
    \\    /   O peration     | Website:  https://openfoam.org
-    \\  /    A nd           | Copyright (C) 2012-2018 OpenFOAM Foundation
+    \\  /    A nd           | Copyright (C) 2011-2019 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
@@ -22,20 +22,20 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::csrSymJacobiSmoother
+    Foam::processorCyclicELLGAMGInterfaceField
 
 Description
-    A csrMatrix::smoother for symmetric Gauss-Seidel
+    GAMG agglomerated processor interface field.
 
 SourceFiles
-    csrSymJacobiSmoother.C
+    processorCyclicELLGAMGInterfaceField.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef csrSymJacobiSmoother_H
-#define csrSymJacobiSmoother_H
+#ifndef processorCyclicELLGAMGInterfaceField_H
+#define processorCyclicELLGAMGInterfaceField_H
 
-#include "csrMatrix.H"
+#include "processorELLGAMGInterfaceField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -43,57 +43,52 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                           Class csrSymJacobiSmoother Declaration
+               Class processorCyclicELLGAMGInterfaceField Declaration
 \*---------------------------------------------------------------------------*/
 
-class csrSymJacobiSmoother
+class processorCyclicELLGAMGInterfaceField
 :
-    public csrMatrix::smoother
+    public processorELLGAMGInterfaceField
 {
+    // Private Member Functions
+
+        //- Disallow default bitwise copy construction
+        processorCyclicELLGAMGInterfaceField
+        (
+            const processorCyclicELLGAMGInterfaceField&
+        );
+
+        //- Disallow default bitwise assignment
+        void operator=(const processorCyclicELLGAMGInterfaceField&) = delete;
+
 
 public:
 
     //- Runtime type information
-    TypeName("symJacobi");
+    TypeName("processorCyclic");
 
 
     // Constructors
 
-        //- Construct from components
-        csrSymJacobiSmoother
+        //- Construct from GAMG interface and fine level interface field
+        processorCyclicELLGAMGInterfaceField
         (
-            const word& fieldName,
-            const csrMatrix& matrix,
-            const FieldField<Field, scalar>& interfaceBouCoeffs,
-            const FieldField<Field, scalar>& interfaceIntCoeffs,
-            const lduInterfaceFieldPtrsList& interfaces
+            const ELLGAMGInterface& GAMGCp,
+            const lduInterfaceField& fineInterface
+        );
+
+        //- Construct from GAMG interface and fine level interface field
+        processorCyclicELLGAMGInterfaceField
+        (
+            const ELLGAMGInterface& GAMGCp,
+            const bool doTransform,
+            const int rank
         );
 
 
-    // Member Functions
+    // Destructor
 
-        //- Smooth for the given number of sweeps
-        static void smooth
-        (
-            const word& fieldName,
-            scalarField& psi,
-            const csrMatrix& matrix,
-            const scalarField& source,
-            const FieldField<Field, scalar>& interfaceBouCoeffs,
-            const lduInterfaceFieldPtrsList& interfaces,
-            const direction cmpt,
-            const label nSweeps
-        );
-
-
-        //- Smooth the solution for a given number of sweeps
-        virtual void smooth
-        (
-            scalarField& psi,
-            const scalarField& Source,
-            const direction cmpt,
-            const label nSweeps
-        ) const;
+        virtual ~processorCyclicELLGAMGInterfaceField();
 };
 
 

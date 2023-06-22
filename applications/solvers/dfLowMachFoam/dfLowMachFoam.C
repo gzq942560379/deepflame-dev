@@ -66,10 +66,14 @@ Description
 #include "GenFvMatrix.H"
 
 // #define _CSR_
+// #define _ELL_
 // #define OPT_GenMatrix_Y
 
 #ifdef _CSR_
 #include "csrMatrix.H"
+#endif
+#ifdef _ELL_
+#include "ellMatrix.H"
 #endif
 #include <assert.h>
 
