@@ -13,30 +13,24 @@ defineTypeNameAndDebug(ellMatrix, 1);
 
 
 ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_row_block_bit), row_block_size_(1 << row_block_bit_){
-    Info << "ellMatrix::ellMatrix start" << endl;
     diagonal_ = ldu.diagonal();
     symmetric_ = ldu.symmetric();
     asymmetric_ = ldu.asymmetric();
-    Info << "ellMatrix::ellMatrix  0" << endl;
 
     const auto& lduDiag = ldu.diag();
     const auto& lduLower = ldu.lower();
     const auto& lduUpper = ldu.upper();
     const auto& lduLowerAddr = ldu.lduAddr().lowerAddr();
     const auto& lduUpperAddr = ldu.lduAddr().upperAddr();
-    Info << "ellMatrix::ellMatrix  1" << endl;
 
     row_ = lduDiag.size();
     block_count_ = BLOCK_COUNT;
     diag_value_.resize(row_);
-    Info << "row : " << row_ << endl;
 
-    Info << "ellMatrix::ellMatrix  2" << endl;
     // fill diag value
     for(label i = 0; i < row_; ++i){
         diag_value_[i] = lduDiag[i];
     }
-    Info << "ellMatrix::ellMatrix  3" << endl;
 
     // compute off_diag_count
     off_diag_count_.resize(row_);
@@ -51,14 +45,11 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
         label row = lduLowerAddr[i];
         off_diag_count_[row] += 1;
     }
-    Info << "ellMatrix::ellMatrix  4" << endl;
     
     max_count_ = 0;
     for(label i = 0; i < row_; ++i){
         max_count_ = std::max(max_count_, off_diag_count_[i]);
     }
-    Info << "ellMatrix::ellMatrix  5" << endl;
-    Info << "max_count_ : " << max_count_ << endl;
 
     // fill non-zero value
     off_diag_value_.resize(row_ * max_count_);
@@ -77,7 +68,6 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
             }
         }
     }
-    Info << "ellMatrix::ellMatrix  6" << endl;
 
     std::vector<label> off_diag_ellcol(row_, 0);
     for(label i = 0; i < lduLower.size(); ++i){
@@ -89,7 +79,6 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
         off_diag_value_[index] = lduLower[i];
         off_diag_ellcol[row] += 1;
     }
-    Info << "ellMatrix::ellMatrix  7" << endl;
     for(label i = 0; i < lduUpper.size(); ++i){
         label row = lduLowerAddr[i];
         label ellcol = off_diag_ellcol[row];
@@ -100,9 +89,7 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
         off_diag_ellcol[row] += 1;
     }
 
-    Info << "ellMatrix::ellMatrix 8" << endl;
     analyze();
-    Info << "ellMatrix::ellMatrix end" << endl;
     // coloring();
 }
 
