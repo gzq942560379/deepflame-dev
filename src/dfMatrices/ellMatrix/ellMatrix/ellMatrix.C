@@ -27,6 +27,8 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
     block_count_ = BLOCK_COUNT;
     diag_value_.resize(row_);
 
+    assert(BLOCK_TAIL == 0);
+
     // fill diag value
     for(label i = 0; i < row_; ++i){
         diag_value_[i] = lduDiag[i];
@@ -82,7 +84,6 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
     for(label i = 0; i < lduUpper.size(); ++i){
         label row = lduLowerAddr[i];
         label ellcol = off_diag_ellcol[row];
-        assert(ellcol < max_count_);
         label index = ELL_INDEX(row, ellcol);
         off_diag_colidx_[index] = lduUpperAddr[i];
         off_diag_value_[index] = lduUpper[i];
@@ -90,7 +91,6 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
     }
 
     analyze();
-    // coloring();
 }
 
 void ellMatrix::write_pattern(const std::string& filename) const {

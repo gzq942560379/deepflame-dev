@@ -29,7 +29,6 @@
 #define BLOCK_TAIL BLOCK_ROW(row_)
 #define BLOCK_COUNT (((row_) + (row_block_size_) - 1) >> (row_block_bit_))
 
-
 #define ELL_INDEX_BLOCK_START(rbs) ((rbs) * (max_count_))
 #define ELL_COL_OFFSET(ellcol) ((ellcol) << (row_block_bit_))
 #define ELL_INDEX(row,ellcol) (((row) & (BLOCK_MASK_INVERSE)) * (max_count_) + ELL_COL_OFFSET(ellcol) + BLOCK_ROW(row))

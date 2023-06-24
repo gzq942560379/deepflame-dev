@@ -143,8 +143,6 @@ else
         ellMatrix ell(pEqn);
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
-
-        // ell.write_pattern("p_matrix");
 #endif   
 
         p_solve_start = MPI_Wtime();

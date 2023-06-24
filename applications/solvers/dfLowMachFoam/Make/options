@@ -44,6 +44,7 @@ EXE_INC = -std=c++14 \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/renumber/renumberMethods/lnInclude \
     -I$(LIB_SRC)/renumber/zoltanRenumber/lnInclude \
+    -I$(DF_SRC)/dfRenumber/lnInclude \
     -I$(LIB_SRC)/parallel/decompose/decompositionMethods/lnInclude
 
 EXE_LIBS = \
@@ -83,5 +84,7 @@ EXE_LIBS = \
     -lfiniteVolume \
     -lgenericPatchFields \
     -lrenumberMethods \
+    -ldfRenumber
+    
     
     

@@ -19,6 +19,7 @@ wmake src/dynamicMesh
 wmake src/dynamicFvMesh
 
 wmake src/dfUtils
+wmake src/dfRenumber
 wmake src/dfGenMatrix
 wmake src/dfMatrices
 
