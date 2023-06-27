@@ -1,4 +1,4 @@
-#include "ellMatrix.H"
+#include "LDUMatrix.H"
 #include <cassert>
 #include <sstream>
 #include <cstdio>
@@ -7,11 +7,8 @@
 
 namespace Foam{
 
-
-const label ellMatrix::solver::defaultMaxIter_ = 1000;
-
 template<class Type>
-SolverPerformance<Type> ellMatrix::solve(
+SolverPerformance<Type> LDUMatrix::solve(
     GeometricField<Type, fvPatchField, volMesh>& psi,
     const Field<Type>& source,
     const FieldField<Field, Type>& internalCoeffs,
@@ -20,7 +17,7 @@ SolverPerformance<Type> ellMatrix::solve(
 ){
     SolverPerformance<Type> solverPerfVec
     (
-        "ellMatrix::solve",
+        "LDUMatrix::solve",
         psi.name()
     );
 
@@ -82,7 +79,7 @@ SolverPerformance<Type> ellMatrix::solve(
         solverPerformance solverPerf;
 
         // Solver call
-        solverPerf = ellMatrix::solver::New
+        solverPerf = LDUMatrix::solver::New
         (
             psi.name() + pTraits<Type>::componentNames[cmpt],
             *this,
@@ -112,7 +109,7 @@ SolverPerformance<Type> ellMatrix::solve(
 }
 
 template<>
-solverPerformance ellMatrix::solve
+solverPerformance LDUMatrix::solve
 (
     GeometricField<scalar, fvPatchField, volMesh>& psi,
     const Field<scalar>& source,
@@ -128,7 +125,7 @@ solverPerformance ellMatrix::solve
     scalarField sourceCpy(source);
     addBoundarySource(sourceCpy, psi, boundaryCoeffs, false);
 
-    Foam::autoPtr<Foam::ellMatrix::solver> solver = ellMatrix::solver::New
+    Foam::autoPtr<Foam::LDUMatrix::solver> solver = LDUMatrix::solver::New
     (
         psi.name(),
         *this,
@@ -161,7 +158,7 @@ solverPerformance ellMatrix::solve
 }
 
 template<class Type>
-SolverPerformance<Type> ellMatrix::solve(
+SolverPerformance<Type> LDUMatrix::solve(
     GeometricField<Type, fvPatchField, volMesh>& psi,
     const Field<Type>& source,
     const FieldField<Field, Type>& internalCoeffs,
@@ -180,7 +177,7 @@ SolverPerformance<Type> ellMatrix::solve(
 }
 
 template<class Type>
-SolverPerformance<Type> ellMatrix::solve(
+SolverPerformance<Type> LDUMatrix::solve(
     GeometricField<Type, fvPatchField, volMesh>& psi,
     const Field<Type>& source,
     const FieldField<Field, Type>& internalCoeffs,
@@ -199,7 +196,7 @@ SolverPerformance<Type> ellMatrix::solve(
 
 
 template<class Type>
-void ellMatrix::addBoundarySource
+void LDUMatrix::addBoundarySource
 (
     Field<Type>& source,
     const GeometricField<Type, fvPatchField, volMesh>& psi,
@@ -231,7 +228,7 @@ void ellMatrix::addBoundarySource
 }
 
 template<class Type>
-void ellMatrix::addBoundaryDiag
+void LDUMatrix::addBoundaryDiag
 (
     scalarField& diag,
     const FieldField<Field, Type>& internalCoeffs,
@@ -250,7 +247,7 @@ void ellMatrix::addBoundaryDiag
 
 
 template<class Type2>
-void ellMatrix::addToInternalField
+void LDUMatrix::addToInternalField
 (
     const labelUList& addr,
     const Field<Type2>& pf,
@@ -270,7 +267,7 @@ void ellMatrix::addToInternalField
 }
 
 template<class Type2>
-void ellMatrix::addToInternalField
+void LDUMatrix::addToInternalField
 (
     const labelUList& addr,
     const tmp<Field<Type2>>& tpf,
@@ -282,7 +279,7 @@ void ellMatrix::addToInternalField
 }
 
 template
-void ellMatrix::addToInternalField<scalar>
+void LDUMatrix::addToInternalField<scalar>
 (
     const labelUList& addr,
     const Field<scalar>& pf,
@@ -290,7 +287,7 @@ void ellMatrix::addToInternalField<scalar>
 ) const;
 
 template
-void ellMatrix::addToInternalField<vector>
+void LDUMatrix::addToInternalField<vector>
 (
     const labelUList& addr,
     const Field<vector>& pf,
@@ -298,7 +295,7 @@ void ellMatrix::addToInternalField<vector>
 ) const;
 
 template
-void ellMatrix::addBoundarySource<scalar>
+void LDUMatrix::addBoundarySource<scalar>
 (
     Field<scalar>& source,
     const GeometricField<scalar, fvPatchField, volMesh>& psi,
@@ -307,7 +304,7 @@ void ellMatrix::addBoundarySource<scalar>
 ) const;
 
 template
-void ellMatrix::addBoundarySource<vector>
+void LDUMatrix::addBoundarySource<vector>
 (
     Field<vector>& source,
     const GeometricField<vector, fvPatchField, volMesh>& psi,
@@ -316,7 +313,7 @@ void ellMatrix::addBoundarySource<vector>
 ) const;
 
 template
-void ellMatrix::addBoundaryDiag<scalar>
+void LDUMatrix::addBoundaryDiag<scalar>
 (
     scalarField& diag,
     const FieldField<Field, scalar>& internalCoeffs,
@@ -324,7 +321,7 @@ void ellMatrix::addBoundaryDiag<scalar>
 ) const;
 
 template
-void ellMatrix::addBoundaryDiag<vector>
+void LDUMatrix::addBoundaryDiag<vector>
 (
     scalarField& diag,
     const FieldField<Field, vector>& internalCoeffs,
@@ -332,7 +329,7 @@ void ellMatrix::addBoundaryDiag<vector>
 ) const;
 
 template
-SolverPerformance<vector> ellMatrix::solve<vector>(
+SolverPerformance<vector> LDUMatrix::solve<vector>(
     GeometricField<vector, fvPatchField, volMesh>& psi,
     const Field<vector>& source,
     const FieldField<Field, vector>& internalCoeffs,
@@ -341,7 +338,7 @@ SolverPerformance<vector> ellMatrix::solve<vector>(
 );
 
 template
-SolverPerformance<scalar> ellMatrix::solve<scalar>(
+SolverPerformance<scalar> LDUMatrix::solve<scalar>(
     GeometricField<scalar, fvPatchField, volMesh>& psi,
     const Field<scalar>& source,
     const FieldField<Field, scalar>& internalCoeffs,
@@ -349,7 +346,7 @@ SolverPerformance<scalar> ellMatrix::solve<scalar>(
 );
 
 template
-SolverPerformance<vector> ellMatrix::solve<vector>(
+SolverPerformance<vector> LDUMatrix::solve<vector>(
     GeometricField<vector, fvPatchField, volMesh>& psi,
     const Field<vector>& source,
     const FieldField<Field, vector>& internalCoeffs,
@@ -357,7 +354,7 @@ SolverPerformance<vector> ellMatrix::solve<vector>(
 );
 
 template
-SolverPerformance<scalar> ellMatrix::solve<scalar>(
+SolverPerformance<scalar> LDUMatrix::solve<scalar>(
     GeometricField<scalar, fvPatchField, volMesh>& psi,
     const Field<scalar>& source,
     const FieldField<Field, scalar>& internalCoeffs,
@@ -366,7 +363,7 @@ SolverPerformance<scalar> ellMatrix::solve<scalar>(
 );
 
 template
-SolverPerformance<vector> ellMatrix::solve<vector>(
+SolverPerformance<vector> LDUMatrix::solve<vector>(
     GeometricField<vector, fvPatchField, volMesh>& psi,
     const Field<vector>& source,
     const FieldField<Field, vector>& internalCoeffs,

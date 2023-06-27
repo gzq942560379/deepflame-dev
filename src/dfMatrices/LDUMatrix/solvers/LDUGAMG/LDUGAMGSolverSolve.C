@@ -23,15 +23,15 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "ELLGAMGSolver.H"
-#include "ELLPCG.H"
-#include "ELLPBiCGStab.H"
+#include "LDUGAMGSolver.H"
+#include "LDUPCG.H"
+#include "LDUPBiCGStab.H"
 #include "SubField.H"
 #include <mpi.h>
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::solverPerformance Foam::ELLGAMGSolver::solve
+Foam::solverPerformance Foam::LDUGAMGSolver::solve
 (
     scalarField& psi,
     const scalarField& source,
@@ -83,7 +83,7 @@ Foam::solverPerformance Foam::ELLGAMGSolver::solve
         PtrList<scalarField> coarseSources;
 
         // Create the smoothers for all levels
-        PtrList<ellMatrix::smoother> smoothers;
+        PtrList<LDUMatrix::smoother> smoothers;
 
         // Scratch fields if processor-agglomerated coarse level meshes
         // are bigger than original. Usually not needed
@@ -148,9 +148,9 @@ Foam::solverPerformance Foam::ELLGAMGSolver::solve
 }
 
 
-void Foam::ELLGAMGSolver::Vcycle
+void Foam::LDUGAMGSolver::Vcycle
 (
-    const PtrList<ellMatrix::smoother>& smoothers,
+    const PtrList<LDUMatrix::smoother>& smoothers,
     scalarField& psi,
     const scalarField& source,
     scalarField& Apsi,
@@ -227,7 +227,7 @@ void Foam::ELLGAMGSolver::Vcycle
                         (
                             ACf.operator const scalarField&()
                         ),
-                        ellMatrixLevels_[leveli],
+                        LDUMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         coarseSources[leveli],
@@ -238,7 +238,7 @@ void Foam::ELLGAMGSolver::Vcycle
                 scale_time += scale_end - scale_start;
 
                 spmv_start = MPI_Wtime();
-                ellMatrixLevels_[leveli].Amul
+                LDUMatrixLevels_[leveli].Amul
                 (
                     const_cast<scalarField&>
                     (
@@ -354,7 +354,7 @@ void Foam::ELLGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        ellMatrixLevels_[leveli],
+                        LDUMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         agglomeration_.restrictAddressing(leveli + 1),
@@ -368,7 +368,7 @@ void Foam::ELLGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        ellMatrixLevels_[leveli],
+                        LDUMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         cmpt
@@ -391,7 +391,7 @@ void Foam::ELLGAMGSolver::Vcycle
                 (
                     coarseCorrFields[leveli],
                     ACfRef,
-                    ellMatrixLevels_[leveli],
+                    LDUMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevels_[leveli],
                     coarseSources[leveli],
@@ -498,11 +498,11 @@ void Foam::ELLGAMGSolver::Vcycle
 
 }
 
-void Foam::ELLGAMGSolver::initVcycle
+void Foam::LDUGAMGSolver::initVcycle
 (
     PtrList<scalarField>& coarseCorrFields,
     PtrList<scalarField>& coarseSources,
-    PtrList<ellMatrix::smoother>& smoothers,
+    PtrList<LDUMatrix::smoother>& smoothers,
     scalarField& scratch1,
     scalarField& scratch2
 ) const
@@ -517,7 +517,7 @@ void Foam::ELLGAMGSolver::initVcycle
     smoothers.set
     (
         0,
-        ellMatrix::smoother::New
+        LDUMatrix::smoother::New
         (
             fieldName_,
             matrix_,
@@ -550,10 +550,10 @@ void Foam::ELLGAMGSolver::initVcycle
             smoothers.set
             (
                 leveli + 1,
-                ellMatrix::smoother::New
+                LDUMatrix::smoother::New
                 (
                     fieldName_,
-                    ellMatrixLevels_[leveli],
+                    LDUMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevelsIntCoeffs_[leveli],
                     interfaceLevels_[leveli],
@@ -572,14 +572,14 @@ void Foam::ELLGAMGSolver::initVcycle
 }
 
 
-Foam::dictionary Foam::ELLGAMGSolver::PCGsolverDict
+Foam::dictionary Foam::LDUGAMGSolver::PCGsolverDict
 (
     const scalar tol,
     const scalar relTol
 ) const
 {
-    // dictionary dict(IStringStream("solver ELLPCG; preconditioner DIC;")());
-    dictionary dict(IStringStream("solver ELLPCG; preconditioner none;")());
+    dictionary dict(IStringStream("solver LDUPCG; preconditioner DIC;")());
+    // dictionary dict(IStringStream("solver LDUPCG; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -587,14 +587,14 @@ Foam::dictionary Foam::ELLGAMGSolver::PCGsolverDict
 }
 
 
-Foam::dictionary Foam::ELLGAMGSolver::PBiCGStabSolverDict
+Foam::dictionary Foam::LDUGAMGSolver::PBiCGStabSolverDict
 (
     const scalar tol,
     const scalar relTol
 ) const
 {
-    // dictionary dict(IStringStream("solver ELLPBiCGStab; preconditioner DILU;")());
-    dictionary dict(IStringStream("solver ELLPBiCGStab; preconditioner none;")());
+    // dictionary dict(IStringStream("solver LDUPBiCGStab; preconditioner DILU;")());
+    dictionary dict(IStringStream("solver LDUPBiCGStab; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -602,7 +602,7 @@ Foam::dictionary Foam::ELLGAMGSolver::PBiCGStabSolverDict
 }
 
 
-void Foam::ELLGAMGSolver::solveCoarsestLevel
+void Foam::LDUGAMGSolver::solveCoarsestLevel
 (
     scalarField& coarsestCorrField,
     const scalarField& coarsestSource
@@ -722,10 +722,10 @@ void Foam::ELLGAMGSolver::solveCoarsestLevel
 
         if (matrixLevels_[coarsestLevel].asymmetric())
         {
-            coarseSolverPerf = ELLPBiCGStab
+            coarseSolverPerf = LDUPBiCGStab
             (
                 "coarsestLevelCorr",
-                ellMatrixLevels_[coarsestLevel],
+                LDUMatrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],
@@ -738,10 +738,10 @@ void Foam::ELLGAMGSolver::solveCoarsestLevel
         }
         else
         {
-            coarseSolverPerf = ELLPCG
+            coarseSolverPerf = LDUPCG
             (
                 "coarsestLevelCorr",
-                ellMatrixLevels_[coarsestLevel],
+                LDUMatrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],

@@ -18,52 +18,32 @@
 #include "lduMatrix.H"
 
 
-
 namespace Foam{
 
-class csrMatrix{
+class LDUMatrix{
 private:
     // const fvMesh& mesh_;
     const lduMatrix& lduMatrix_;
 
     //- Coefficients (not including interfaces)
-    label row_;
-    label col_;
-    label off_diag_nnz_;
-    labelList off_diag_rowptr_;
-    labelList off_diag_colidx_;
-    scalarField diag_value_;
-    scalarField off_diag_value_;
+    scalarField *lowerPtr_, *diagPtr_, *upperPtr_;
 
-    // // map from face to lower in off_diag_value_
-    // // lower (nei,own)
-    // labelList face2lower_;
-    // // map from face to upper in off_diag_value_
-    // // lower (own,nei)
-    // labelList face2upper_;
-
-    bool diagonal_;
-    bool symmetric_;
-    bool asymmetric_;
-    
 public:
     // Static data
     // Declare name of the class and its debug switch
-    ClassName("csrMatrix");
+    ClassName("LDUMatrix");
 
-    // Constructors
-    // csrMatrix(const fvMesh& mesh);
 
-    csrMatrix(const lduMatrix& lduMatrix);
+    LDUMatrix(const lduMatrix& lduMatrix);
 
     // Copy constructor
-    csrMatrix(const csrMatrix& other) = delete;
+    LDUMatrix(const LDUMatrix& other) = delete;
 
     // Copy constructor
     // void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
 
     //- Destructor
-    ~csrMatrix(){};
+    ~LDUMatrix();
 
     const lduMatrix& ldu() const {return lduMatrix_;}
 
@@ -75,22 +55,63 @@ public:
     //- Return the patch evaluation schedule
     const lduSchedule& patchSchedule() const {return lduAddr().patchSchedule();}
 
-    bool diagonal() const {return diagonal_;}
+    // Access to coefficients
 
-    bool symmetric() const {return symmetric_;}
+    scalarField& lower();
+    scalarField& diag();
+    scalarField& upper();
 
-    bool asymmetric() const {return asymmetric_;}
+    scalarField& lower(const label size);
+    scalarField& diag(const label nCoeffs);
+    scalarField& upper(const label nCoeffs);
 
-    label row() const {return row_;}
-    label col() const {return col_;}
-    const scalarField& diag() const {return diag_value_;}
-    scalarField& diag() {return diag_value_;}
-    const scalarField& off_diag_value() const {return off_diag_value_;}
-    scalarField& off_diag_value() {return off_diag_value_;}
-    const labelList& off_diag_colidx() const {return off_diag_colidx_;}
-    labelList& off_diag_colidx() {return off_diag_colidx_;}
-    const labelList& off_diag_rowptr() const {return off_diag_rowptr_;}
-    labelList& off_diag_rowptr() {return off_diag_rowptr_;}
+    const scalarField& lower() const;
+    const scalarField& diag() const;
+    const scalarField& upper() const;
+
+    bool hasDiag() const
+    {
+        return (diagPtr_);
+    }
+
+    bool hasUpper() const
+    {
+        return (upperPtr_);
+    }
+
+    bool hasLower() const
+    {
+        return (lowerPtr_);
+    }
+
+    bool diagonal() const
+    {
+        return (diagPtr_ && !lowerPtr_ && !upperPtr_);
+    }
+
+    bool symmetric() const
+    {
+        return (diagPtr_ && (!lowerPtr_ && upperPtr_));
+    }
+
+    bool asymmetric() const
+    {
+        return (diagPtr_ && lowerPtr_ && upperPtr_);
+    }
+
+    mutable double Amul_time_ = 0.;
+    mutable double Amul_Communication_init_time_ = 0.;
+    mutable double Amul_Communication_update_time_ = 0.;
+    mutable double Amul_Compute_time_ = 0.;
+    mutable double Jacobi_time_ = 0.;
+
+    void print_time() const {
+        Info << "Amul time : " << Amul_time_ << endl; 
+        Info << "Amul Communication init time : " << Amul_Communication_init_time_ << ", " << Amul_Communication_init_time_ / Amul_time_ * 100. << "%" << endl; 
+        Info << "Amul Communication update time : " << Amul_Communication_update_time_ << ", " << Amul_Communication_update_time_ / Amul_time_ * 100. << "%" << endl; 
+        Info << "Amul Compute time : " << Amul_Compute_time_ << ", " << Amul_Compute_time_ / Amul_time_ * 100. << "%" << endl; 
+        Info << "Jocabi time : " << Jacobi_time_ << endl; 
+    }
 
     //- Matrix multiplication with updated interfaces.
     void Amul
@@ -101,6 +122,7 @@ public:
         const lduInterfaceFieldPtrsList&,
         const direction cmpt
     ) const;
+
     void Amul
     (
         scalarField&,
@@ -119,11 +141,28 @@ public:
         scalarField&,
         const scalarField&
     ) const;
-    void SpMV_UNROOL
+    void Jacobi
     (
         scalarField&,
-        const scalarField&
+        scalarField&
     ) const;
+    void Jacobi_naive
+    (
+        scalarField&,
+        scalarField&
+    ) const;
+    void SymGaussSeidel
+    (
+        scalarField&,
+        scalarField&
+    ) const;
+
+    void SymGaussSeidel_naive
+    (
+        scalarField&,
+        scalarField&
+    ) const;
+    
     //- Sum the coefficients on each row of the matrix
     void sumA
     (
@@ -131,6 +170,27 @@ public:
         const FieldField<Field, scalar>&,
         const lduInterfaceFieldPtrsList&
     ) const;
+
+
+    void residual
+    (
+        scalarField& rA,
+        const scalarField& psi,
+        const scalarField& source,
+        const FieldField<Field, scalar>& interfaceBouCoeffs,
+        const lduInterfaceFieldPtrsList& interfaces,
+        const direction cmpt
+    ) const;
+
+    tmp<scalarField> residual
+    (
+        const scalarField& psi,
+        const scalarField& source,
+        const FieldField<Field, scalar>& interfaceBouCoeffs,
+        const lduInterfaceFieldPtrsList& interfaces,
+        const direction cmpt
+    ) const;
+
 
     //- Initialise the update of interfaced interfaces
     //  for matrix operations
@@ -214,14 +274,10 @@ public:
         const direction solveCmpt
     ) const;
 
-    void write_pattern(const std::string& filename);
-
-    void analyze();
-
     class solver{
     protected:
         word fieldName_;
-        const csrMatrix& matrix_;
+        const LDUMatrix& matrix_;
         const FieldField<Field, scalar>& interfaceBouCoeffs_;
         const FieldField<Field, scalar>& interfaceIntCoeffs_;
         lduInterfaceFieldPtrsList interfaces_;
@@ -250,7 +306,7 @@ public:
             symMatrix,
             (
                 const word& fieldName,
-                const csrMatrix& matrix,
+                const LDUMatrix& matrix,
                 const FieldField<Field, scalar>& interfaceBouCoeffs,
                 const FieldField<Field, scalar>& interfaceIntCoeffs,
                 const lduInterfaceFieldPtrsList& interfaces,
@@ -272,7 +328,7 @@ public:
             asymMatrix,
             (
                 const word& fieldName,
-                const csrMatrix& matrix,
+                const LDUMatrix& matrix,
                 const FieldField<Field, scalar>& interfaceBouCoeffs,
                 const FieldField<Field, scalar>& interfaceIntCoeffs,
                 const lduInterfaceFieldPtrsList& interfaces,
@@ -290,7 +346,7 @@ public:
 
         solver(
             const word& fieldName,
-            const csrMatrix& matrix,
+            const LDUMatrix& matrix,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const FieldField<Field, scalar>& interfaceIntCoeffs,
             const lduInterfaceFieldPtrsList& interfaces,
@@ -301,7 +357,7 @@ public:
         static autoPtr<solver> New
         (
             const word& fieldName,
-            const csrMatrix& matrix,
+            const LDUMatrix& matrix,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const FieldField<Field, scalar>& interfaceIntCoeffs,
             const lduInterfaceFieldPtrsList& interfaces,
@@ -314,7 +370,7 @@ public:
         // Member Functions
         // Access
         const word& fieldName() const {return fieldName_;}
-        const csrMatrix& matrix() const {return matrix_;}
+        const LDUMatrix& matrix() const {return matrix_;}
         const FieldField<Field, scalar>& interfaceBouCoeffs() const {return interfaceBouCoeffs_;}
         const FieldField<Field, scalar>& interfaceIntCoeffs() const {return interfaceIntCoeffs_;}
         const lduInterfaceFieldPtrsList& interfaces() const{return interfaces_;}
@@ -342,13 +398,13 @@ public:
 
     };
 
-    //- Abstract base-class for csrMatrix smoothers
+    //- Abstract base-class for LDUMatrix smoothers
     class smoother
     {
     protected:
         // Protected data
         word fieldName_;
-        const csrMatrix& matrix_;
+        const LDUMatrix& matrix_;
         const FieldField<Field, scalar>& interfaceBouCoeffs_;
         const FieldField<Field, scalar>& interfaceIntCoeffs_;
         const lduInterfaceFieldPtrsList& interfaces_;
@@ -366,7 +422,7 @@ public:
             symMatrix,
             (
                 const word& fieldName,
-                const csrMatrix& matrix,
+                const LDUMatrix& matrix,
                 const FieldField<Field, scalar>& interfaceBouCoeffs,
                 const FieldField<Field, scalar>& interfaceIntCoeffs,
                 const lduInterfaceFieldPtrsList& interfaces
@@ -387,7 +443,7 @@ public:
             asymMatrix,
             (
                 const word& fieldName,
-                const csrMatrix& matrix,
+                const LDUMatrix& matrix,
                 const FieldField<Field, scalar>& interfaceBouCoeffs,
                 const FieldField<Field, scalar>& interfaceIntCoeffs,
                 const lduInterfaceFieldPtrsList& interfaces
@@ -406,7 +462,7 @@ public:
         smoother
         (
             const word& fieldName,
-            const csrMatrix& matrix,
+            const LDUMatrix& matrix,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const FieldField<Field, scalar>& interfaceIntCoeffs,
             const lduInterfaceFieldPtrsList& interfaces
@@ -419,7 +475,7 @@ public:
         static autoPtr<smoother> New
         (
             const word& fieldName,
-            const csrMatrix& matrix,
+            const LDUMatrix& matrix,
             const FieldField<Field, scalar>& interfaceBouCoeffs,
             const FieldField<Field, scalar>& interfaceIntCoeffs,
             const lduInterfaceFieldPtrsList& interfaces,
@@ -441,7 +497,7 @@ public:
             return fieldName_;
         }
 
-        const csrMatrix& matrix() const
+        const LDUMatrix& matrix() const
         {
             return matrix_;
         }
@@ -476,7 +532,7 @@ public:
     };
 
 
-    //- Abstract base-class for csrMatrix preconditioners
+    //- Abstract base-class for LDUMatrix preconditioners
     class preconditioner
     {
     protected:

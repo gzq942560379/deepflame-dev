@@ -332,15 +332,6 @@ void csrMatrix::addBoundaryDiag<vector>
 ) const;
 
 template
-SolverPerformance<scalar> csrMatrix::solve<scalar>(
-    GeometricField<scalar, fvPatchField, volMesh>& psi,
-    const Field<scalar>& source,
-    const FieldField<Field, scalar>& internalCoeffs,
-    const FieldField<Field, scalar>& boundaryCoeffs,
-    const dictionary& solverControls
-);
-
-template
 SolverPerformance<vector> csrMatrix::solve<vector>(
     GeometricField<vector, fvPatchField, volMesh>& psi,
     const Field<vector>& source,

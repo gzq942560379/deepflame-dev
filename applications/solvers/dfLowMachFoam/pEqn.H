@@ -68,21 +68,20 @@ if (pimple.transonic())
         p_build_end = MPI_Wtime();
         p_build_time += p_build_end - p_build_start;
 
+        p_convert_start = MPI_Wtime();
 #ifdef _CSR_
-        p_convert_start = MPI_Wtime();
         csrMatrix csr(pEqn);
-        p_convert_end = MPI_Wtime();
-        p_convert_time += p_convert_end - p_convert_start;
-#endif   
+#endif
 #ifdef _ELL_
-        p_convert_start = MPI_Wtime();
         ellMatrix ell(pEqn);
+#endif
+#ifdef _LDU_
+        LDUMatrix LDU(pEqn);
+#endif
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
-#endif   
 
         p_solve_start = MPI_Wtime();
-
 #ifdef _CSR_
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
@@ -97,8 +96,15 @@ if (pimple.transonic())
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #endif
+#ifdef _LDU_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
 
-#if !defined(_CSR_) && !defined(_ELL_)
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();
@@ -132,18 +138,18 @@ else
         p_build_end = MPI_Wtime();
         p_build_time += p_build_end - p_build_start;
 
+        p_convert_start = MPI_Wtime();
 #ifdef _CSR_
-        p_convert_start = MPI_Wtime();
         csrMatrix csr(pEqn);
-        p_convert_end = MPI_Wtime();
-        p_convert_time += p_convert_end - p_convert_start;
-#endif   
+#endif
 #ifdef _ELL_
-        p_convert_start = MPI_Wtime();
         ellMatrix ell(pEqn);
+#endif
+#ifdef _LDU_
+        LDUMatrix LDU(pEqn);
+#endif
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
-#endif   
 
         p_solve_start = MPI_Wtime();
 #ifdef _CSR_
@@ -160,8 +166,15 @@ else
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #endif
+#ifdef _LDU_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
 
-#if !defined(_CSR_) && !defined(_ELL_)
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();

@@ -23,36 +23,36 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "CSRGAMGSolver.H"
-#include "CSRGAMGInterface.H"
+#include "LDUGAMGSolver.H"
+#include "LDUGAMGInterface.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(CSRGAMGSolver, 0);
+    defineTypeNameAndDebug(LDUGAMGSolver, 0);
 
-    csrMatrix::solver::addsymMatrixConstructorToTable<CSRGAMGSolver>
-        addCSRGAMGSolverMatrixConstructorToTable_;
+    LDUMatrix::solver::addsymMatrixConstructorToTable<LDUGAMGSolver>
+        addLDUGAMGSolverMatrixConstructorToTable_;
 
-    csrMatrix::solver::addasymMatrixConstructorToTable<CSRGAMGSolver>
-        addCSRGAMGAsymSolverMatrixConstructorToTable_;
+    LDUMatrix::solver::addasymMatrixConstructorToTable<LDUGAMGSolver>
+        addLDUGAMGAsymSolverMatrixConstructorToTable_;
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::CSRGAMGSolver::CSRGAMGSolver
+Foam::LDUGAMGSolver::LDUGAMGSolver
 (
     const word& fieldName,
-    const csrMatrix& matrix,
+    const LDUMatrix& matrix,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const FieldField<Field, scalar>& interfaceIntCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
     const dictionary& solverControls
 )
 :
-    csrMatrix::solver
+    LDUMatrix::solver
     (
         fieldName,
         matrix,
@@ -77,9 +77,9 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
     scaleCorrection_(matrix.symmetric()),
     solveCoarsest_(true),
     directSolveCoarsest_(false),
-    agglomeration_(CSRGAMGAgglomeration::New(matrix_.ldu(), controlDict_)),
+    agglomeration_(LDUGAMGAgglomeration::New(matrix_.ldu(), controlDict_)),
     matrixLevels_(agglomeration_.size()),
-    csrMatrixLevels_(agglomeration_.size()),
+    LDUMatrixLevels_(agglomeration_.size()),
     primitiveInterfaceLevels_(agglomeration_.size()),
     interfaceLevels_(agglomeration_.size()),
     interfaceLevelsBouCoeffs_(agglomeration_.size()),
@@ -87,7 +87,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
 {
     readControls();
 
-    Info << "CSRGAMGSolver settings :" << endl
+    Info << "LDUGAMGSolver settings :" << endl
         << "    Agglomeration Level:" << agglomeration_.size() << endl
         << "    cacheAgglomeration:" << cacheAgglomeration_ << endl
         << "    nPreSweeps:" << nPreSweeps_ << endl
@@ -125,7 +125,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
                     const lduInterfacePtrsList& fineMeshInterfaces =
                         agglomeration_.interfaceLevel(fineLevelIndex);
 
-                    PtrList<CSRGAMGInterface> dummyPrimMeshInterfaces
+                    PtrList<LDUGAMGInterface> dummyPrimMeshInterfaces
                     (
                         fineMeshInterfaces.size()
                     );
@@ -138,7 +138,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
                         if (fineMeshInterfaces.set(intI))
                         {
                             OStringStream os;
-                            refCast<const CSRGAMGInterface>
+                            refCast<const LDUGAMGInterface>
                             (
                                 fineMeshInterfaces[intI]
                             ).write(os);
@@ -147,7 +147,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
                             dummyPrimMeshInterfaces.set
                             (
                                 intI,
-                                CSRGAMGInterface::New
+                                LDUGAMGInterface::New
                                 (
                                     fineMeshInterfaces[intI].type(),
                                     intI,
@@ -299,7 +299,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::CSRGAMGSolver::~CSRGAMGSolver()
+Foam::LDUGAMGSolver::~LDUGAMGSolver()
 {
     if (!cacheAgglomeration_)
     {
@@ -310,9 +310,9 @@ Foam::CSRGAMGSolver::~CSRGAMGSolver()
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-void Foam::CSRGAMGSolver::readControls()
+void Foam::LDUGAMGSolver::readControls()
 {
-    csrMatrix::solver::readControls();
+    LDUMatrix::solver::readControls();
 
     controlDict_.readIfPresent("cacheAgglomeration", cacheAgglomeration_);
     controlDict_.readIfPresent("nPreSweeps", nPreSweeps_);
@@ -338,7 +338,7 @@ void Foam::CSRGAMGSolver::readControls()
 
     if (debug)
     {
-        Pout<< "CSRGAMGSolver settings :" << endl
+        Pout<< "LDUGAMGSolver settings :" << endl
             << "    cacheAgglomeration:" << cacheAgglomeration_ << endl
             << "    nPreSweeps:" << nPreSweeps_ << endl
             << "    preSweepsLevelMultiplier:" << preSweepsLevelMultiplier_ << endl
@@ -357,7 +357,7 @@ void Foam::CSRGAMGSolver::readControls()
 }
 
 
-const Foam::lduMatrix& Foam::CSRGAMGSolver::matrixLevel(const label i) const
+const Foam::lduMatrix& Foam::LDUGAMGSolver::matrixLevel(const label i) const
 {
     if (i == 0)
     {
@@ -370,7 +370,7 @@ const Foam::lduMatrix& Foam::CSRGAMGSolver::matrixLevel(const label i) const
 }
 
 
-const Foam::lduInterfaceFieldPtrsList& Foam::CSRGAMGSolver::interfaceLevel
+const Foam::lduInterfaceFieldPtrsList& Foam::LDUGAMGSolver::interfaceLevel
 (
     const label i
 ) const
@@ -387,7 +387,7 @@ const Foam::lduInterfaceFieldPtrsList& Foam::CSRGAMGSolver::interfaceLevel
 
 
 const Foam::FieldField<Foam::Field, Foam::scalar>&
-Foam::CSRGAMGSolver::interfaceBouCoeffsLevel
+Foam::LDUGAMGSolver::interfaceBouCoeffsLevel
 (
     const label i
 ) const
@@ -404,7 +404,7 @@ Foam::CSRGAMGSolver::interfaceBouCoeffsLevel
 
 
 const Foam::FieldField<Foam::Field, Foam::scalar>&
-Foam::CSRGAMGSolver::interfaceIntCoeffsLevel
+Foam::LDUGAMGSolver::interfaceIntCoeffsLevel
 (
     const label i
 ) const
