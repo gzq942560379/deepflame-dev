@@ -56,9 +56,9 @@ void Foam::ellMatrix::build_graph() {
         
         #pragma omp for
         for(label bi = 0; bi < block_count_; ++bi){
-            label rbs = BLOCK_START(bi);
-            label rbe = BLOCK_END(rbs);
-            label rbl = BLOCK_LEN(rbs,rbe);
+            label rbs = ELL_BLOCK_START(bi);
+            label rbe = ELL_BLOCK_END(rbs);
+            label rbl = ELL_BLOCK_LEN(rbs,rbe);
             label index_block_start = ELL_INDEX_BLOCK_START(rbs);
             label* blocked_off_diag_colidx_current = blocked_off_diag_colidx_.begin() + bi * row_block_size_ * max_count_;
             // expand
@@ -69,7 +69,7 @@ void Foam::ellMatrix::build_graph() {
                     label index = index_ellcol_start + br;
                     label col = off_diag_colidx_[index];
                     if(row == col) continue; // 跳过填充的非零元
-                    label block_index_col = BLOCK_INDEX(col);
+                    label block_index_col = ELL_BLOCK_INDEX(col);
                     if(bi == block_index_col) continue; // 忽略块内依赖
                     label blocked_index = blocked_off_diag_count_[bi];
                     blocked_off_diag_colidx_current[blocked_index] = block_index_col;

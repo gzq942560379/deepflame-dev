@@ -18,20 +18,20 @@
 #include "lduMatrix.H"
 
 
-#define BLOCK_MASK ((1 << (row_block_bit_)) - 1)
-#define BLOCK_MASK_INVERSE (~BLOCK_MASK)
+#define ELL_BLOCK_MASK ((1 << (row_block_bit_)) - 1)
+#define ELL_BLOCK_MASK_INVERSE (~ELL_BLOCK_MASK)
 
-#define BLOCK_INDEX(row) ((row) >> (row_block_bit_))
-#define BLOCK_ROW(row) ((row) & BLOCK_MASK)
-#define BLOCK_START(bi) (bi << row_block_bit_)
-#define BLOCK_END(rbs) (std::min((rbs) + (row_block_size_), (row_)))
-#define BLOCK_LEN(rbs,rbe) ((rbe - rbs))
-#define BLOCK_TAIL BLOCK_ROW(row_)
-#define BLOCK_COUNT (((row_) + (row_block_size_) - 1) >> (row_block_bit_))
+#define ELL_BLOCK_INDEX(row) ((row) >> (row_block_bit_))
+#define ELL_BLOCK_ROW(row) ((row) & ELL_BLOCK_MASK)
+#define ELL_BLOCK_START(bi) (bi << row_block_bit_)
+#define ELL_BLOCK_END(rbs) (std::min((rbs) + (row_block_size_), (row_)))
+#define ELL_BLOCK_LEN(rbs,rbe) ((rbe - rbs))
+#define ELL_BLOCK_TAIL ELL_BLOCK_ROW(row_)
+#define ELL_BLOCK_COUNT (((row_) + (row_block_size_) - 1) >> (row_block_bit_))
 
 #define ELL_INDEX_BLOCK_START(rbs) ((rbs) * (max_count_))
 #define ELL_COL_OFFSET(ellcol) ((ellcol) << (row_block_bit_))
-#define ELL_INDEX(row,ellcol) (((row) & (BLOCK_MASK_INVERSE)) * (max_count_) + ELL_COL_OFFSET(ellcol) + BLOCK_ROW(row))
+#define ELL_INDEX(row,ellcol) (((row) & (ELL_BLOCK_MASK_INVERSE)) * (max_count_) + ELL_COL_OFFSET(ellcol) + ELL_BLOCK_ROW(row))
 
 namespace Foam{
 

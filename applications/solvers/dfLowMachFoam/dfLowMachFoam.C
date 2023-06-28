@@ -67,6 +67,8 @@ Description
 
 // #define _CSR_
 // #define _ELL_
+// #define _DIV_
+// #define _LDU_
 // #define OPT_GenMatrix_Y
 
 #ifdef _CSR_
@@ -74,6 +76,12 @@ Description
 #endif
 #ifdef _ELL_
 #include "ellMatrix.H"
+#endif
+#ifdef _DIV_
+#include "divMatrix.H"
+#endif
+#ifdef _LDU_
+#include "LDUMatrix.H"
 #endif
 #include <assert.h>
 
@@ -109,9 +117,10 @@ int main(int argc, char *argv[])
     pybind11::scoped_interpreter guard{};//start python interpreter
 #endif
     #include "postProcess.H"
-
     // #include "setRootCaseLists.H"
     #include "listOptions.H"
+
+    // MPI init here
     #include "setRootCase2.H"
 
     env_show();
@@ -171,6 +180,7 @@ int main(int argc, char *argv[])
 
     double refine_start = 0., refine_end = 0.;
     double intializeFields_start = 0., intializeFields_end = 0.;
+    double renumber_start = 0., renumber_end = 0.;
 
     while (runTime.run()){
         refine_start = MPI_Wtime();
@@ -188,16 +198,19 @@ int main(int argc, char *argv[])
         #include "intializeFields.H"
         intializeFields_end = MPI_Wtime();
 
+        renumber_start = MPI_Wtime();
         #include "renumberMesh.H"
-
+        renumber_end = MPI_Wtime();
         break;
     }
 
     double refine_time = refine_end - refine_start;
     double intializeFields_time = intializeFields_end - intializeFields_start;
+    double renumber_time = renumber_end - renumber_start;
 
-    Info << "Refine time : " << refine_end - refine_start << endl; 
-    Info << "IntializeFields time : " << intializeFields_end - intializeFields_start << endl; 
+    Info << "Refine time : " << refine_time << endl; 
+    Info << "IntializeFields time : " << intializeFields_time << endl; 
+    Info << "Renumber time : " << renumber_time << endl; 
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -62,9 +62,9 @@ void Foam::ellMatrix::SymGaussSeidel_naive
     scalar* __restrict__ tmpPtr = tmp.begin();
 
     for(label bi = 0; bi < block_count_; ++bi){
-        label rbs = BLOCK_START(bi);
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbs = ELL_BLOCK_START(bi);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
         const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -86,9 +86,9 @@ void Foam::ellMatrix::SymGaussSeidel_naive
     }
 
     for(label bi = block_count_ - 1; bi >= 0; --bi){
-        label rbs = BLOCK_START(bi);
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbs = ELL_BLOCK_START(bi);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         scalar* psiPtr_offset = psiPtr + rbs;
         const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -117,7 +117,7 @@ void Foam::ellMatrix::SymGaussSeidel_B8
 ) const
 {
     assert(psi.size() == row_);
-    assert(row_block_size_ == 8 && BLOCK_TAIL == 0);
+    assert(row_block_size_ == 8 && ELL_BLOCK_TAIL == 0);
 
     const scalar* const __restrict__ bPrimePtr = bPrime.begin();
 
@@ -130,7 +130,7 @@ void Foam::ellMatrix::SymGaussSeidel_B8
     scalarField tmp(row_block_size_);
     scalar* __restrict__ tmpPtr = tmp.begin();
     for(label bi = 0; bi < block_count_; ++bi){
-        label rbs = BLOCK_START(bi);
+        label rbs = ELL_BLOCK_START(bi);
         scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
         const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -164,7 +164,7 @@ void Foam::ellMatrix::SymGaussSeidel_B8
         psiPtr_offset[7] = tmpPtr[7] / diagPtr_offset[7];
     }
     for(label bi = block_count_ - 1; bi >= 0; --bi){
-        label rbs = BLOCK_START(bi);
+        label rbs = ELL_BLOCK_START(bi);
         scalar* psiPtr_offset = psiPtr + rbs;
         const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -224,7 +224,7 @@ void Foam::ellMatrix::SymGaussSeidel_B8_colored
             #pragma omp for
             for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
                 label bi = nodes_of_color_[node_index];
-                label rbs = BLOCK_START(bi);
+                label rbs = ELL_BLOCK_START(bi);
                 scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
                 const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
                 const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -262,7 +262,7 @@ void Foam::ellMatrix::SymGaussSeidel_B8_colored
             #pragma omp for
             for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
                 label bi = nodes_of_color_[node_index];
-                label rbs = BLOCK_START(bi);
+                label rbs = ELL_BLOCK_START(bi);
                 scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
                 const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
                 const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;

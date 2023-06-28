@@ -42,12 +42,12 @@ void Foam::ellMatrix::SpMV
     const scalarField& psi
 ) const
 {
-    if(row_block_size_ % 8 == 0 && BLOCK_TAIL == 0){
+    if(row_block_size_ % 8 == 0 && ELL_BLOCK_TAIL == 0){
         if(row_block_size_ == 32){
 #ifdef __ARM_FEATURE_SVE
             SpMV_UNROOL32_SVE(Apsi, psi);
 #else
-            assert(false);
+            SpMV_UNROOL8(Apsi, psi);
 #endif
         }else{
 #ifdef __ARM_FEATURE_SVE
@@ -77,8 +77,8 @@ void Foam::ellMatrix::SpMV_naive
 
     #pragma omp parallel for
     for(label rbs = 0; rbs < row_; rbs += row_block_size_){
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         scalar* ApsiPtr_offset = ApsiPtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
         for(label br = 0; br < rbl; ++br){
@@ -111,8 +111,8 @@ void Foam::ellMatrix::SpMV_UNROOL8
 
     #pragma omp parallel for
     for(label rbs = 0; rbs < row_; rbs += row_block_size_){
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         scalar* ApsiPtr_offset = ApsiPtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
         for(label br = 0; br < rbl; br += 8){
@@ -165,9 +165,9 @@ void Foam::ellMatrix::SpMV_UNROOL8_SVE
         {
             #pragma omp for
             for(label bi = 0; bi < block_count_; ++bi){
-                label rbs = BLOCK_START(bi);
-                label rbe = BLOCK_END(rbs);
-                label rbl = BLOCK_LEN(rbs,rbe);
+                label rbs = ELL_BLOCK_START(bi);
+                label rbe = ELL_BLOCK_END(rbs);
+                label rbl = ELL_BLOCK_LEN(rbs,rbe);
                 scalar* ApsiPtr_offset = ApsiPtr + rbs;
                 const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
                 for(label br = 0; br < rbl; br += svcntd()){
@@ -195,9 +195,9 @@ void Foam::ellMatrix::SpMV_UNROOL8_SVE
         }
     }else{
         for(label bi = 0; bi < block_count_; ++bi){
-            label rbs = BLOCK_START(bi);
-            label rbe = BLOCK_END(rbs);
-            label rbl = BLOCK_LEN(rbs,rbe);
+            label rbs = ELL_BLOCK_START(bi);
+            label rbe = ELL_BLOCK_END(rbs);
+            label rbl = ELL_BLOCK_LEN(rbs,rbe);
             scalar* ApsiPtr_offset = ApsiPtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
             for(label br = 0; br < rbl; br += svcntd()){
@@ -251,9 +251,7 @@ void Foam::ellMatrix::SpMV_UNROOL32_SVE
         // #pragma omp for schedule(static, 1)
         // for(label bi = 0; bi < block_count_; ++bi){
         for(label bi = local_start; bi < local_end; ++bi){
-            label rbs = BLOCK_START(bi);
-            label rbe = BLOCK_END(rbs);
-            label rbl = BLOCK_LEN(rbs,rbe);
+            label rbs = ELL_BLOCK_START(bi);
             scalar* ApsiPtr_offset = ApsiPtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
             svfloat64_t vApsi0, vApsi1, vApsi2, vApsi3;

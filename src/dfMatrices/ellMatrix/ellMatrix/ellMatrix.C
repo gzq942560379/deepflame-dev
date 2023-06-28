@@ -12,7 +12,7 @@ namespace Foam{
 defineTypeNameAndDebug(ellMatrix, 1);
 
 
-ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_row_block_bit), row_block_size_(1 << row_block_bit_){
+ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(row_block_bit), row_block_size_(1 << row_block_bit_){
     diagonal_ = ldu.diagonal();
     symmetric_ = ldu.symmetric();
     asymmetric_ = ldu.asymmetric();
@@ -24,10 +24,10 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
     const auto& lduUpperAddr = ldu.lduAddr().upperAddr();
 
     row_ = lduDiag.size();
-    block_count_ = BLOCK_COUNT;
+    block_count_ = ELL_BLOCK_COUNT;
     diag_value_.resize(row_);
 
-    assert(BLOCK_TAIL == 0);
+    assert(ELL_BLOCK_TAIL == 0);
 
     // fill diag value
     for(label i = 0; i < row_; ++i){
@@ -57,8 +57,8 @@ ellMatrix::ellMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(ell_ro
     off_diag_value_.resize(row_ * max_count_);
     off_diag_colidx_.resize(row_ * max_count_);
     for(label rbs = 0; rbs < row_; rbs += row_block_size_){
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         label index_block_start = ELL_INDEX_BLOCK_START(rbs);
         for(label ellcol = 0; ellcol < max_count_; ++ellcol){
             label index_ellcol_start = index_block_start + ELL_COL_OFFSET(ellcol);
@@ -110,8 +110,8 @@ void ellMatrix::write_pattern(const std::string& filename) const {
         
         fprintf(fw, "%ld %ld %ld\n", row_, row_, nnz());
         for(label rbs = 0; rbs < row_; rbs += row_block_size_){
-            label rbe = BLOCK_END(rbs);
-            label rbl = BLOCK_LEN(rbs,rbe);
+            label rbe = ELL_BLOCK_END(rbs);
+            label rbl = ELL_BLOCK_LEN(rbs,rbe);
             for(label row = rbs; row < rbe; ++row){
                 fprintf(fw, "%ld %ld\n", row + 1, row + 1);
             }
@@ -146,7 +146,7 @@ void ellMatrix::analyze() const {
 
     Info << "ell sparse matrix analyze : --------------------------------------------------------------------" << endl;
     Info << "row(col) : " << row_ << endl;
-    Info << "block tail : " << BLOCK_TAIL << endl;
+    Info << "block tail : " << ELL_BLOCK_TAIL << endl;
     Info << "nnz : " << nnz() << endl;
     Info << "max colume count : " << max_count_ << endl;
     Info << "fill-in : " << (((max_count_ + 1) * row_ - nnz()) * 100.0) / ((max_count_ + 1) * row_) << "%" << endl;
@@ -202,8 +202,8 @@ void ellMatrix::check() const {
         }
     }
     for(label rbs = 0; rbs < row_; rbs += row_block_size_){
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         label index_block_start = ELL_INDEX_BLOCK_START(rbs);
         for(label ellcol = 0; ellcol < max_count_; ++ellcol){
             label index_ellcol_start = index_block_start + ELL_COL_OFFSET(ellcol);

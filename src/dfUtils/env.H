@@ -2,7 +2,7 @@
 
 
 extern int dnn_batch_size;
-extern int ell_row_block_bit;
+extern int row_block_bit;
 
 void env_show();
 

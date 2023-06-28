@@ -172,8 +172,8 @@ void Foam::ellMatrix::sumA
 
     #pragma omp parallel for
     for(label rbs = 0; rbs < row_; rbs += row_block_size_){
-        label rbe = BLOCK_END(rbs);
-        label rbl = BLOCK_LEN(rbs,rbe);
+        label rbe = ELL_BLOCK_END(rbs);
+        label rbl = ELL_BLOCK_LEN(rbs,rbe);
         scalar* __restrict__ sumAPtr_offset = sumAPtr + rbs;
         const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
         for(label br = 0; br < rbl; ++br){

@@ -43,7 +43,7 @@ void Foam::ellMatrix::Jacobi
 ) const
 {
     double start = MPI_Wtime();
-    if(row_block_size_ == 32 && BLOCK_TAIL == 0){
+    if(row_block_size_ == 32 && ELL_BLOCK_TAIL == 0){
 #ifdef __ARM_FEATURE_SVE
         Jacobi_UNLOOP32_SVE(psi, bPrime);
 #else
@@ -84,9 +84,9 @@ void Foam::ellMatrix::Jacobi_naive
         }
         #pragma omp for
         for(label bi = 0; bi < block_count_; ++bi){
-            label rbs = BLOCK_START(bi);
-            label rbe = BLOCK_END(rbs);
-            label rbl = BLOCK_LEN(rbs,rbe);
+            label rbs = ELL_BLOCK_START(bi);
+            label rbe = ELL_BLOCK_END(rbs);
+            label rbl = ELL_BLOCK_LEN(rbs,rbe);
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
             const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -147,9 +147,7 @@ void Foam::ellMatrix::Jacobi_UNLOOP32_SVE
             // #pragma omp for schedule(static, 1)
             // for(label bi = 0; bi < block_count_; ++bi){
             for(label bi = local_start; bi < local_end; ++bi){
-                label rbs = BLOCK_START(bi);
-                label rbe = BLOCK_END(rbs);
-                label rbl = BLOCK_LEN(rbs,rbe);
+                label rbs = ELL_BLOCK_START(bi);
                 scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
                 const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
                 const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
@@ -206,9 +204,7 @@ void Foam::ellMatrix::Jacobi_UNLOOP32_SVE
             psiCopyPtr[row] = psiPtr[row];
         }
         for(label bi = 0; bi < block_count_; ++bi){
-            label rbs = BLOCK_START(bi);
-            label rbe = BLOCK_END(rbs);
-            label rbl = BLOCK_LEN(rbs,rbe);
+            label rbs = ELL_BLOCK_START(bi);
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
             const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;

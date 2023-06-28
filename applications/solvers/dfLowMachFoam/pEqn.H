@@ -75,6 +75,9 @@ if (pimple.transonic())
 #ifdef _ELL_
         ellMatrix ell(pEqn);
 #endif
+#ifdef _DIV_
+        divMatrix div(pEqn);
+#endif
 #ifdef _LDU_
         LDUMatrix LDU(pEqn);
 #endif
@@ -96,6 +99,13 @@ if (pimple.transonic())
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #endif
+#ifdef _DIV_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
 #ifdef _LDU_
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
@@ -104,7 +114,7 @@ if (pimple.transonic())
         LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #endif
 
-#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_)
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();
@@ -145,6 +155,9 @@ else
 #ifdef _ELL_
         ellMatrix ell(pEqn);
 #endif
+#ifdef _DIV_
+        divMatrix div(pEqn);
+#endif
 #ifdef _LDU_
         LDUMatrix LDU(pEqn);
 #endif
@@ -166,6 +179,13 @@ else
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #endif
+#ifdef _DIV_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
 #ifdef _LDU_
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
@@ -174,7 +194,7 @@ else
         LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #endif
 
-#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_)
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();
