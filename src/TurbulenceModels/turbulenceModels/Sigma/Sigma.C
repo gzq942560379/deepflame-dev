@@ -73,7 +73,7 @@ void Sigma<BasicTurbulenceModel>::correctNut()
          }
       }
 
-      if(abs(sigma_1)<ROOTVSMALL && !zeroSigma) zeroSigma = true;
+      if(std::abs(sigma_1)<ROOTVSMALL && !zeroSigma) zeroSigma = true;
 
       DsgCells[celli] = sigma_3*(sigma_1-sigma_2)*(sigma_2-sigma_3)
                         /(sqr(sigma_1)+VSMALL);

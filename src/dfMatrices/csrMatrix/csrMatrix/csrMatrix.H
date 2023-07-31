@@ -101,7 +101,29 @@ public:
         const lduInterfaceFieldPtrsList&,
         const direction cmpt
     ) const;
-    
+    void Amul
+    (
+        scalarField&,
+        const scalarField&,
+        const FieldField<Field, scalar>&,
+        const lduInterfaceFieldPtrsList&,
+        const direction cmpt
+    ) const;
+    void SpMV
+    (
+        scalarField&,
+        const scalarField&
+    ) const;
+    void SpMV_naive
+    (
+        scalarField&,
+        const scalarField&
+    ) const;
+    void SpMV_UNROOL
+    (
+        scalarField&,
+        const scalarField&
+    ) const;
     //- Sum the coefficients on each row of the matrix
     void sumA
     (
@@ -192,7 +214,9 @@ public:
         const direction solveCmpt
     ) const;
 
-    void write_pattern(const std::string& filename);
+    void write_pattern(const std::string& filename) const;
+    void write(const std::string& filename) const;
+    void write_equation(const std::string& filename,const scalarField& source) const;
 
     void analyze();
 
@@ -315,6 +339,8 @@ public:
             const scalarField& Apsi,
             scalarField& tmpField
         ) const;
+
+        virtual void print_time() const {}
 
     };
 
@@ -446,6 +472,9 @@ public:
             const direction cmpt,
             const label nSweeps
         ) const = 0;
+
+        virtual void print_time() const {}
+
     };
 
 
@@ -549,6 +578,8 @@ public:
         {
             NotImplemented;
         }
+
+        virtual void print_time() const {}
     };
 
 };

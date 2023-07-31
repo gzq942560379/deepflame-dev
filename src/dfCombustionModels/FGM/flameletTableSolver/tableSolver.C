@@ -109,11 +109,11 @@ double Foam::tableSolver::cal_gcor
 {
     double gcor;
 
-    if(abs(Zcvar) < 1e-12)
+    if(std::abs(Zcvar) < 1e-12)
     {
         gcor=0.0;
     }
-    else if(abs(cvar) < 1e-12 || abs(Zvar) < 1e-12)
+    else if(std::abs(cvar) < 1e-12 || std::abs(Zvar) < 1e-12)
     {
         gcor=0.0;
     }

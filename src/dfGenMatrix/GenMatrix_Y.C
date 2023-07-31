@@ -169,7 +169,7 @@ GenMatrix_Y(
             const scalar* const __restrict__ psfGradientInternalCoeffsPtr = psfGradientInternalCoeffs->begin();
             const scalar* const __restrict__ psfGradientBoundaryCoeffsPtr = psfGradientBoundaryCoeffs->begin();
 
-            Info << "psf.coupled()" << endl;
+            // Info << "psf.coupled()" << endl;
 
             // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs(pDeltaCoeffs);
             // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs(pDeltaCoeffs);
@@ -183,7 +183,7 @@ GenMatrix_Y(
         }
         else
         {
-            Info << "not psf.coupled()" << endl;
+            // Info << "not psf.coupled()" << endl;
             const auto& psfGradientInternalCoeffs = psf.gradientInternalCoeffs();
             const auto& psfGradientBoundaryCoeffs = psf.gradientBoundaryCoeffs();
             const scalar* const __restrict__ psfGradientInternalCoeffsPtr = psfGradientInternalCoeffs->begin();

@@ -15,9 +15,7 @@ GenMatrix_U(
     const volScalarField& p, 
     compressible::turbulenceModel& turbulence
 ){
-    double GenMatrix_U_loop_start, GenMatrix_U_loop_end, GenMatrix_U_loop_time = 0.;
-    double GenMatrix_U_constructVar_start, GenMatrix_U_constructVar_end, GenMatrix_U_constructVar_time = 0.;
-    double GenMatrix_U_turbulence_start, GenMatrix_U_turbulence_end, GenMatrix_U_turbulence_time = 0.;
+    double GenMatrix_U_tick_0 = MPI_Wtime();
 
     const fvMesh& mesh = U.mesh();
     assert(mesh.moving() == false);
@@ -28,7 +26,7 @@ GenMatrix_U(
     // basic variable
     const surfaceScalarField& weights = mesh.surfaceInterpolation::weights(); // interpolation weight (linear)
     tmp<fv::snGradScheme<scalar>> tsnGradScheme_(new fv::orthogonalSnGrad<scalar>(mesh));
-    tmp<fvVectorMatrix> tfvm_DDT
+    tmp<fvVectorMatrix> tfvm
     (
         new fvVectorMatrix
         (
@@ -36,15 +34,15 @@ GenMatrix_U(
             rho.dimensions()*U.dimensions()*dimVol/dimTime
         )
     );
-    fvVectorMatrix& fvm_DDT = tfvm_DDT.ref();
+    fvVectorMatrix& fvm = tfvm.ref();
 
-    scalar* __restrict__ diagPtr_ddt = fvm_DDT.diag().begin();
-    vector* __restrict__ sourcePtr_ddt = fvm_DDT.source().begin();
-    scalar* __restrict__ lowerPtr_ddt = fvm_DDT.lower().begin();
-    scalar* __restrict__ upperPtr_ddt = fvm_DDT.upper().begin();
+    scalar* __restrict__ diagPtr = fvm.diag().begin();
+    vector* __restrict__ sourcePtr = fvm.source().begin();
+    scalar* __restrict__ lowerPtr = fvm.lower().begin();
+    scalar* __restrict__ upperPtr = fvm.upper().begin();
 
-    const labelUList& l = fvm_DDT.lduAddr().lowerAddr();
-    const labelUList& u = fvm_DDT.lduAddr().upperAddr();
+    const labelUList& l = fvm.lduAddr().lowerAddr();
+    const labelUList& u = fvm.lduAddr().upperAddr();
 
 
     scalar rDeltaT = 1.0/mesh.time().deltaTValue();
@@ -100,16 +98,15 @@ GenMatrix_U(
     );
     volVectorField& gGrad = tgGrad.ref();
 
+    double GenMatrix_U_tick_1 = MPI_Wtime();
+    Info << "GenMatrix_U_time_1 : " << GenMatrix_U_tick_1 - GenMatrix_U_tick_0 << endl;
+
     // 1. interpolation
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
     for(label f = 0; f < nFaces; ++f){
         pfPtr[f] = weightsPtr[f] * (pPtr[l[f]] - pPtr[u[f]]) + pPtr[u[f]];
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
 
-    GenMatrix_U_loop_start = MPI_Wtime();
     forAll(weights.boundaryField(), pi)
     {
         const fvsPatchScalarField& pLambda = weights.boundaryField()[pi];
@@ -129,21 +126,18 @@ GenMatrix_U(
             psf = p.boundaryField()[pi]; 
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
+
+    double GenMatrix_U_tick_2 = MPI_Wtime();
+    Info << "GenMatrix_U_time_2 : " << GenMatrix_U_tick_2 - GenMatrix_U_tick_1 << endl;
+
     // 2. gradf
     Field<vector>& igGrad = gGrad;
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
     for(label facei = 0; facei < nFaces; ++facei){
         vector Sfssf = mesh.Sf()[facei] * pfPtr[facei];
         igGrad[l[facei]] += Sfssf;
         igGrad[u[facei]] -= Sfssf;
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
-
-    GenMatrix_U_loop_start = MPI_Wtime();
     forAll(mesh.boundary(), patchi)
     {
         const labelUList& pFaceCells =
@@ -159,8 +153,10 @@ GenMatrix_U(
             igGrad[pFaceCells[facei]] += pSf[facei]*pssf[facei];
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
+
+    double GenMatrix_U_tick_3 = MPI_Wtime();
+    Info << "GenMatrix_U_time_3 : " << GenMatrix_U_tick_3 - GenMatrix_U_tick_2 << endl;
+
     // gGrad.correctBoundaryConditions();
     // igGrad /= mesh.V();
 
@@ -175,7 +171,6 @@ GenMatrix_U(
      */
     // fvc::div((turbulence.alpha()*turbulence.rho()*turbulence.nuEff())*dev2(T(fvc::grad(U))))
     // gradU
-    GenMatrix_U_turbulence_start = MPI_Wtime();
     tmp<surfaceVectorField> tUf(
         new GeometricField<vector, fvsPatchField, surfaceMesh>
         (
@@ -213,16 +208,16 @@ GenMatrix_U(
         )
     );
     volTensorField& gGradU = tgGradU.ref();
+
+    double GenMatrix_U_tick_4 = MPI_Wtime();
+    Info << "GenMatrix_U_time_4 : " << GenMatrix_U_tick_4 - GenMatrix_U_tick_3 << endl;
+
     // 1. interpolation
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
     for(label f = 0; f < nFaces; ++f){
         Uf[f] = weightsPtr[f] * (UOldTimePtr[l[f]] - UOldTimePtr[u[f]]) + UOldTimePtr[u[f]];
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
 
-    GenMatrix_U_loop_start = MPI_Wtime();
     forAll(weights.boundaryField(), Ui)
     {
         const fvsPatchScalarField& pLambda = weights.boundaryField()[Ui];
@@ -242,13 +237,14 @@ GenMatrix_U(
             psf = U.boundaryField()[Ui]; 
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
+
+    double GenMatrix_U_tick_5 = MPI_Wtime();
+    Info << "GenMatrix_U_time_5 : " << GenMatrix_U_tick_5 - GenMatrix_U_tick_4 << endl;
+
     // 2. gradf
     // face loop to assign cell (conflict)
     Field<tensor>& igGradU = gGradU;
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
     for(label facei = 0; facei < nFaces; ++facei){
         tensor Sfssf = mesh.Sf()[facei] * Uf[facei];
         igGradU[l[facei]] += Sfssf;
@@ -269,13 +265,14 @@ GenMatrix_U(
             igGradU[pFaceCells[facei]] += pSf[facei]*pssf[facei];
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
 
     igGradU /= mesh.V();
+
+    double GenMatrix_U_tick_6 = MPI_Wtime();
+    Info << "GenMatrix_U_time_6 : " << GenMatrix_U_tick_6 - GenMatrix_U_tick_5 << endl;
+
     gGradU.correctBoundaryConditions();
 
-    GenMatrix_U_loop_start = MPI_Wtime();
     forAll(U.boundaryField(), patchi)
     {
         fvPatchTensorField& gGradbf = gGradU.boundaryFieldRef()[patchi];
@@ -295,12 +292,19 @@ GenMatrix_U(
             );
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
+
+    double GenMatrix_U_tick_7 = MPI_Wtime();
+    Info << "GenMatrix_U_time_7 : " << GenMatrix_U_tick_7 - GenMatrix_U_tick_6 << endl;
+
+    double GenMatrix_U_tick_7_0 = MPI_Wtime();
 
     // dev_T
     // tmp<volTensorField> tgGradUCoeff = (turbulence.alpha()*turbulence.rho()*turbulence.nuEff())*dev2(T(gGradU));
     tmp<volTensorField> tgGradUCoeff = (turbulence.rho()*turbulence.nuEff())*dev2(T(gGradU));
+
+    double GenMatrix_U_tick_7_1 = MPI_Wtime();
+    Info << "GenMatrix_U_time_7_1 : " << GenMatrix_U_tick_7_1 - GenMatrix_U_tick_7_0 << endl;
+
     volTensorField gGradUCoeff = tgGradUCoeff.ref();
 
     // div
@@ -320,9 +324,11 @@ GenMatrix_U(
     surfaceVectorField& gGradUCoeff_f = tgGradUCoeff_f.ref();
     const tensor* const __restrict__ gGradUCoeffPtr = gGradUCoeff.primitiveField().begin();
 
+    double GenMatrix_U_tick_8 = MPI_Wtime();
+    Info << "GenMatrix_U_time_8 : " << GenMatrix_U_tick_8 - GenMatrix_U_tick_7 << endl;
+
     // 1. interpolation
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
     for (label f = 0; f < nFaces; ++f)
     {
         gGradUCoeff_f[f] = mesh.Sf()[f] & (weightsPtr[f]*(gGradUCoeffPtr[l[f]] - gGradUCoeffPtr[u[f]]) + gGradUCoeffPtr[u[f]]);
@@ -348,8 +354,10 @@ GenMatrix_U(
             psf = pSf & gGradUCoeff.boundaryField()[gGradUi]; 
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
+
+    double GenMatrix_U_tick_9 = MPI_Wtime();
+    Info << "GenMatrix_U_time_9 : " << GenMatrix_U_tick_9 - GenMatrix_U_tick_8 << endl;
+
     // 2. surfaceIntegrate
     tmp<GeometricField<vector, fvPatchField, volMesh>> tgDivGradUCoeff
     (
@@ -376,8 +384,10 @@ GenMatrix_U(
     volVectorField& gDivGradUCoeff = tgDivGradUCoeff.ref();
     vectorField& igDivGradUCoeff = gDivGradUCoeff.primitiveFieldRef();
     
+    double GenMatrix_U_tick_10 = MPI_Wtime();
+    Info << "GenMatrix_U_time_10 : " << GenMatrix_U_tick_10 - GenMatrix_U_tick_9 << endl;
+
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
     for (label f = 0; f < nFaces; ++f)
     {
         igDivGradUCoeff[l[f]] += gGradUCoeff_f[f];
@@ -397,10 +407,11 @@ GenMatrix_U(
             igDivGradUCoeff[pFaceCells[facei]] += pssf[facei];
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
-    GenMatrix_U_turbulence_end = MPI_Wtime();
-    GenMatrix_U_turbulence_time = GenMatrix_U_turbulence_end - GenMatrix_U_turbulence_start;
+
+    
+    double GenMatrix_U_tick_11 = MPI_Wtime();
+    Info << "GenMatrix_U_time_11 : " << GenMatrix_U_tick_11 - GenMatrix_U_tick_10 << endl;
+
     // igDivGradUCoeff /= mesh.Vsc();
     // gDivGradUCoeff.correctBoundaryConditions();
 
@@ -423,7 +434,10 @@ GenMatrix_U(
     surfaceScalarField& gammaf = tgammaf.ref();
     const scalar* const __restrict__ gammaPtr = gamma.primitiveField().begin();
     // TODO: Thread this loop
-    GenMatrix_U_loop_start = MPI_Wtime();
+
+    double GenMatrix_U_tick_12 = MPI_Wtime();
+    Info << "GenMatrix_U_time_12 : " << GenMatrix_U_tick_12 - GenMatrix_U_tick_11 << endl;
+
     for(label f = 0; f < nFaces; ++f){
         gammaf[f] = weightsPtr[f] * (gammaPtr[l[f]] - gammaPtr[u[f]]) + gammaPtr[u[f]];
     }
@@ -446,8 +460,10 @@ GenMatrix_U(
             psf = gamma.boundaryField()[gammai]; 
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
+
+    double GenMatrix_U_tick_13 = MPI_Wtime();
+    Info << "GenMatrix_U_time_13 : " << GenMatrix_U_tick_13 - GenMatrix_U_tick_12 << endl;
+
     surfaceScalarField gammaMagSf = (gammaf * mesh.magSf()).ref();
     const surfaceScalarField& deltaCoeffs = mesh.nonOrthDeltaCoeffs();
 
@@ -482,36 +498,28 @@ GenMatrix_U(
     // construct matrix
     // ------------------------------------------------------------------------------------------
     // cell loop
-    GenMatrix_U_loop_start = MPI_Wtime();
-    #pragma omp parallel for
-    // #pragma clang loop unroll_count(4)
-    // #pragma clang loop vectorize(enable)
     for(label c = 0; c < nCells; ++c){
-        diagPtr_ddt[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
-        sourcePtr_ddt[c] = rDeltaT * rhoOldTimePtr[c] * UOldTimePtr[c] * meshVscPtr[c];
+        diagPtr[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
+        sourcePtr[c] = rDeltaT * rhoOldTimePtr[c] * UOldTimePtr[c] * meshVscPtr[c];
         // grad(p)
-        sourcePtr_ddt[c] -= igGrad[c];
+        sourcePtr[c] -= igGrad[c];
         // turbulence div
-        sourcePtr_ddt[c] += igDivGradUCoeff[c];
+        sourcePtr[c] += igDivGradUCoeff[c];
     }
 
-    // face loop to assign face
-    #pragma omp parallel for
-    // #pragma clang loop unroll_count(4)
-    // #pragma clang loop vectorize(enable)
     for(label f = 0; f < nFaces; ++f){
-        lowerPtr_ddt[f] = - weightsPtr[f] * phiPtr[f];
-        upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * phiPtr[f];
+        lowerPtr[f] = - weightsPtr[f] * phiPtr[f];
+        upperPtr[f] = (- weightsPtr[f] + 1.) * phiPtr[f];
         // laplacian
-        lowerPtr_ddt[f] -= deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        upperPtr_ddt[f] -= deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+        lowerPtr[f] -= deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+        upperPtr[f] -= deltaCoeffsPtr[f] * gammaMagSfPtr[f];
     }
 
     // TODO: Thread this loop
     for (label face=0; face< nFaces; ++face)
     {
-        diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
-        diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
+        diagPtr[l[face]] -= lowerPtr[face];
+        diagPtr[u[face]] -= upperPtr[face];
     }
 
 
@@ -525,41 +533,26 @@ GenMatrix_U(
         const fvsPatchScalarField& pDeltaCoeffs =
             deltaCoeffs.boundaryField()[patchi];
 
-        fvm_DDT.internalCoeffs()[patchi] = patchFlux*psf.valueInternalCoeffs(pw);
-        fvm_DDT.boundaryCoeffs()[patchi] = -patchFlux*psf.valueBoundaryCoeffs(pw);
+        fvm.internalCoeffs()[patchi] = patchFlux*psf.valueInternalCoeffs(pw);
+        fvm.boundaryCoeffs()[patchi] = -patchFlux*psf.valueBoundaryCoeffs(pw);
 
         if (psf.coupled())
         {
-            fvm_DDT.internalCoeffs()[patchi] -=
+            fvm.internalCoeffs()[patchi] -=
                 pGamma*psf.gradientInternalCoeffs(pDeltaCoeffs);
-            fvm_DDT.boundaryCoeffs()[patchi] -=
+            fvm.boundaryCoeffs()[patchi] -=
                -pGamma*psf.gradientBoundaryCoeffs(pDeltaCoeffs);
         }
         else
         {
-            fvm_DDT.internalCoeffs()[patchi] -= pGamma*psf.gradientInternalCoeffs();
-            fvm_DDT.boundaryCoeffs()[patchi] -= -pGamma*psf.gradientBoundaryCoeffs();
+            fvm.internalCoeffs()[patchi] -= pGamma*psf.gradientInternalCoeffs();
+            fvm.boundaryCoeffs()[patchi] -= -pGamma*psf.gradientBoundaryCoeffs();
         }
     }
-    GenMatrix_U_loop_end = MPI_Wtime();
-    GenMatrix_U_loop_time += GenMatrix_U_loop_end - GenMatrix_U_loop_start;
 
-    // construct matrix
-    tmp<fvVectorMatrix> tUeqnDIV = gaussConvectionSchemeFvmDiv(phi, U);
-    // tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulenceModelLinearViscousStressDivDevRhoReff(U,turbulence());
-    tmp<fvVectorMatrix> tfvm
-    (
-        new fvVectorMatrix
-        (
-            tfvm_DDT
-            // + tUeqnDIV 
-            // + tUeqnDivDevRhoReff
-            // ==
-            // -fvc::grad(p)
-        )
-    );
-    Info << "GenMatrix U loop time : " << GenMatrix_U_loop_time << endl;
-    Info << "GenMatrix_U_turbulence_time : " << GenMatrix_U_turbulence_time << endl;
+    double GenMatrix_U_tick_14 = MPI_Wtime();
+    Info << "GenMatrix_U_time_14 : " << GenMatrix_U_tick_14 - GenMatrix_U_tick_13 << endl;
+ 
     return tfvm;
 }
 }

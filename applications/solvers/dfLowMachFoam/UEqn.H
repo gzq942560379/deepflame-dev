@@ -4,43 +4,17 @@ double U_build_start, U_build_end, U_build_time = 0.;
 double U_convert_start, U_convert_end, U_convert_time = 0.;
 double U_solve_start, U_solve_end, U_solve_time = 0.;
 
-double U_build_ddt_start, U_build_ddt_end, U_build_ddt_time = 0.;
-double U_build_div_start, U_build_div_end, U_build_div_time = 0.;
-double U_build_grad_start, U_build_grad_end, U_build_grad_time = 0.;
-double U_build_turbulence_start, U_build_turbulence_end, U_build_turbulence_time = 0.;
 double U_build_relax_start, U_build_relax_end, U_build_relax_time = 0.;
-double U_build_sum_start, U_build_sum_end, U_build_sum_time = 0.;
 
-double U_build_orig_start, U_build_orig_end, U_build_orig_time = 0.;
-double U_build_new_start, U_build_new_end, U_build_new_time = 0.;
+double U_build_org_start, U_build_org_end, U_build_org_time = 0.;
+double U_build_opt_start, U_build_opt_end, U_build_opt_time = 0.;
 
 double U_total_start = MPI_Wtime();
 
 U_build_start = MPI_Wtime();
-// tmp<fvVectorMatrix> tUEqn
-// (
-//     fvm::ddt(rho, U) + fvm::div(phi, U)
-//   + turbulence->divDevRhoReff(U)
-// );
 
-U_build_ddt_start = MPI_Wtime();
-tmp<fvVectorMatrix> tUeqnDDT = EulerDdtSchemeFvmDdt(rho, U);
-U_build_ddt_end = MPI_Wtime();
-U_build_ddt_time += U_build_ddt_end - U_build_ddt_start;
-
-U_build_div_start = MPI_Wtime();
-tmp<fvVectorMatrix> tUeqnDIV = gaussConvectionSchemeFvmDiv(phi, U);
-U_build_div_end = MPI_Wtime();
-U_build_div_time += U_build_div_end - U_build_div_start;
-
-U_build_turbulence_start=MPI_Wtime();
-tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulence->divDevRhoReff(U);
-// tmp<fvVectorMatrix> tUeqnDivDevRhoReff = turbulenceModelLinearViscousStressDivDevRhoReff(U,turbulence());
-U_build_turbulence_end=MPI_Wtime();
-U_build_turbulence_time += U_build_turbulence_end - U_build_turbulence_start;
-
-U_build_sum_start = MPI_Wtime();
-U_build_orig_start = MPI_Wtime();
+#ifndef OPT_GenMatrix_U
+U_build_org_start = MPI_Wtime();
 tmp<fvVectorMatrix> tUEqn
 (
     fvm::ddt(rho, U) + fvm::div(phi, U)
@@ -48,54 +22,32 @@ tmp<fvVectorMatrix> tUEqn
     == 
     -fvc::grad(p)
 );
-U_build_orig_end = MPI_Wtime();
-U_build_orig_time = U_build_orig_end - U_build_orig_start;
 fvVectorMatrix& UEqn = tUEqn.ref();
-U_build_new_start = MPI_Wtime();
-tmp<fvVectorMatrix> tUEqn_new = GenMatrix_U(rho, U, phi, p, turbulence());
-U_build_new_end = MPI_Wtime();
-U_build_new_time = U_build_new_end - U_build_new_start;
-fvVectorMatrix& UEqn_new = tUEqn_new.ref();
+U_build_org_end = MPI_Wtime();
+U_build_org_time += U_build_org_end - U_build_org_start;
+#else
+U_build_opt_start = MPI_Wtime();
+tmp<fvVectorMatrix> tUEqn = GenMatrix_U(rho, U, phi, p, turbulence());
+fvVectorMatrix& UEqn = tUEqn.ref();
+U_build_opt_end = MPI_Wtime();
+U_build_opt_time += U_build_opt_end - U_build_opt_start;
+#ifdef OPT_GenMatrix_U_check
+U_build_org_start = MPI_Wtime();
+tmp<fvVectorMatrix> tUEqn_answer
+(
+    fvm::ddt(rho, U) + fvm::div(phi, U)
+    + turbulence->divDevRhoReff(U)
+    == 
+    -fvc::grad(p)
+);
+fvVectorMatrix& UEqn_answer = tUEqn_answer.ref();
+U_build_org_end = MPI_Wtime();
+U_build_org_time += U_build_org_end - U_build_org_start;
+check_fvmatrix_equal(UEqn, UEqn_answer);
+#endif
+#endif
 
-// assert
 
-assert(UEqn.source().begin() != UEqn_new.source().begin());
-for (direction cmpt=0; cmpt<vector::nComponents; ++cmpt)
-{
-    scalarField sourceCmpt(UEqn.source().component(cmpt)());
-    scalarField sourceCmpt_new(UEqn_new.source().component(cmpt)());
-    for (label i = 0; i < sourceCmpt.size(); ++i)
-    {
-        assert(fabs(sourceCmpt[i] - sourceCmpt_new[i]) < 1e-12);
-    }
-}
-
-for(label i = 0; i < UEqn.diag().size(); ++i){
-    assert(fabs(UEqn.diag()[i] - UEqn_new.diag()[i]) < 1e-12);
-}
-for(label i = 0; i < UEqn.lower().size(); ++i){
-    assert(fabs(UEqn.lower()[i] - UEqn_new.lower()[i]) < 1e-12);
-}
-for(label i = 0; i < UEqn.upper().size(); ++i){
-    assert(fabs(UEqn.upper()[i] - UEqn_new.upper()[i]) < 1e-12);
-}
-for (direction cmpt=0; cmpt<vector::nComponents; ++cmpt)
-{
-    forAll(U.boundaryField(), patchi)
-    {
-        auto internalCoeffsDiffTmp = UEqn.internalCoeffs().component(cmpt)()[patchi] - UEqn_new.internalCoeffs().component(cmpt)()[patchi];
-        auto boundaryCoeffsDiffTmp = UEqn.boundaryCoeffs().component(cmpt)()[patchi] - UEqn_new.boundaryCoeffs().component(cmpt)()[patchi];
-        auto& internalCoeffsDiff = internalCoeffsDiffTmp.ref();
-        auto& boundaryCoeffsDiff = boundaryCoeffsDiffTmp.ref();
-
-        for(label i = 0; i < internalCoeffsDiff.size(); ++i){
-            assert(fabs(internalCoeffsDiff[i]) < 1e-12);
-        }
-        for(label i = 0; i < UEqn.boundaryCoeffs()[patchi].size(); ++i){
-            assert(fabs(boundaryCoeffsDiff[i]) < 1e-12);
-        }
-    }
-}
 
 UEqn.relax();
 
@@ -107,16 +59,11 @@ fvVectorMatrix turb_source
     turbulence->divDevRhoReff(U)
 );*/
 
-if (pimple.momentumPredictor())
-{
-    solve(UEqn_new);
+assert(pimple.momentumPredictor());
 
-    U_build_start = MPI_Wtime();
-
-    // fvVectorMatrix UEqnTmp(UEqn == -fvc::grad(p));
-
-    U_build_end = MPI_Wtime();
-    U_build_time += U_build_end - U_build_start;
+// if (pimple.momentumPredictor())
+// {
+    // solve(UEqn_new);
 
 // #ifdef _CSR_
 //     U_convert_start = MPI_Wtime();
@@ -131,8 +78,7 @@ if (pimple.momentumPredictor())
 //     U_convert_time += U_convert_end - U_convert_start;
 // #endif
 
-
-    // U_solve_start = MPI_Wtime();
+    U_solve_start = MPI_Wtime();
 // #ifdef _CSR_
 //     auto& psi = const_cast<GeometricField<vector, fvPatchField, volMesh>&>(UEqnTmp.psi());
 //     auto& source = UEqnTmp.source();
@@ -140,14 +86,14 @@ if (pimple.momentumPredictor())
 //     auto& boundaryCoeffs = UEqnTmp.boundaryCoeffs();
 //     csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
 // #else
-    // UEqnTmp.solve();
+    UEqn.solve();
 // #endif
 
     U_solve_end = MPI_Wtime();
     U_solve_time = U_solve_end - U_solve_start;
 
     K = 0.5*magSqr(U);
-}
+// }
 
 double U_total_end = MPI_Wtime();
 
@@ -155,15 +101,8 @@ double U_total_time = U_total_end - U_total_start;
 
 Info << "U total Time : " << U_total_time << endl;
 Info << "U build Time : " << U_build_time << endl;
-Info << "U build ddt Time : " << U_build_ddt_time << endl;
-Info << "U build div Time : " << U_build_div_time << endl;
-Info << "U build grad Time : " << U_build_grad_time << endl;
-Info << "U build turbulence Time : " << U_build_turbulence_time << endl;
-Info << "U build relax Time : " << U_build_relax_time << endl;
-Info << "U build sum Time : " << U_build_sum_time << endl;
-Info << "U build other Time : " << U_build_time - U_build_ddt_time - U_build_div_time - U_build_grad_time - U_build_turbulence_time - U_build_relax_time - U_build_sum_time << endl;
+Info << "U build opt time : " << U_build_opt_time << endl;
+Info << "U build org time : " << U_build_org_time << endl;
 Info << "U convert Time : " << U_convert_time << endl;
 Info << "U solve Time : " << U_solve_time << endl;
-Info << "U build orig Time : " << U_build_orig_time << endl;
-Info << "U build new Time : " << U_build_new_time << endl;
 Info << "U other Time : " << U_total_time - U_build_time - U_convert_time - U_solve_time << endl;

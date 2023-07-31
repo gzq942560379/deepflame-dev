@@ -150,26 +150,107 @@ csrMatrix::csrMatrix(const lduMatrix& ldu):lduMatrix_(ldu){
     }
 }
 
-void csrMatrix::write_pattern(const std::string& filename){
+void csrMatrix::write_pattern(const std::string& filename) const {
     int mpisize, mpirank;
     MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
     MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
-    std::stringstream ss;
-    ss << filename << "_" << mpirank << ".mtx";
-    FILE* file = fopen(ss.str().c_str(),"w");
-    if(file == NULL){
-        std::cout << "open file error !!! " << ss.str() << std::endl;
-        std::abort();
-    }
-    fprintf(file,"%s\n", "%%MatrixMarket matrix coordinate pattern general");
-    fprintf(file, "%d %d %d\n", row_, col_, off_diag_nnz_);
-    for(label r = 0; r < row_; ++r){
-        for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
-            label c = off_diag_colidx_[index];
-            fprintf(file, "%d %d\n", r + 1, c + 1);
+    if(mpirank == 0){
+        std::stringstream ss;
+        ss << filename << "_" << mpirank << ".mtx";
+        FILE* fr = fopen(ss.str().c_str(),"r");
+        if(fr != NULL){
+            fclose(fr);
+            return;
         }
+        FILE* fw = fopen(ss.str().c_str(),"w");
+        fprintf(fw,"%s\n", "%%MatrixMarket matrix coordinate pattern general");
+        fprintf(fw, "%d %d %d\n", row_, col_, off_diag_nnz_);
+        for(label r = 0; r < row_; ++r){
+            for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
+                label c = off_diag_colidx_[index];
+                fprintf(fw, "%d %d\n", r + 1, c + 1);
+            }
+        }
+        fclose(fw);
     }
-    fclose(file);
+}
+
+void csrMatrix::write(const std::string& filename) const {
+    // int mpisize, mpirank;
+    // MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+    // MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    // if(mpirank == 0){
+        int index = 0;
+        while(true){
+            std::stringstream ss;
+            ss << filename << "_matrix_" << row_ << "_" << index << ".mtx";
+            FILE* fr = fopen(ss.str().c_str(),"r");
+            if(fr != NULL){
+                fclose(fr);
+            }else{
+                break;
+            }
+            index += 1;
+        } 
+
+        std::stringstream ss;
+        ss << filename << "_matrix_" << row_ << "_" << index << ".mtx";
+        FILE* fw = fopen(ss.str().c_str(),"w");
+        
+        fprintf(fw,"%s\n", "%%MatrixMarket matrix coordinate real general");
+        fprintf(fw, "%d %d %d\n", row_, col_, off_diag_nnz_+row_);
+        Info << "csrMatrix::write 3" << endl;
+        for(label r = 0; r < row_; ++r){
+            for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
+                label c = off_diag_colidx_[index];
+                scalar v = off_diag_value_[index];
+                if(c < r){
+                    fprintf(fw, "%d %d %20.16g\n", r + 1, c + 1, v);
+                }
+            }
+            fprintf(fw, "%d %d %20.16g\n", r + 1, r + 1, diag_value_[r]);
+            for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
+                label c = off_diag_colidx_[index];
+                scalar v = off_diag_value_[index];
+                if(c > r){
+                    fprintf(fw, "%d %d %20.16g\n", r + 1, c + 1, v);
+                }
+            }
+        }
+        Info << "csrMatrix::write 4" << endl;
+        fclose(fw);
+    // }
+}
+
+void csrMatrix::write_equation(const std::string& filename,const scalarField& source) const {
+    write(filename);
+
+    // int mpisize, mpirank;
+    // MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+    // MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    // if(mpirank == 0){
+        int index = 0;
+        while(true){
+            std::stringstream ss;
+            ss << filename << "_source_" << source.size() << "_" << index << ".dat";
+            FILE* fr = fopen(ss.str().c_str(),"r");
+            if(fr != NULL){
+                fclose(fr);
+            }else{
+                break;
+            }
+            index += 1;
+        } 
+        std::stringstream ss;
+        ss << filename << "_source_" << source.size() << "_" << index << ".dat";
+        FILE* fw = fopen(ss.str().c_str(),"w");
+        fprintf(fw, "%%source vector, the first line is the length of vector, and the following length lines are the value of source vector\n");
+        fprintf(fw, "%d \n", source.size());
+        forAll(source, i){
+            fprintf(fw, "%20.16g\n", source[i]);
+        }        
+        
+    // }
 }
 
 void csrMatrix::analyze(){
@@ -189,12 +270,12 @@ void csrMatrix::analyze(){
     }
 
     Info << "sparse matrix analyze : " << endl;
-    Info << "row(col) : " << row_ << max_col_count << endl;
-    Info << "nnz : " << off_diag_nnz_ + row_ << max_col_count << endl;
+    Info << "row(col) : " << row_ << endl;
+    Info << "nnz : " << off_diag_nnz_ + row_ << endl;
     Info << "sparsity : " << (off_diag_nnz_ + row_) * 1.0 / row_ / row_ * 100  << "%" << endl;
     Info << "max colume count : " << max_col_count << endl;
     Info << "colume frequency : " << endl;
-    for(label i = 0; i < col_count_frequency.size(); ++i){
+    for(size_t i = 0; i < col_count_frequency.size(); ++i){
         if(col_count_frequency[i] > 0){
             Info << "\t" << i << " : " << col_count_frequency[i] << endl;
         }

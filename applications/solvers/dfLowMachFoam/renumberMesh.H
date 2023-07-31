@@ -36,12 +36,10 @@ argList::addNote
 (
     "Renumber mesh to minimize bandwidth"
 );
-Info << "time at line 39 = " << runTime.timeName() << endl;
 #include "addRegionOption.H"
 #include "addOverwriteOption.H"
 #include "addTimeOptions.H"
 #include "addDictOption.H"
-Info << "time at line 44 = " << runTime.timeName() << endl;
 argList::addBoolOption
 (
     "frontWidth",
@@ -137,6 +135,8 @@ if (readDict)
     renumberDictPtr.reset(new IOdictionary(dictIO));
     const IOdictionary& renumberDict = renumberDictPtr();
 
+    Info << "renumberDict : " << renumberDict << endl;
+
     renumberPtr = renumberMethod::New(renumberDict);
 
     sortCoupledFaceCells = renumberDict.lookupOrDefault
@@ -191,7 +191,7 @@ else
     renumberPtr.reset(new CuthillMcKeeRenumber(renumberDict));
 }
 
-Info<< "Selecting renumberMethod " << renumberPtr().type() << nl << endl;
+Info<< "Selecting renumberMethod : " << renumberPtr().type() << nl << endl;
 
 
 

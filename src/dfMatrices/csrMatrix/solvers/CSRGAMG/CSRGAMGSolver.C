@@ -72,20 +72,37 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
     postSweepsLevelMultiplier_(1),
     maxPostSweeps_(4),
     nFinestSweeps_(2),
+    nCoarsestSweeps_(0),
     interpolateCorrection_(false),
     scaleCorrection_(matrix.symmetric()),
+    solveCoarsest_(true),
     directSolveCoarsest_(false),
     agglomeration_(CSRGAMGAgglomeration::New(matrix_.ldu(), controlDict_)),
-
     matrixLevels_(agglomeration_.size()),
+    csrMatrixLevels_(agglomeration_.size()),
     primitiveInterfaceLevels_(agglomeration_.size()),
     interfaceLevels_(agglomeration_.size()),
     interfaceLevelsBouCoeffs_(agglomeration_.size()),
     interfaceLevelsIntCoeffs_(agglomeration_.size())
 {
-    Info << "Foam::CSRGAMGSolver::CSRGAMGSolver start" << endl;
-
     readControls();
+
+    Info << "CSRGAMGSolver settings :" << endl
+        << "    Agglomeration Level:" << agglomeration_.size() << endl
+        << "    cacheAgglomeration:" << cacheAgglomeration_ << endl
+        << "    nPreSweeps:" << nPreSweeps_ << endl
+        << "    preSweepsLevelMultiplier:" << preSweepsLevelMultiplier_ << endl
+        << "    maxPreSweeps:" << maxPreSweeps_ << endl
+        << "    nPostSweeps:" << nPostSweeps_ << endl
+        << "    postSweepsLevelMultiplier:" << postSweepsLevelMultiplier_ << endl
+        << "    maxPostSweeps:" << maxPostSweeps_ << endl
+        << "    nFinestSweeps:" << nFinestSweeps_ << endl
+        << "    nCoarsestSweeps:" << nCoarsestSweeps_ << endl
+        << "    interpolateCorrection:" << interpolateCorrection_ << endl
+        << "    scaleCorrection:" << scaleCorrection_ << endl
+        << "    solveCoarsest:" << solveCoarsest_ << endl
+        << "    directSolveCoarsest:" << directSolveCoarsest_ << endl
+        << endl;
 
     if (agglomeration_.processorAgglomerate())
     {
@@ -207,8 +224,7 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
     }
 
 
-    // if (debug)
-    if (1)
+    if (debug)
     {
         for
         (
@@ -278,8 +294,6 @@ Foam::CSRGAMGSolver::CSRGAMGSolver
             << exit(FatalError);
     }
 
-    Info << "Foam::CSRGAMGSolver::CSRGAMGSolver end" << endl;
-
 }
 
 
@@ -316,25 +330,28 @@ void Foam::CSRGAMGSolver::readControls()
     );
     controlDict_.readIfPresent("maxPostSweeps", maxPostSweeps_);
     controlDict_.readIfPresent("nFinestSweeps", nFinestSweeps_);
+    controlDict_.readIfPresent("nCoarsestSweeps", nCoarsestSweeps_);
     controlDict_.readIfPresent("interpolateCorrection", interpolateCorrection_);
     controlDict_.readIfPresent("scaleCorrection", scaleCorrection_);
+    controlDict_.readIfPresent("solveCoarsest", solveCoarsest_);
     controlDict_.readIfPresent("directSolveCoarsest", directSolveCoarsest_);
 
-    // if (debug)
-    if (1)
+    if (debug)
     {
-        Pout<< "CSRGAMGSolver settings :"
-            << " cacheAgglomeration:" << cacheAgglomeration_
-            << " nPreSweeps:" << nPreSweeps_
-            << " preSweepsLevelMultiplier:" << preSweepsLevelMultiplier_
-            << " maxPreSweeps:" << maxPreSweeps_
-            << " nPostSweeps:" << nPostSweeps_
-            << " postSweepsLevelMultiplier:" << postSweepsLevelMultiplier_
-            << " maxPostSweeps:" << maxPostSweeps_
-            << " nFinestSweeps:" << nFinestSweeps_
-            << " interpolateCorrection:" << interpolateCorrection_
-            << " scaleCorrection:" << scaleCorrection_
-            << " directSolveCoarsest:" << directSolveCoarsest_
+        Pout<< "CSRGAMGSolver settings :" << endl
+            << "    cacheAgglomeration:" << cacheAgglomeration_ << endl
+            << "    nPreSweeps:" << nPreSweeps_ << endl
+            << "    preSweepsLevelMultiplier:" << preSweepsLevelMultiplier_ << endl
+            << "    maxPreSweeps:" << maxPreSweeps_ << endl
+            << "    nPostSweeps:" << nPostSweeps_ << endl
+            << "    postSweepsLevelMultiplier:" << postSweepsLevelMultiplier_ << endl
+            << "    maxPostSweeps:" << maxPostSweeps_ << endl
+            << "    nFinestSweeps:" << nFinestSweeps_ << endl
+            << "    nCoarsestSweeps:" << nCoarsestSweeps_ << endl
+            << "    interpolateCorrection:" << interpolateCorrection_ << endl
+            << "    scaleCorrection:" << scaleCorrection_ << endl
+            << "    solveCoarsest:" << solveCoarsest_ << endl
+            << "    directSolveCoarsest:" << directSolveCoarsest_ << endl
             << endl;
     }
 }

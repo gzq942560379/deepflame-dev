@@ -232,9 +232,9 @@ Foam::CSRGAMGAgglomeration::CSRGAMGAgglomeration
 )
 :
     MeshObject<lduMesh, Foam::GeometricMeshObject, CSRGAMGAgglomeration>(mesh),
-
-    maxLevels_(50),
-
+    maxLevels_(
+        controlDict.lookupOrDefault<label>("maxLevels", 50)
+    ),
     nCellsInCoarsestLevel_
     (
         controlDict.lookupOrDefault<label>("nCellsInCoarsestLevel", 10)
@@ -337,7 +337,6 @@ const Foam::CSRGAMGAgglomeration& Foam::CSRGAMGAgglomeration::New
     const dictionary& controlDict
 )
 {
-    Info << "Foam::CSRGAMGAgglomeration::New start" << endl;
     const lduMesh& mesh = matrix.mesh();
 
     if
@@ -383,7 +382,6 @@ const Foam::CSRGAMGAgglomeration& Foam::CSRGAMGAgglomeration::New
             CSRGAMGAgglomeration::typeName
         );
     }
-    Info << "Foam::CSRGAMGAgglomeration::New end" << endl;
 }
 
 

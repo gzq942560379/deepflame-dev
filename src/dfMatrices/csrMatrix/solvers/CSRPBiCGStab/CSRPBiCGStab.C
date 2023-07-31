@@ -60,6 +60,13 @@ Foam::CSRPBiCGStab::CSRPBiCGStab
         interfaceIntCoeffs,
         interfaces,
         solverControls
+    ),
+    preconPtr_(
+        csrMatrix::preconditioner::New
+        (
+            *this,
+            controlDict_
+        )
     )
 {}
 
@@ -73,24 +80,15 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
     const direction cmpt
 ) const
 {
-    double spmv_start, spmv_end, spmv_time = 0;
-    int spmv_count = 0;
-    double normFactor_start, normFactor_end, normFactor_time = 0;
-    int normFactor_count = 0;
-    double gSumMag_start, gSumMag_end, gSumMag_time = 0;
-    int gSumMag_count = 0;
-    double gSumProd_start, gSumProd_end, gSumProd_time = 0;
-    int gSumProd_count = 0;
-    double gSumSqr_start, gSumSqr_end, gSumSqr_time = 0;
-    int gSumSqr_count = 0;
-    double localUpdate_start, localUpdate_end, localUpdate_time = 0;
-    int localUpdate_count = 0;
-    double precondition_start, precondition_end, precondition_time = 0;
-    int precondition_count = 0;
-    double checkSingularity_start, checkSingularity_end, checkSingularity_time = 0;
-    int checkSingularity_count = 0;
+    double spmv_start, spmv_end;
+    double normFactor_start, normFactor_end;
+    double gSumMag_start, gSumMag_end;
+    double gSumProd_start, gSumProd_end;
+    double gSumSqr_start, gSumSqr_end;
+    double localUpdate_start, localUpdate_end;
+    double precondition_start, precondition_end;
 
-    // Info << "Foam::CSRPBiCGStab::solve start -------------------------------------" << endl;
+    Info << "Foam::CSRPBiCGStab::solve start -------------------------------------" << endl;
     double solve_start = MPI_Wtime();
 
     // --- Setup class containing solver performance data
@@ -111,27 +109,24 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
     scalar* __restrict__ yAPtr = yA.begin();
 
     // --- Calculate A.psi
-    normFactor_start = MPI_Wtime();
+    spmv_start = MPI_Wtime();
     matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-    normFactor_end = MPI_Wtime();
-    normFactor_time += normFactor_end - normFactor_start;
-    normFactor_count += 1;
+    spmv_end = MPI_Wtime();
+    spmv_time += spmv_end - spmv_start;
 
     // --- Calculate initial residual field
     localUpdate_start = MPI_Wtime();
     scalarField rA(source - yA);
     localUpdate_end = MPI_Wtime();
     localUpdate_time += localUpdate_end - localUpdate_start;
-    localUpdate_count += 1;
 
     scalar* __restrict__ rAPtr = rA.begin();
 
     // --- Calculate normalisation factor
-    spmv_start = MPI_Wtime();
+    normFactor_start = MPI_Wtime();
     const scalar normFactor = this->normFactor(psi, source, yA, pA);
-    spmv_end = MPI_Wtime();
-    spmv_time += spmv_end - spmv_start;
-    spmv_count += 1;
+    normFactor_end = MPI_Wtime();
+    normFactor_time += normFactor_end - normFactor_start;
 
     // --- Calculate normalised residual norm
     gSumMag_start = MPI_Wtime();
@@ -140,7 +135,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
        /normFactor;
     gSumMag_end = MPI_Wtime();
     gSumMag_time += gSumMag_end - gSumMag_start;
-    gSumMag_count += 1;
 
     solverPerf.finalResidual() = solverPerf.initialResidual();
 
@@ -171,14 +165,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
         scalar alpha = 0;
         scalar omega = 0;
 
-        // --- Select and construct the preconditioner
-        autoPtr<csrMatrix::preconditioner> preconPtr =
-        csrMatrix::preconditioner::New
-        (
-            *this,
-            controlDict_
-        );
-
         // --- Solver iteration
         do
         {
@@ -189,18 +175,13 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
             rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
             gSumProd_end = MPI_Wtime();
             gSumProd_time += gSumProd_end - gSumProd_start;
-            gSumProd_count += 1;
 
 
             // --- Test for singularity
-            checkSingularity_start = MPI_Wtime();
             if (solverPerf.checkSingularity(mag(rA0rA)))
             {
                 break;
             }
-            checkSingularity_end = MPI_Wtime();
-            checkSingularity_time += checkSingularity_end - checkSingularity_start;
-            checkSingularity_count += 1;   
 
             // --- Update pA
             if (solverPerf.nIterations() == 0)
@@ -212,19 +193,14 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
                 }
                 localUpdate_end = MPI_Wtime();
                 localUpdate_time += localUpdate_end - localUpdate_start;
-                localUpdate_count += 1;
             }
             else
             {
                 // --- Test for singularity
-                checkSingularity_start = MPI_Wtime();
                 if (solverPerf.checkSingularity(mag(omega)))
                 {
                     break;
                 }
-                checkSingularity_end = MPI_Wtime();
-                checkSingularity_time += checkSingularity_end - checkSingularity_start;
-                checkSingularity_count += 1;   
 
                 localUpdate_start = MPI_Wtime();
                 const scalar beta = (rA0rA/rA0rAold)*(alpha/omega);
@@ -235,28 +211,24 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
                 }
                 localUpdate_end = MPI_Wtime();
                 localUpdate_time += localUpdate_end - localUpdate_start;
-                localUpdate_count += 1;
             }
 
             // --- Precondition pA
             precondition_start = MPI_Wtime();
-            preconPtr->precondition(yA, pA, cmpt);
+            preconPtr_->precondition(yA, pA, cmpt);
             precondition_end = MPI_Wtime();
             precondition_time += precondition_end - precondition_start;
-            precondition_count += 1;
             
             // --- Calculate AyA
             spmv_start = MPI_Wtime();   
             matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
             spmv_end = MPI_Wtime();
             spmv_time += spmv_end - spmv_start;
-            spmv_count += 1;
 
             gSumProd_start = MPI_Wtime();
             const scalar rA0AyA = gSumProd(rA0, AyA, matrix().mesh().comm());
             gSumProd_end = MPI_Wtime();
             gSumProd_time += gSumProd_end - gSumProd_start;
-            gSumProd_count += 1;
 
             // --- Calculate sA
             localUpdate_start = MPI_Wtime();
@@ -268,7 +240,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
             }
             localUpdate_end = MPI_Wtime();
             localUpdate_time += localUpdate_end - localUpdate_start;
-            localUpdate_count += 1;
 
             // --- Test sA for convergence
             gSumMag_start = MPI_Wtime();
@@ -276,7 +247,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
                 gSumMag(sA, matrix().mesh().comm())/normFactor;
             gSumMag_end = MPI_Wtime();
             gSumMag_time += gSumMag_end - gSumMag_start;
-            gSumMag_count += 1;
 
             if (solverPerf.checkConvergence(tolerance_, relTol_))
             {
@@ -288,30 +258,26 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
                 solverPerf.nIterations()++;
                 localUpdate_end = MPI_Wtime();
                 localUpdate_time += localUpdate_end - localUpdate_start;
-                localUpdate_count += 1;
 
                 break;
             }
 
             // --- Precondition sA
             precondition_start = MPI_Wtime();
-            preconPtr->precondition(zA, sA, cmpt);
+            preconPtr_->precondition(zA, sA, cmpt);
             precondition_end = MPI_Wtime();
             precondition_time += precondition_end - precondition_start;
-            precondition_count += 1;
 
             // --- Calculate tA
             spmv_start = MPI_Wtime();   
             matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
             spmv_end = MPI_Wtime();
             spmv_time += spmv_end - spmv_start;
-            spmv_count += 1;
 
             gSumSqr_start = MPI_Wtime();
             const scalar tAtA = gSumSqr(tA, matrix().mesh().comm());
             gSumSqr_end = MPI_Wtime();
             gSumSqr_time += gSumSqr_end - gSumSqr_start;
-            gSumSqr_count += 1;
 
             // --- Calculate omega from tA and sA
             //     (cheaper than using zA with preconditioned tA)
@@ -319,7 +285,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
             omega = gSumProd(tA, sA, matrix().mesh().comm())/tAtA;
             gSumProd_end = MPI_Wtime();
             gSumProd_time += gSumProd_end - gSumProd_start;
-            gSumProd_count += 1;
 
             // --- Update solution and residual
             localUpdate_start = MPI_Wtime();
@@ -330,7 +295,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
             }
             localUpdate_end = MPI_Wtime();
             localUpdate_time += localUpdate_end - localUpdate_start;
-            localUpdate_count += 1;
 
             gSumMag_start = MPI_Wtime();
             solverPerf.finalResidual() =
@@ -338,7 +302,6 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
                /normFactor;
             gSumMag_end = MPI_Wtime();
             gSumMag_time += gSumMag_end - gSumMag_start;
-            gSumMag_count += 1;
 
         } while
         (
@@ -351,32 +314,16 @@ Foam::solverPerformance Foam::CSRPBiCGStab::solve
     }
 
     double solve_end = MPI_Wtime();
-    double solve_time = solve_end - solve_start;
+    solve_time += solve_end - solve_start;
 
-    double other_time = solve_time - spmv_time - normFactor_time - gSumMag_time - gSumProd_time - gSumSqr_time - localUpdate_time - precondition_time - checkSingularity_time;
-
-    // Info << "solve time : " << solve_time << endl;
-
-    // Info << "spmv time : " << spmv_time << ", " << spmv_time / solve_time * 100 << "%" << endl;
-    // Info << "spmv count : " << spmv_count << endl;
-    // Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / solve_time * 100 << "%" << endl;
-    // Info << "normFactor count : " << normFactor_count << endl;
-    // Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
-    // Info << "gSumMag count : " << gSumMag_count << endl;
-    // Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
-    // Info << "gSumProd count : " << gSumProd_count << endl;
-    // Info << "gSumSqr time : " << gSumSqr_time << ", " << gSumSqr_time / solve_time * 100 << "%" << endl;
-    // Info << "gSumSqr count : " << gSumSqr_count << endl;
-    // Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / solve_time * 100 << "%" << endl;
-    // Info << "localUpdate count : " << localUpdate_count << endl;
-    // Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
-    // Info << "precondition count : " << precondition_count << endl;
-    // Info << "checkSingularity time : " << checkSingularity_time << ", " << checkSingularity_time / solve_time * 100 << "%" << endl;
-    // Info << "checkSingularity count : " << checkSingularity_count << endl;
-    // Info << "other time : " << other_time << ", " << other_time / solve_time * 100 << "%" << endl;
-
-
-    // Info << "Foam::CSRPBiCGStab::solve end --------------------------------------------" << endl;
+    Info << "spmv time : " << spmv_time << ", " << spmv_time / solve_time * 100 << "%" << endl;
+    Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / solve_time * 100 << "%" << endl;
+    Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
+    Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
+    Info << "gSumSqr time : " << gSumSqr_time << ", " << gSumSqr_time / solve_time * 100 << "%" << endl;
+    Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / solve_time * 100 << "%" << endl;
+    Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
+    Info << "Foam::CSRPBiCGStab::solve end --------------------------------------------" << endl;
     return solverPerf;
 }
 

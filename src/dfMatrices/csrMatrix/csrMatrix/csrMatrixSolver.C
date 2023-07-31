@@ -25,8 +25,6 @@ Foam::autoPtr<Foam::csrMatrix::solver> Foam::csrMatrix::solver::New
     const dictionary& solverControls
 )
 {
-    Info << "Foam::csrMatrix::solver::New start" << endl;
-
     const word name(solverControls.lookup("solver"));
 
     if (matrix.diagonal())

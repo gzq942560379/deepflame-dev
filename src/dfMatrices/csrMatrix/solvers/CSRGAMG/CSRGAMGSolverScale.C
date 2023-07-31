@@ -25,6 +25,7 @@ License
 
 #include "CSRGAMGSolver.H"
 #include "vector2D.H"
+#include <mpi.h>
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -32,13 +33,14 @@ void Foam::CSRGAMGSolver::scale
 (
     scalarField& field,
     scalarField& Acf,
-    const lduMatrix& A,
+    const csrMatrix& A,
     const FieldField<Field, scalar>& interfaceLevelBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaceLevel,
     const scalarField& source,
     const direction cmpt
 ) const
 {
+    double start = MPI_Wtime();
     A.Amul
     (
         Acf,
@@ -47,6 +49,8 @@ void Foam::CSRGAMGSolver::scale
         interfaceLevel,
         cmpt
     );
+    double end = MPI_Wtime();
+    scale_spmv_time += end - start;
 
     scalar scalingFactorNum = 0.0;
     scalar scalingFactorDenom = 0.0;

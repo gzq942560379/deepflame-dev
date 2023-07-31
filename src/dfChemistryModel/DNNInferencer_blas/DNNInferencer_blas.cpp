@@ -8,7 +8,7 @@
 DNNInferencer_blas::DNNInferencer_blas() {
     char* env_tmp = getenv("DNN_BATCH_SIZE");
     if(env_tmp == NULL){
-        this->batch_size_ = 131072;
+        this->batch_size_ = 16384;
     }else{
         this->batch_size_ = std::atol(env_tmp);;
     }

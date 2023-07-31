@@ -67,8 +67,6 @@ gaussGradSchemeGrad
 );
 
 
-// fvm::laplacian
-
 template<class Type>
 tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacianUncorrected
@@ -78,6 +76,7 @@ gaussLaplacianSchemeFvmLaplacianUncorrected
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
+// fvm::laplacian
 template<class Type>
 tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
@@ -119,6 +118,7 @@ GenMatrix_Y(
 
 
 void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
+void check_fvmatrix_equal(fvVectorMatrix& a,fvVectorMatrix& b);
 
 
 } // End namespace Foam

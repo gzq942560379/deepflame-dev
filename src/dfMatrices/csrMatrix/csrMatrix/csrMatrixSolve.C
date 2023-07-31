@@ -18,9 +18,6 @@ SolverPerformance<Type> csrMatrix::solve(
     const FieldField<Field, Type>& boundaryCoeffs,
     const dictionary& solverControls
 ){
-
-    
-
     SolverPerformance<Type> solverPerfVec
     (
         "csrMatrix::solve",
@@ -124,8 +121,6 @@ solverPerformance csrMatrix::solve
     const dictionary& solverControls
 )
 {
-    Info << "csrMatrix::solve start" << endl;
-
     scalarField saveDiag(diag());
     addBoundaryDiag(diag(), internalCoeffs, 0);
     const_cast<scalarField&>(ldu().diag()) = diag();
@@ -133,8 +128,7 @@ solverPerformance csrMatrix::solve
     scalarField sourceCpy(source);
     addBoundarySource(sourceCpy, psi, boundaryCoeffs, false);
 
-    // Solver call
-    solverPerformance solverPerf = csrMatrix::solver::New
+    Foam::autoPtr<Foam::csrMatrix::solver> solver = csrMatrix::solver::New
     (
         psi.name(),
         *this,
@@ -142,7 +136,10 @@ solverPerformance csrMatrix::solve
         internalCoeffs,
         psi.boundaryField().scalarInterfaces(),
         solverControls
-    )->solve(psi.primitiveFieldRef(), sourceCpy);
+    );
+    
+    // Solver call
+    solverPerformance solverPerf = solver->solve(psi.primitiveFieldRef(), sourceCpy);
 
     if (solverPerformance::debug)
     {
@@ -156,7 +153,10 @@ solverPerformance csrMatrix::solve
 
     Residuals<scalar>::append(psi.mesh(), solverPerf);
 
-    Info << "csrMatrix::solve end" << endl;
+#ifdef _PROFILING_
+    solver->print_time();
+#endif    
+
     return solverPerf;
 }
 
@@ -330,15 +330,6 @@ void csrMatrix::addBoundaryDiag<vector>
     const FieldField<Field, vector>& internalCoeffs,
     const direction solveCmpt
 ) const;
-
-template
-SolverPerformance<scalar> csrMatrix::solve<scalar>(
-    GeometricField<scalar, fvPatchField, volMesh>& psi,
-    const Field<scalar>& source,
-    const FieldField<Field, scalar>& internalCoeffs,
-    const FieldField<Field, scalar>& boundaryCoeffs,
-    const dictionary& solverControls
-);
 
 template
 SolverPerformance<vector> csrMatrix::solve<vector>(

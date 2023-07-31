@@ -189,6 +189,14 @@ void Foam::CSRGAMGSolver::agglomerateMatrix
                 }
             }
         }
+
+        // Set the coarse level matrix
+        csrMatrixLevels_.set
+        (
+            fineLevelIndex,
+            new csrMatrix(coarseMatrix)
+        );
+
     }
 }
 

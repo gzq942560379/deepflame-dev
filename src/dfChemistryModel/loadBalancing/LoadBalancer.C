@@ -141,7 +141,7 @@ Foam::LoadBalancer::getOperations(
         double send_value = std::min(
             sender->value - globalMean, globalMean - receiver->value);
 
-        Operation operation{sender->rank, receiver->rank, send_value};
+        Operation operation{static_cast<int>(sender->rank), static_cast<int>(receiver->rank), send_value};
         if(sender->rank == myLoad.rank || receiver->rank == myLoad.rank)
         {
             operations.push_back(operation);
@@ -200,7 +200,7 @@ Foam::LoadBalancer::getOperationsRedezVous(
 
         double send_value = (sender->value - receiver->value) / 2; // calculate the send value
 
-        Operation operation{sender->rank, receiver->rank, send_value};
+        Operation operation{static_cast<int>(sender->rank), static_cast<int>(receiver->rank), send_value};
         if(sender->rank == myLoad.rank || receiver->rank == myLoad.rank)
         {
             operations.push_back(operation); // if send or recv rank related to my rank, add to operations

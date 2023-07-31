@@ -24,9 +24,10 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "CSRGAMGSolver.H"
-#include "PCG.H"
-#include "PBiCGStab.H"
+#include "CSRPCG.H"
+#include "CSRPBiCGStab.H"
 #include "SubField.H"
+#include <mpi.h>
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -44,7 +45,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
 
     // Calculate A.psi used to calculate the initial residual
     scalarField Apsi(psi.size());
-    matrix_.ldu().Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+    matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
 
     // Create the storage for the finestCorrection which may be used as a
     // temporary in normFactor
@@ -84,7 +85,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
         PtrList<scalarField> coarseSources;
 
         // Create the smoothers for all levels
-        PtrList<lduMatrix::smoother> smoothers;
+        PtrList<csrMatrix::smoother> smoothers;
 
         // Scratch fields if processor-agglomerated coarse level meshes
         // are bigger than original. Usually not needed
@@ -121,7 +122,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
             );
 
             // Calculate finest level residual field
-            matrix_.ldu().Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
             finestResidual = source;
             finestResidual -= Apsi;
 
@@ -153,7 +154,7 @@ Foam::solverPerformance Foam::CSRGAMGSolver::solve
 
 void Foam::CSRGAMGSolver::Vcycle
 (
-    const PtrList<lduMatrix::smoother>& smoothers,
+    const PtrList<csrMatrix::smoother>& smoothers,
     scalarField& psi,
     const scalarField& source,
     scalarField& Apsi,
@@ -168,20 +169,22 @@ void Foam::CSRGAMGSolver::Vcycle
     const direction cmpt
 ) const
 {
-    debug = 2;
+    double spmv_start, spmv_end;
+    double smooth_start, smooth_end;
+    double scale_start, scale_end;
+    double interpolate_start, interpolate_end;
+    double restrictField_start, restrictField_end;
+    double prolongField_start, prolongField_end;
+
+    double Vcycle_start = MPI_Wtime();
 
     const label coarsestLevel = matrixLevels_.size() - 1;
     
-    Info << "coarsestLevel : " << coarsestLevel << endl;
-
     // Restrict finest grid residual for the next level up.
+    restrictField_start = MPI_Wtime();
     agglomeration_.restrictField(coarseSources[0], finestResidual, 0, true);
-
-    if (debug >= 2 && nPreSweeps_)
-    {
-        Pout<< "Pre-smoothing scaling factors: ";
-    }
-
+    restrictField_end = MPI_Wtime();
+    restrictField_time += restrictField_end - restrictField_start;
 
     // Residual restriction (going to coarser levels)
     for (label leveli = 0; leveli < coarsestLevel; leveli++)
@@ -194,6 +197,7 @@ void Foam::CSRGAMGSolver::Vcycle
             {
                 coarseCorrFields[leveli] = 0.0;
 
+                smooth_start = MPI_Wtime();
                 smoothers[leveli + 1].smooth
                 (
                     coarseCorrFields[leveli],
@@ -205,6 +209,8 @@ void Foam::CSRGAMGSolver::Vcycle
                         maxPreSweeps_
                     )
                 );
+                smooth_end = MPI_Wtime();
+                smooth_time += smooth_end - smooth_start;
 
                 scalarField::subField ACf
                 (
@@ -214,6 +220,7 @@ void Foam::CSRGAMGSolver::Vcycle
 
                 // Scale coarse-grid correction field
                 // but not on the coarsest level because it evaluates to 1
+                scale_start = MPI_Wtime();
                 if (scaleCorrection_ && leveli < coarsestLevel - 1)
                 {
                     scale
@@ -223,16 +230,18 @@ void Foam::CSRGAMGSolver::Vcycle
                         (
                             ACf.operator const scalarField&()
                         ),
-                        matrixLevels_[leveli],
+                        csrMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         coarseSources[leveli],
                         cmpt
                     );
                 }
+                scale_end = MPI_Wtime();
+                scale_time += scale_end - scale_start;
 
-                // Correct the residual with the new solution
-                matrixLevels_[leveli].Amul
+                spmv_start = MPI_Wtime();
+                csrMatrixLevels_[leveli].Amul
                 (
                     const_cast<scalarField&>
                     (
@@ -243,11 +252,14 @@ void Foam::CSRGAMGSolver::Vcycle
                     interfaceLevels_[leveli],
                     cmpt
                 );
+                spmv_end = MPI_Wtime();
+                spmv_time += spmv_end - spmv_start;
 
                 coarseSources[leveli] -= ACf;
             }
 
             // Residual is equal to source
+            restrictField_start = MPI_Wtime();
             agglomeration_.restrictField
             (
                 coarseSources[leveli + 1],
@@ -255,28 +267,33 @@ void Foam::CSRGAMGSolver::Vcycle
                 leveli + 1,
                 true
             );
+            restrictField_end = MPI_Wtime();
+            restrictField_time += restrictField_end - restrictField_start;
         }
     }
 
-    if (debug >= 2 && nPreSweeps_)
-    {
-        Pout<< endl;
+    // smooth Coarsest level
+    smooth_start = MPI_Wtime();
+    if(nCoarsestSweeps_ > 0){
+        smoothers[coarsestLevel + 1].smooth
+        (
+            coarseCorrFields[coarsestLevel],
+            coarseSources[coarsestLevel],
+            cmpt,
+            nCoarsestSweeps_
+        );
     }
-
+    smooth_end = MPI_Wtime();
+    smooth_time += smooth_end - smooth_start;
 
     // Solve Coarsest level with either an iterative or direct solver
-    if (coarseCorrFields.set(coarsestLevel))
+    if (solveCoarsest_ && coarseCorrFields.set(coarsestLevel))
     {
         solveCoarsestLevel
         (
             coarseCorrFields[coarsestLevel],
             coarseSources[coarsestLevel]
         );
-    }
-
-    if (debug >= 2)
-    {
-        Pout<< "Post-smoothing scaling factors: ";
     }
 
     // Smoothing and prolongation of the coarse correction fields
@@ -304,6 +321,7 @@ void Foam::CSRGAMGSolver::Vcycle
                 preSmoothedCoarseCorrField = coarseCorrFields[leveli];
             }
 
+            prolongField_start = MPI_Wtime();
             agglomeration_.prolongField
             (
                 coarseCorrFields[leveli],
@@ -315,7 +333,8 @@ void Foam::CSRGAMGSolver::Vcycle
                 leveli + 1,
                 true
             );
-
+            prolongField_end = MPI_Wtime();
+            prolongField_time += prolongField_end - prolongField_start;
 
             // Create A.psi for this coarse level as a sub-field of Apsi
             scalarField::subField ACf
@@ -326,6 +345,7 @@ void Foam::CSRGAMGSolver::Vcycle
             scalarField& ACfRef =
                 const_cast<scalarField&>(ACf.operator const scalarField&());
 
+            interpolate_start = MPI_Wtime();
             if (interpolateCorrection_) //&& leveli < coarsestLevel - 2)
             {
                 if (coarseCorrFields.set(leveli+1))
@@ -334,7 +354,7 @@ void Foam::CSRGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        matrixLevels_[leveli],
+                        csrMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         agglomeration_.restrictAddressing(leveli + 1),
@@ -348,16 +368,19 @@ void Foam::CSRGAMGSolver::Vcycle
                     (
                         coarseCorrFields[leveli],
                         ACfRef,
-                        matrixLevels_[leveli],
+                        csrMatrixLevels_[leveli],
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         cmpt
                     );
                 }
             }
+            interpolate_end = MPI_Wtime();
+            interpolate_time += interpolate_end - interpolate_start;
 
             // Scale coarse-grid correction field
             // but not on the coarsest level because it evaluates to 1
+            scale_start = MPI_Wtime();
             if
             (
                 scaleCorrection_
@@ -368,13 +391,15 @@ void Foam::CSRGAMGSolver::Vcycle
                 (
                     coarseCorrFields[leveli],
                     ACfRef,
-                    matrixLevels_[leveli],
+                    csrMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevels_[leveli],
                     coarseSources[leveli],
                     cmpt
                 );
             }
+            scale_end = MPI_Wtime();
+            scale_time += scale_end - scale_start;
 
             // Only add the preSmoothedCoarseCorrField if pre-smoothing is
             // used
@@ -383,6 +408,7 @@ void Foam::CSRGAMGSolver::Vcycle
                 coarseCorrFields[leveli] += preSmoothedCoarseCorrField;
             }
 
+            smooth_start = MPI_Wtime();
             smoothers[leveli + 1].smooth
             (
                 coarseCorrFields[leveli],
@@ -394,10 +420,13 @@ void Foam::CSRGAMGSolver::Vcycle
                     maxPostSweeps_
                 )
             );
+            smooth_end = MPI_Wtime();
+            smooth_time += smooth_end - smooth_start;
         }
     }
 
     // Prolong the finest level correction
+    prolongField_start = MPI_Wtime();
     agglomeration_.prolongField
     (
         finestCorrection,
@@ -405,14 +434,17 @@ void Foam::CSRGAMGSolver::Vcycle
         0,
         true
     );
+    prolongField_end = MPI_Wtime();
+    prolongField_time += prolongField_end - prolongField_start;
 
+    interpolate_start = MPI_Wtime();
     if (interpolateCorrection_)
     {
         interpolate
         (
             finestCorrection,
             Apsi,
-            matrix_.ldu(),
+            matrix_,
             interfaceBouCoeffs_,
             interfaces_,
             agglomeration_.restrictAddressing(0),
@@ -420,7 +452,11 @@ void Foam::CSRGAMGSolver::Vcycle
             cmpt
         );
     }
+    interpolate_end = MPI_Wtime();
+    interpolate_time += interpolate_end - interpolate_start;
 
+
+    scale_start = MPI_Wtime();
     if (scaleCorrection_)
     {
         // Scale the finest level correction
@@ -428,39 +464,50 @@ void Foam::CSRGAMGSolver::Vcycle
         (
             finestCorrection,
             Apsi,
-            matrix_.ldu(),
+            matrix_,
             interfaceBouCoeffs_,
             interfaces_,
             finestResidual,
             cmpt
         );
     }
+    scale_end = MPI_Wtime();
+    scale_time += scale_end - scale_start;
+
 
     forAll(psi, i)
     {
         psi[i] += finestCorrection[i];
     }
 
-    smoothers[0].smooth
-    (
-        psi,
-        source,
-        cmpt,
-        nFinestSweeps_
-    );
-}
+    smooth_start = MPI_Wtime();
+    if(nFinestSweeps_ > 0){
+        smoothers[0].smooth
+        (
+            psi,
+            source,
+            cmpt,
+            nFinestSweeps_
+        );
+    }
+    smooth_end = MPI_Wtime();
+    smooth_time += smooth_end - smooth_start;
 
+    double Vcycle_end = MPI_Wtime();
+    Vcycle_time += Vcycle_end - Vcycle_start;
+
+}
 
 void Foam::CSRGAMGSolver::initVcycle
 (
     PtrList<scalarField>& coarseCorrFields,
     PtrList<scalarField>& coarseSources,
-    PtrList<lduMatrix::smoother>& smoothers,
+    PtrList<csrMatrix::smoother>& smoothers,
     scalarField& scratch1,
     scalarField& scratch2
 ) const
 {
-    label maxSize = matrix_.ldu().diag().size();
+    label maxSize = matrix_.diag().size();
 
     coarseCorrFields.setSize(matrixLevels_.size());
     coarseSources.setSize(matrixLevels_.size());
@@ -470,10 +517,10 @@ void Foam::CSRGAMGSolver::initVcycle
     smoothers.set
     (
         0,
-        lduMatrix::smoother::New
+        csrMatrix::smoother::New
         (
             fieldName_,
-            matrix_.ldu(),
+            matrix_,
             interfaceBouCoeffs_,
             interfaceIntCoeffs_,
             interfaces_,
@@ -503,10 +550,10 @@ void Foam::CSRGAMGSolver::initVcycle
             smoothers.set
             (
                 leveli + 1,
-                lduMatrix::smoother::New
+                csrMatrix::smoother::New
                 (
                     fieldName_,
-                    matrixLevels_[leveli],
+                    csrMatrixLevels_[leveli],
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevelsIntCoeffs_[leveli],
                     interfaceLevels_[leveli],
@@ -516,7 +563,7 @@ void Foam::CSRGAMGSolver::initVcycle
         }
     }
 
-    if (maxSize > matrix_.ldu().diag().size())
+    if (maxSize > matrix_.diag().size())
     {
         // Allocate some scratch storage
         scratch1.setSize(maxSize);
@@ -531,7 +578,8 @@ Foam::dictionary Foam::CSRGAMGSolver::PCGsolverDict
     const scalar relTol
 ) const
 {
-    dictionary dict(IStringStream("solver PCG; preconditioner DIC;")());
+    // dictionary dict(IStringStream("solver PCG; preconditioner DIC;")());
+    dictionary dict(IStringStream("solver PCG; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -545,7 +593,8 @@ Foam::dictionary Foam::CSRGAMGSolver::PBiCGStabSolverDict
     const scalar relTol
 ) const
 {
-    dictionary dict(IStringStream("solver PBiCGStab; preconditioner DILU;")());
+    // dictionary dict(IStringStream("solver PBiCGStab; preconditioner DILU;")());
+    dictionary dict(IStringStream("solver PBiCGStab; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -673,10 +722,10 @@ void Foam::CSRGAMGSolver::solveCoarsestLevel
 
         if (matrixLevels_[coarsestLevel].asymmetric())
         {
-            coarseSolverPerf = PBiCGStab
+            coarseSolverPerf = CSRPBiCGStab
             (
                 "coarsestLevelCorr",
-                matrixLevels_[coarsestLevel],
+                csrMatrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],
@@ -689,10 +738,10 @@ void Foam::CSRGAMGSolver::solveCoarsestLevel
         }
         else
         {
-            coarseSolverPerf = PCG
+            coarseSolverPerf = CSRPCG
             (
                 "coarsestLevelCorr",
-                matrixLevels_[coarsestLevel],
+                csrMatrixLevels_[coarsestLevel],
                 interfaceLevelsBouCoeffs_[coarsestLevel],
                 interfaceLevelsIntCoeffs_[coarsestLevel],
                 interfaceLevels_[coarsestLevel],
@@ -704,10 +753,10 @@ void Foam::CSRGAMGSolver::solveCoarsestLevel
             );
         }
 
-        if (debug >= 2)
-        {
+        // if (debug >= 2)
+        // {
             coarseSolverPerf.print(Info.masterStream(coarseComm));
-        }
+        // }
     }
 }
 

@@ -1,3 +1,13 @@
+double p_pre_end, p_pre_start, p_pre_time = 0.;
+double p_post_end, p_post_start, p_post_time = 0.;
+double p_build_end, p_build_start, p_build_time = 0.;
+double p_convert_end, p_convert_start, p_convert_time = 0.;
+double p_solve_end, p_solve_start, p_solve_time = 0.;
+
+double p_total_start = MPI_Wtime();
+
+p_pre_start = MPI_Wtime();
+
 if (!pimple.simpleRho())
 {
     rho = thermo.rho();
@@ -28,19 +38,12 @@ fvc::makeRelative(phiHbyA, rho, U);
 // Update the pressure BCs to ensure flux consistency
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
 
-double p_build_end, p_build_start;
-double p_convert_end, p_convert_start;
-double p_solve_end, p_solve_start;
-
-double p_build_time = 0.;
-double p_solve_time = 0.;
-double p_convert_time = 0.;
-
-double p_total_start = MPI_Wtime();
+p_pre_end = MPI_Wtime();
+p_pre_time += p_pre_end - p_pre_start;
 
 if (pimple.transonic())
 {
-    Info << "pimple.transonic()" << endl;
+//     Info << "pimple.transonic()" << endl;
     p_build_start = MPI_Wtime();
 
     surfaceScalarField phid
@@ -68,15 +71,21 @@ if (pimple.transonic())
         p_build_end = MPI_Wtime();
         p_build_time += p_build_end - p_build_start;
 
-#ifdef _CSR_
         p_convert_start = MPI_Wtime();
-        
+#ifdef _CSR_
         csrMatrix csr(pEqn);
-        csr.analyze();
-
+#endif
+#ifdef _ELL_
+        ellMatrix ell(pEqn);
+#endif
+#ifdef _DIV_
+        divMatrix div(pEqn);
+#endif
+#ifdef _LDU_
+        LDUMatrix LDU(pEqn);
+#endif
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
-#endif   
 
         p_solve_start = MPI_Wtime();
 #ifdef _CSR_
@@ -85,21 +94,48 @@ if (pimple.transonic())
         auto& internalCoeffs = pEqn.internalCoeffs();
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
+#endif
+#ifdef _ELL_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+#ifdef _DIV_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+#ifdef _LDU_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();
         p_solve_time += p_solve_end - p_solve_start;
 
+        p_post_start = MPI_Wtime();
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
+        p_post_end = MPI_Wtime();
+        p_post_time += p_post_end - p_post_start;
+
     }
 }
 else
 {
-    Info << "not pimple.transonic()" << endl;
+//     Info << "not pimple.transonic()" << endl;
     p_build_start = MPI_Wtime();
     
     fvScalarMatrix pDDtEqn
@@ -119,16 +155,21 @@ else
         p_build_end = MPI_Wtime();
         p_build_time += p_build_end - p_build_start;
 
-#ifdef _CSR_
         p_convert_start = MPI_Wtime();
-        
+#ifdef _CSR_
         csrMatrix csr(pEqn);
-        csr.analyze();
-        csr.write_pattern("128mtx");
-
+#endif
+#ifdef _ELL_
+        ellMatrix ell(pEqn);
+#endif
+#ifdef _DIV_
+        divMatrix div(pEqn);
+#endif
+#ifdef _LDU_
+        LDUMatrix LDU(pEqn);
+#endif
         p_convert_end = MPI_Wtime();
         p_convert_time += p_convert_end - p_convert_start;
-#endif   
 
         p_solve_start = MPI_Wtime();
 #ifdef _CSR_
@@ -137,27 +178,46 @@ else
         auto& internalCoeffs = pEqn.internalCoeffs();
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
+#endif
+#ifdef _ELL_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+#ifdef _DIV_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+#ifdef _LDU_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
         pEqn.solve();
 #endif
         p_solve_end = MPI_Wtime();
         p_solve_time += p_solve_end - p_solve_start;
 
+        p_post_start = MPI_Wtime();
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
+        p_post_end = MPI_Wtime();
+        p_post_time += p_post_end - p_post_start;
     }
 }
 
-double p_total_end = MPI_Wtime();
-double p_total_time = p_total_end - p_total_start;
-
-Info << "p total Time : " << p_total_time << endl;
-Info << "p build Time : " << p_build_time << endl;
-Info << "p convert Time : " << p_convert_time << endl;
-Info << "p solve Time : " << p_solve_time << endl;
-Info << "p other Time : " << p_total_time - p_build_time - p_convert_time - p_solve_time << endl;
+p_post_start = MPI_Wtime();
 
 bool limitedp = pressureControl.limit(p);
 
@@ -196,3 +256,17 @@ if (thermo.dpdt())
         dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
     }
 }
+p_post_end = MPI_Wtime();
+p_post_time += p_post_end - p_post_start;
+
+double p_total_end = MPI_Wtime();
+double p_total_time = p_total_end - p_total_start;
+
+Info << "p total Time : " << p_total_time << endl;
+Info << "p pre Time : " << p_pre_time << endl;
+Info << "p build Time : " << p_build_time << endl;
+Info << "p convert Time : " << p_convert_time << endl;
+Info << "p solve Time : " << p_solve_time << endl;
+Info << "p post Time : " << p_post_time << endl;
+Info << "p other Time : " << p_total_time - p_pre_time - p_build_time - p_convert_time - p_solve_time - p_post_time << endl;
+
