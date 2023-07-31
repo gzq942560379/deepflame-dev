@@ -215,13 +215,6 @@ public:
     void analyze() const;
     void check() const;
 
-    void coloring();
-    void build_graph();
-    void hash_coloring();
-    void jpl_coloring();
-    void color_count();
-    void coloring_analyze() const;
-    
     //- Sum the coefficients on each row of the matrix
     void sumA
     (

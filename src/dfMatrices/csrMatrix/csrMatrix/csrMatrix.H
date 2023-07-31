@@ -214,7 +214,9 @@ public:
         const direction solveCmpt
     ) const;
 
-    void write_pattern(const std::string& filename);
+    void write_pattern(const std::string& filename) const;
+    void write(const std::string& filename) const;
+    void write_equation(const std::string& filename,const scalarField& source) const;
 
     void analyze();
 

@@ -1,3 +1,13 @@
+double p_pre_end, p_pre_start, p_pre_time = 0.;
+double p_post_end, p_post_start, p_post_time = 0.;
+double p_build_end, p_build_start, p_build_time = 0.;
+double p_convert_end, p_convert_start, p_convert_time = 0.;
+double p_solve_end, p_solve_start, p_solve_time = 0.;
+
+double p_total_start = MPI_Wtime();
+
+p_pre_start = MPI_Wtime();
+
 if (!pimple.simpleRho())
 {
     rho = thermo.rho();
@@ -28,19 +38,12 @@ fvc::makeRelative(phiHbyA, rho, U);
 // Update the pressure BCs to ensure flux consistency
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
 
-double p_build_end, p_build_start;
-double p_convert_end, p_convert_start;
-double p_solve_end, p_solve_start;
-
-double p_build_time = 0.;
-double p_solve_time = 0.;
-double p_convert_time = 0.;
-
-double p_total_start = MPI_Wtime();
+p_pre_end = MPI_Wtime();
+p_pre_time += p_pre_end - p_pre_start;
 
 if (pimple.transonic())
 {
-    Info << "pimple.transonic()" << endl;
+//     Info << "pimple.transonic()" << endl;
     p_build_start = MPI_Wtime();
 
     surfaceScalarField phid
@@ -120,15 +123,19 @@ if (pimple.transonic())
         p_solve_end = MPI_Wtime();
         p_solve_time += p_solve_end - p_solve_start;
 
+        p_post_start = MPI_Wtime();
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
+        p_post_end = MPI_Wtime();
+        p_post_time += p_post_end - p_post_start;
+
     }
 }
 else
 {
-    Info << "not pimple.transonic()" << endl;
+//     Info << "not pimple.transonic()" << endl;
     p_build_start = MPI_Wtime();
     
     fvScalarMatrix pDDtEqn
@@ -200,21 +207,17 @@ else
         p_solve_end = MPI_Wtime();
         p_solve_time += p_solve_end - p_solve_start;
 
+        p_post_start = MPI_Wtime();
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
+        p_post_end = MPI_Wtime();
+        p_post_time += p_post_end - p_post_start;
     }
 }
 
-double p_total_end = MPI_Wtime();
-double p_total_time = p_total_end - p_total_start;
-
-Info << "p total Time : " << p_total_time << endl;
-Info << "p build Time : " << p_build_time << endl;
-Info << "p convert Time : " << p_convert_time << endl;
-Info << "p solve Time : " << p_solve_time << endl;
-Info << "p other Time : " << p_total_time - p_build_time - p_convert_time - p_solve_time << endl;
+p_post_start = MPI_Wtime();
 
 bool limitedp = pressureControl.limit(p);
 
@@ -253,3 +256,17 @@ if (thermo.dpdt())
         dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
     }
 }
+p_post_end = MPI_Wtime();
+p_post_time += p_post_end - p_post_start;
+
+double p_total_end = MPI_Wtime();
+double p_total_time = p_total_end - p_total_start;
+
+Info << "p total Time : " << p_total_time << endl;
+Info << "p pre Time : " << p_pre_time << endl;
+Info << "p build Time : " << p_build_time << endl;
+Info << "p convert Time : " << p_convert_time << endl;
+Info << "p solve Time : " << p_solve_time << endl;
+Info << "p post Time : " << p_post_time << endl;
+Info << "p other Time : " << p_total_time - p_pre_time - p_build_time - p_convert_time - p_solve_time - p_post_time << endl;
+

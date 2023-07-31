@@ -101,16 +101,6 @@ divMatrix::divMatrix(const lduMatrix& ldu):lduMatrix_(ldu),row_block_bit_(row_bl
         label index = DIV_INDEX(row, divcol);
         off_diag_value_[index] = lduLower[i];
     }
-
-    Info << "row_ : " << row_ << endl;
-    Info << "block_count_ : " << block_count_ << endl;
-    Info << "block_tail_ : " << block_tail_ << endl;
-    Info << "max_distance_ : " << max_distance_ << endl;
-    Info << "min_distance_ : " << min_distance_ << endl;
-    Info << "head_block_count_ : " << head_block_count_ << endl;
-    Info << "tail_block_count_ : " << tail_block_count_ << endl;
-    Info << "distance_list_ : " << distance_list_ << endl;
-
 }
 
 void divMatrix::analyze() const {

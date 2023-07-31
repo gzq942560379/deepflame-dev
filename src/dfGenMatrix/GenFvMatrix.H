@@ -67,8 +67,6 @@ gaussGradSchemeGrad
 );
 
 
-// fvm::laplacian
-
 template<class Type>
 tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacianUncorrected
@@ -78,6 +76,7 @@ gaussLaplacianSchemeFvmLaplacianUncorrected
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
+// fvm::laplacian
 template<class Type>
 tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian

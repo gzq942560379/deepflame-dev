@@ -193,6 +193,7 @@ void Foam::divMatrix::SpMV_split_unroll32_sve
         svst1_vnum(ptrue, ApsiPtr_offset, 2, vApsi2);
         svst1_vnum(ptrue, ApsiPtr_offset, 3, vApsi3);
     }
+    
     #pragma omp for
     for(label bi = head_block_count_; bi < block_count_ - tail_block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
@@ -242,6 +243,7 @@ void Foam::divMatrix::SpMV_split_unroll32_sve
         svst1_vnum(ptrue, ApsiPtr_offset, 2, vApsi2);
         svst1_vnum(ptrue, ApsiPtr_offset, 3, vApsi3);
     }
+    
     #pragma omp for
     for(label bi = block_count_ - tail_block_count_; bi < block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);

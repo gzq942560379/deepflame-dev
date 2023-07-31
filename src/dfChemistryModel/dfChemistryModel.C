@@ -28,6 +28,7 @@ License
 #include "clockTime.H"
 #include "runtime_assert.H"
 #include <omp.h>
+#include <mpi.h>
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -586,47 +587,45 @@ void Foam::dfChemistryModel<ThermoType>::correctEnthalpy()
 template<class ThermoType>
 void Foam::dfChemistryModel<ThermoType>::correctThermo()
 {
-    psi_.oldTime();
-    
-    // int nThreads = omp_get_max_threads();
-    int nThreads = 1;
-    std::vector<std::shared_ptr<Cantera::Solution>> sols;
-    const word mechanismFile = this->lookup("CanteraMechanismFile");
-    Info << "omp thread number = " << nThreads << endl;
+    double correctThermo_part1_start, correctThermo_part1_end, correctThermo_part1_time = 0.;
+    double correctThermo_part2_start, correctThermo_part2_end, correctThermo_part2_time = 0.;
+    double correctThermo_start, correctThermo_end, correctThermo_time = 0.;
+    double correctThermoT_start, correctThermoT_end, correctThermoT_time = 0.;
 
-    for (int i = 0; i < nThreads; i++) {
-        auto sol = Cantera::newSolution(mechanismFile, "");
-        sols.emplace_back(sol);
-    }
-    
-    // #pragma omp parallel for schedule(static, 1)
+    correctThermo_start = MPI_Wtime();
+
+    psi_.oldTime();
+
+    correctThermo_part1_start = MPI_Wtime();
+
     forAll(T_, celli)
     {
         scalarList yTemp(mixture_.nSpecies());
         scalarList dTemp(mixture_.nSpecies());
         scalarList hrtTemp(mixture_.nSpecies());
         
-        size_t tid = omp_get_thread_num();
-
-        auto CanteraGas = sols[tid]->thermo();
-
         forAll(Y_, i)
         {
             yTemp[i] = Y_[i][celli];
         }
+        correctThermoT_start = MPI_Wtime();
 
-        CanteraGas->setState_PY(p_[celli], yTemp.begin());
+        CanteraGas_->setState_PY(p_[celli], yTemp.begin());
 
-        CanteraGas->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
+        CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
 
-        T_[celli] = CanteraGas->temperature();
+        T_[celli] = CanteraGas_->temperature();
+
+        correctThermoT_end = MPI_Wtime();
+        correctThermoT_time += correctThermoT_end - correctThermoT_start;
+
 
         // meanMolecularWeight() kg/kmol    RT() Joules/kmol
-        psi_[celli] = CanteraGas->meanMolecularWeight()/CanteraGas->RT();
+        psi_[celli] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
 
         mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
 
-        alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas->cp_mass()); // kg/(m*s)
+        alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass()); // kg/(m*s)
         // thermalConductivity() W/m/K
         // cp_mass()   J/kg/K
 
@@ -641,18 +640,21 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         {
             mixture_.CanteraTransport()->getMixDiffCoeffsMass(dTemp.begin()); // m2/s
 
-            CanteraGas->getEnthalpy_RT(hrtTemp.begin()); //hrtTemp_=m_h0_RT non-dimension
+            CanteraGas_->getEnthalpy_RT(hrtTemp.begin()); //hrtTemp_=m_h0_RT non-dimension
             // constant::physicoChemical::R.value()   J/(mol·k)
             const scalar RT = constant::physicoChemical::R.value()*1e3*T_[celli]; // J/kmol/K
             forAll(rhoD_, i)
             {
                 rhoD_[i][celli] = rho_[celli]*dTemp[i];
 
-                // CanteraGas->molecularWeight(i)    kg/kmol
-                hai_[i][celli] = hrtTemp[i]*RT/CanteraGas->molecularWeight(i);
+                // CanteraGas_->molecularWeight(i)    kg/kmol
+                hai_[i][celli] = hrtTemp[i]*RT/CanteraGas_->molecularWeight(i);
             }
         }
     }
+
+    correctThermo_part1_end = MPI_Wtime();
+    correctThermo_part1_time += correctThermo_part1_end - correctThermo_part1_start;
 
     const volScalarField::Boundary& pBf = p_.boundaryField();
 
@@ -667,6 +669,8 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     volScalarField::Boundary& muBf = mu_.boundaryFieldRef();
 
     volScalarField::Boundary& alphaBf = alpha_.boundaryFieldRef();
+
+    correctThermo_part2_start = MPI_Wtime();
 
     forAll(T_.boundaryField(), patchi)
     {
@@ -760,6 +764,17 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
             }
         }
     }
+
+    correctThermo_part2_end = MPI_Wtime();
+    correctThermo_part2_time += correctThermo_part2_end - correctThermo_part2_start;
+    
+    correctThermo_end = MPI_Wtime();
+    correctThermo_time += correctThermo_end - correctThermo_start;
+
+    Info << "correctThermo Total : " << correctThermo_time << endl;
+    Info << "correctThermo part1 : " << correctThermo_part1_time << endl;
+    Info << "correctThermo part2 : " << correctThermo_part2_time << endl;
+    Info << "correctThermo Temperature : " << correctThermoT_time << endl;
 }
 
 template<class ThermoType>

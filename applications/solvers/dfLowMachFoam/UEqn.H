@@ -6,14 +6,15 @@ double U_solve_start, U_solve_end, U_solve_time = 0.;
 
 double U_build_relax_start, U_build_relax_end, U_build_relax_time = 0.;
 
-double U_build_orig_start, U_build_orig_end, U_build_orig_time = 0.;
-double U_build_new_start, U_build_new_end, U_build_new_time = 0.;
+double U_build_org_start, U_build_org_end, U_build_org_time = 0.;
+double U_build_opt_start, U_build_opt_end, U_build_opt_time = 0.;
 
 double U_total_start = MPI_Wtime();
 
 U_build_start = MPI_Wtime();
 
-U_build_orig_start = MPI_Wtime();
+#ifndef OPT_GenMatrix_U
+U_build_org_start = MPI_Wtime();
 tmp<fvVectorMatrix> tUEqn
 (
     fvm::ddt(rho, U) + fvm::div(phi, U)
@@ -21,19 +22,32 @@ tmp<fvVectorMatrix> tUEqn
     == 
     -fvc::grad(p)
 );
-U_build_orig_end = MPI_Wtime();
-U_build_orig_time += U_build_orig_end - U_build_orig_start;
-
 fvVectorMatrix& UEqn = tUEqn.ref();
-
-#ifdef OPT_GenMatrix_U
-U_build_new_start = MPI_Wtime();
-tmp<fvVectorMatrix> tUEqn_new = GenMatrix_U(rho, U, phi, p, turbulence());
-U_build_new_end = MPI_Wtime();
-U_build_new_time = U_build_new_end - U_build_new_start;
-fvVectorMatrix& UEqn_new = tUEqn_new.ref();
-check_fvmatrix_equal(UEqn, UEqn_new);
+U_build_org_end = MPI_Wtime();
+U_build_org_time += U_build_org_end - U_build_org_start;
+#else
+U_build_opt_start = MPI_Wtime();
+tmp<fvVectorMatrix> tUEqn = GenMatrix_U(rho, U, phi, p, turbulence());
+fvVectorMatrix& UEqn = tUEqn.ref();
+U_build_opt_end = MPI_Wtime();
+U_build_opt_time += U_build_opt_end - U_build_opt_start;
+#ifdef OPT_GenMatrix_U_check
+U_build_org_start = MPI_Wtime();
+tmp<fvVectorMatrix> tUEqn_answer
+(
+    fvm::ddt(rho, U) + fvm::div(phi, U)
+    + turbulence->divDevRhoReff(U)
+    == 
+    -fvc::grad(p)
+);
+fvVectorMatrix& UEqn_answer = tUEqn_answer.ref();
+U_build_org_end = MPI_Wtime();
+U_build_org_time += U_build_org_end - U_build_org_start;
+check_fvmatrix_equal(UEqn, UEqn_answer);
 #endif
+#endif
+
+
 
 UEqn.relax();
 
@@ -87,6 +101,8 @@ double U_total_time = U_total_end - U_total_start;
 
 Info << "U total Time : " << U_total_time << endl;
 Info << "U build Time : " << U_build_time << endl;
+Info << "U build opt time : " << U_build_opt_time << endl;
+Info << "U build org time : " << U_build_org_time << endl;
 Info << "U convert Time : " << U_convert_time << endl;
 Info << "U solve Time : " << U_solve_time << endl;
 Info << "U other Time : " << U_total_time - U_build_time - U_convert_time - U_solve_time << endl;

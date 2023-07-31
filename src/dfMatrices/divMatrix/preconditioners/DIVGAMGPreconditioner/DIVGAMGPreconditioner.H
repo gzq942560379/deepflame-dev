@@ -114,13 +114,13 @@ public:
         Info << "solveCoarsest time : " << solveCoarsest_time << ", " << solveCoarsest_time / procondition_time * 100 << "%" << endl;
         Info << "other time : " << other_time << ", " << other_time / procondition_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;
-        Info << "Level " << 0 << " : " << endl; 
-        matrix_.print_time();
-        forAll(divMatrixLevels_, leveli){
-            Info << "Level " << leveli + 1 << " : " << endl; 
-            divMatrixLevels_[leveli].print_time();
-        }
-        Info << "----------------------------------------------------------------------------------------" << endl;
+        // Info << "Level " << 0 << " : " << endl; 
+        // matrix_.print_time();
+        // forAll(divMatrixLevels_, leveli){
+        //     Info << "Level " << leveli + 1 << " : " << endl; 
+        //     divMatrixLevels_[leveli].print_time();
+        // }
+        // Info << "----------------------------------------------------------------------------------------" << endl;
     }
 
 };
