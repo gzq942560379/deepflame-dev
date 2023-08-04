@@ -37,8 +37,6 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-
-
 template<class Type>
 tmp<fvMatrix<Type>>
 EulerDdtSchemeFvmDdt
@@ -82,6 +80,63 @@ EulerDdtSchemeFvmDdt
     return tfvm;
 }
 
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+EulerDdtSchemeFvcDdt
+(
+    const volScalarField& rho,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+)
+{
+    Info << "EulerDdtSchemeFvmDdt start" << endl;
+
+    const fvMesh& mesh = vf.mesh();
+
+    dimensionedScalar rDeltaT = 1.0/mesh.time().deltaT();
+
+    IOobject ddtIOobject
+    (
+        "ddt("+rho.name()+','+vf.name()+')',
+        mesh.time().timeName(),
+        mesh
+    );
+
+    if (mesh.moving())
+    {
+        return tmp<GeometricField<Type, fvPatchField, volMesh>>
+        (
+            new GeometricField<Type, fvPatchField, volMesh>
+            (
+                ddtIOobject,
+                rDeltaT*
+                (
+                    rho()*vf()
+                  - rho.oldTime()()
+                   *vf.oldTime()()*mesh.Vsc0()/mesh.Vsc()
+                ),
+                rDeltaT.value()*
+                (
+                    rho.boundaryField()*vf.boundaryField()
+                  - rho.oldTime().boundaryField()
+                   *vf.oldTime().boundaryField()
+                )
+            )
+        );
+    }
+    else
+    {
+        return tmp<GeometricField<Type, fvPatchField, volMesh>>
+        (
+            new GeometricField<Type, fvPatchField, volMesh>
+            (
+                ddtIOobject,
+                rDeltaT*(rho*vf - rho.oldTime()*vf.oldTime())
+            )
+        );
+    }
+}
+
+
 template
 tmp<fvMatrix<scalar>>
 EulerDdtSchemeFvmDdt<scalar>
@@ -96,6 +151,14 @@ EulerDdtSchemeFvmDdt<vector>
 (
     const volScalarField& rho,
     const GeometricField<vector, fvPatchField, volMesh>& vf
+);
+
+template
+tmp<GeometricField<scalar, fvPatchField, volMesh>>
+EulerDdtSchemeFvcDdt<scalar>
+(
+    const volScalarField& rho,
+    const GeometricField<scalar, fvPatchField, volMesh>& vf
 );
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

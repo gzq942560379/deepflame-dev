@@ -24,8 +24,12 @@ GenMatrix_U(
     label nFaces = mesh.neighbour().size();
     
     // basic variable
+    double get_weights_begin = MPI_Wtime();
     const surfaceScalarField& weights = mesh.surfaceInterpolation::weights(); // interpolation weight (linear)
-    tmp<fv::snGradScheme<scalar>> tsnGradScheme_(new fv::orthogonalSnGrad<scalar>(mesh));
+    double get_weights_end = MPI_Wtime();
+    Info << "get_weights : " << get_weights_end - get_weights_begin << endl;
+
+
     tmp<fvVectorMatrix> tfvm
     (
         new fvVectorMatrix
@@ -35,6 +39,9 @@ GenMatrix_U(
         )
     );
     fvVectorMatrix& fvm = tfvm.ref();
+
+    double GenMatrix_U_tick_1_1 = MPI_Wtime();
+    Info << "GenMatrix_U_time_1_1 : " << GenMatrix_U_tick_1_1 - GenMatrix_U_tick_0 << endl;
 
     scalar* __restrict__ diagPtr = fvm.diag().begin();
     vector* __restrict__ sourcePtr = fvm.source().begin();

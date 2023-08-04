@@ -1,6 +1,7 @@
 -include $(GENERAL_RULES)/mplibType
 
 EXE_INC = \
+	-g \
     $(PFLAGS) $(PINC) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \

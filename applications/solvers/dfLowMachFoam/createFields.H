@@ -231,6 +231,8 @@ int refineLevel = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefau
 double createFildes_tick_21 = MPI_Wtime();
 Info << "createFildes_time_21 : " << createFildes_tick_21 - createFildes_tick_20 << endl;
 
+const surfaceScalarField linear_weights = mesh.surfaceInterpolation::weights(); // interpolation weight (linear)
+
 #ifdef USE_PYTORCH
     const Switch log_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("log", false);
     const Switch torch_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("torch", false);

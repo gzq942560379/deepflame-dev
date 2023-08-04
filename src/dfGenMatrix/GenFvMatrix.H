@@ -32,6 +32,15 @@ EulerDdtSchemeFvmDdt
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
+// fvc::ddt
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+EulerDdtSchemeFvcDdt
+(
+    const volScalarField& rho,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+);
+
 // fvm::div
 template<class Type>
 tmp<fvMatrix<Type>>
@@ -48,6 +57,15 @@ gaussConvectionSchemeFvmDiv
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
     const word& name
+);
+
+// fvc::div
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+gaussConvectionSchemeFvcDiv
+(
+    const surfaceScalarField& faceFlux,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 // fvc::grad
@@ -114,6 +132,19 @@ GenMatrix_Y(
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
     fv::convectionScheme<scalar>& mvConvection
+);
+
+tmp<fvScalarMatrix>
+GenMatrix_E(
+    const volScalarField& rho,
+    volScalarField& he,
+    const surfaceScalarField& phi,
+    const volScalarField& K,
+    const volScalarField& dpdt,
+    const volScalarField& alphaEff,
+    const volScalarField& diffAlphaD,
+    const volVectorField& hDiffCorrFlux,
+    const surfaceScalarField& linear_weights
 );
 
 

@@ -1,14 +1,35 @@
+double Y_total_start, Y_total_end, Y_total_time = 0.; 
+double Y_init_start, Y_init_end, Y_init_time = 0.; 
+double Y_build_start, Y_build_end, Y_build_time = 0.; 
+double Y_build_grad_start, Y_build_grad_end, Y_build_grad_time = 0.;  
+double Y_build_laplacian_start, Y_build_laplacian_end, Y_build_laplacian_time = 0.;  
+double Y_build_opt_start, Y_build_opt_end, Y_build_opt_time = 0.; 
+double Y_convert_start, Y_convert_end, Y_convert_time = 0.; 
+double Y_update_start, Y_update_end, Y_update_time = 0.; 
+double Y_solve_start, Y_solve_end, Y_solve_time = 0.;
+
+double Y_build_old_start, Y_build_old_end, Y_build_old_time = 0.; 
+double Y_build_new_start, Y_build_new_end, Y_build_new_time = 0.; 
+double Y_phiUc_start, Y_phiUc_end, Y_phiUc_time = 0.; 
+double Y_field_multi_time = 0.0;
+
 start = MPI_Wtime();
 
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
 sumYDiffError = Zero;
 
+Y_total_start = MPI_Wtime();
+Y_build_start = MPI_Wtime();
 forAll(Y, i)
 {
     sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
 }
 const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
+
+Y_build_end = MPI_Wtime();
+Y_build_time += Y_build_end - Y_build_start;
+Y_phiUc_time += Y_build_end - Y_build_start;
 
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 //label flag_mpi_init;
@@ -31,22 +52,6 @@ if (!splitting)
 
 start = MPI_Wtime();
 
-double Y_total_start, Y_total_end, Y_total_time = 0.; 
-double Y_init_start, Y_init_end, Y_init_time = 0.; 
-double Y_build_start, Y_build_end, Y_build_time = 0.; 
-double Y_build_grad_start, Y_build_grad_end, Y_build_grad_time = 0.;  
-double Y_build_laplacian_start, Y_build_laplacian_end, Y_build_laplacian_time = 0.;  
-double Y_build_opt_start, Y_build_opt_end, Y_build_opt_time = 0.; 
-double Y_convert_start, Y_convert_end, Y_convert_time = 0.; 
-double Y_update_start, Y_update_end, Y_update_time = 0.; 
-double Y_solve_start, Y_solve_end, Y_solve_time = 0.;
-
-double Y_build_old_start, Y_build_old_end, Y_build_old_time = 0.; 
-double Y_build_new_start, Y_build_new_end, Y_build_new_time = 0.; 
-
-
-Y_total_start = MPI_Wtime();
-
 Y_init_start = MPI_Wtime();
 
 tmp<fv::convectionScheme<scalar>> mvConvection
@@ -64,13 +69,17 @@ volScalarField Yt(0.0*Y[0]);
 
 Y_init_end = MPI_Wtime();
 Y_init_time += Y_init_end - Y_init_start;
+Y_build_time += Y_init_end - Y_init_start;
 forAll(Y, i)
 {
     Y_build_start = MPI_Wtime();
     
     volScalarField& Yi = Y[i];
 
+    Y_build_grad_start = MPI_Wtime();
     auto alpha_mul_hai = thermo.alpha() * chemistry->hai(i);
+    Y_build_grad_end = MPI_Wtime();
+    Y_field_multi_time += Y_build_grad_end - Y_build_grad_start;
 
     // hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * fvc::grad(Yi) - Yi * sumYDiffError);
     Y_build_grad_start = MPI_Wtime();
@@ -83,8 +92,11 @@ forAll(Y, i)
     Y_build_laplacian_end = MPI_Wtime();
     Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
 
+    Y_build_grad_start = MPI_Wtime();
     hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * gradTmp - Yi * sumYDiffError);
     diffAlphaD += laplacianTmp;
+    Y_build_grad_end = MPI_Wtime();
+    Y_field_multi_time += Y_build_grad_end - Y_build_grad_start;
 
     Y_build_end = MPI_Wtime();
     Y_build_time += Y_build_end - Y_build_start;
@@ -94,6 +106,7 @@ forAll(Y, i)
         Y_build_start = MPI_Wtime();
         Y_build_opt_start = MPI_Wtime();
 #ifndef OPT_GenMatrix_Y
+        Y_build_old_start = MPI_Wtime();
         tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
         fvScalarMatrix YiEqn
         (
@@ -107,9 +120,14 @@ forAll(Y, i)
             :  (fvm::laplacian(DEff(), Yi) + combustion->R(Yi))
             )
         );
+        Y_build_old_end = MPI_Wtime();
+        Y_build_old_time += Y_build_old_end - Y_build_old_start;
 #else
+        Y_build_new_start = MPI_Wtime();
         tmp<fvScalarMatrix> tYiEqn = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref());
         fvScalarMatrix& YiEqn = tYiEqn.ref();
+        Y_build_new_end = MPI_Wtime();
+        Y_build_new_time += Y_build_new_end - Y_build_new_start;
 #endif
         Y_build_opt_end = MPI_Wtime();
         Y_build_opt_time += Y_build_opt_end - Y_build_opt_start;
@@ -117,12 +135,36 @@ forAll(Y, i)
         YiEqn.relax();
         Y_build_end = MPI_Wtime();
         Y_build_time += Y_build_end - Y_build_start;
+        Y_total_end = MPI_Wtime();
+        Y_total_time += Y_total_end - Y_total_start;
+
+#ifdef OPT_GenMatrix_Y_check
+        Y_build_old_start = MPI_Wtime();
+        tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
+        fvScalarMatrix YiEqn_answer
+        (
+            fvm::ddt(rho, Yi)
+            + mvConvection->fvmDiv(phi, Yi)
+            + mvConvection->fvmDiv(phiUc, Yi)
+            ==
+            (
+                splitting
+            ?   fvm::laplacian(DEff(), Yi)
+            :  (fvm::laplacian(DEff(), Yi) + combustion->R(Yi))
+            )
+        );
+        Y_build_old_end = MPI_Wtime();
+        Y_build_old_time += Y_build_old_end - Y_build_old_start;
+        check_fvmatrix_equal(YiEqn, YiEqn_answer);
+
+#endif
 // #ifdef _CSR_
 //             Y_convert_start = MPI_Wtime();
 //             csr.init_value_from_lduMatrix(YiEqn);
 //             Y_convert_end = MPI_Wtime();
 //             Y_convert_time += Y_convert_end - Y_convert_start;
 // #endif
+        Y_total_start = MPI_Wtime();
         Y_solve_start = MPI_Wtime();
 // #ifdef _CSR_
 //             auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
@@ -150,14 +192,17 @@ Y_total_time += Y_total_end - Y_total_start;
 
 Info << "Y total Time : " << Y_total_time << endl;
 Info << "Y init Time : " << Y_init_time << endl;
+Info << "Y phiUc time : " << Y_phiUc_time << endl;
 Info << "Y build Time : " << Y_build_time << endl;
-Info << "Y build opt Time : " << Y_build_opt_time << endl;
+Info << "Y build new Time : " << Y_build_new_time << endl;
+Info << "Y build old Time : " << Y_build_old_time << endl;
 Info << "Y build grad Time : " << Y_build_grad_time << endl;
 Info << "Y build laplacian Time : " << Y_build_laplacian_time << endl;
+Info << "Y build fieldMulti Time : " << Y_field_multi_time << endl;
 Info << "Y convert Time : " << Y_convert_time << endl;
 Info << "Y update Time : " << Y_update_time << endl;
 Info << "Y solve Time : " << Y_solve_time << endl;
-Info << "Y other Time : " << Y_total_time - Y_build_time - Y_convert_time - Y_solve_time - Y_init_time - Y_update_time << endl;
+Info << "Y other Time : " << Y_total_time - Y_build_time - Y_convert_time - Y_solve_time - Y_update_time << endl;
 
 Y[inertIndex] = scalar(1) - Yt;
 Y[inertIndex].max(0.0);
