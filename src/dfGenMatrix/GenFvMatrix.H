@@ -99,7 +99,8 @@ GenMatrix_U(
     volVectorField& U,
     const surfaceScalarField& phi,
     const volScalarField& p, 
-    compressible::turbulenceModel& turbulence
+    compressible::turbulenceModel& turbulence,
+    labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>

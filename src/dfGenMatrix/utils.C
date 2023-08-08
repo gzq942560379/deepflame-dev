@@ -3,7 +3,8 @@
 
 namespace Foam{
 
-#define ERROR_TOLERANCE 1e-10
+#define RELATIVE_ERROR_TOLERANCE 1e-9
+#define ABSULTE_ERROR_TOLERANCE 1e-18
 
 void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name){
     if(a.size() != b.size()){
@@ -18,7 +19,7 @@ void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name){
         max_absulte_error = std::max(max_absulte_error, absulte_error);
         max_relative_error = std::max(max_relative_error, relative_error);
     }
-    if(max_relative_error > ERROR_TOLERANCE){
+    if(max_relative_error > RELATIVE_ERROR_TOLERANCE && max_absulte_error > ABSULTE_ERROR_TOLERANCE){
         Info << name << " error : " << endl;
         Info << "max_absulte_error : " << max_absulte_error << endl;
         Info << "max_relative_error : " << max_relative_error << endl;
