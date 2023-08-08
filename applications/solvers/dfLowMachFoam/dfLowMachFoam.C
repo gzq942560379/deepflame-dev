@@ -76,7 +76,7 @@ Description
 // #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
-#define OPT_GenMatrix_p_check
+// #define OPT_GenMatrix_p_check
 
 #ifdef _CSR_
 #include "csrMatrix.H"
