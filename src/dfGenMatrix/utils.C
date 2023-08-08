@@ -26,6 +26,12 @@ void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name){
     }
 }
 
+void check_field_equal(Field<scalar>& a, Field<scalar>& b){
+    check_field_error(a, b, "field");
+    return;
+}
+
+
 void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b){
     if(a.source().begin() == b.source().begin()){
         SeriousError << "a and b are the same matrix." << endl;

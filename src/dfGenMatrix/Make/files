@@ -8,6 +8,7 @@ linearViscousStress.C
 GenMatrix_Y.C
 GenMatrix_U.C
 GenMatrix_E.C
+GenMatrix_p.C
 utils.C
 
 LIB = $(DF_LIBBIN)/libdfGenMatrix

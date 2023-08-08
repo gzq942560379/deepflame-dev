@@ -32,6 +32,13 @@ EulerDdtSchemeFvmDdt
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
+template<class Type>
+tmp<fvMatrix<Type>>
+EulerDdtSchemeFvmDdt
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+);
+
 // fvc::ddt
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
@@ -40,6 +47,63 @@ EulerDdtSchemeFvcDdt
     const volScalarField& rho,
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+EulerDdtSchemeFvcDdt
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+);
+
+// fvc::ddtCorr
+tmp<surfaceScalarField>
+EulerDdtSchemeFvcDdtCorr
+(
+    const volScalarField& rho,
+    const volVectorField& U,
+    const surfaceScalarField& phi,
+    const autoPtr<surfaceVectorField>& Uf
+);
+
+tmp<surfaceScalarField>
+EulerDdtSchemeFvcDdtPhiCoeff
+(
+    const volVectorField& U,
+    const surfaceScalarField& phi,
+    const surfaceScalarField& phiCorr,
+    const volScalarField& rho
+);
+
+template<class Type>
+Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
+UEqn_H
+(
+    fvMatrix<Type>& UEqn
+);
+
+tmp<volScalarField>
+rAUConstructor
+(
+    fvMatrix<vector>& UEqn
+);
+
+tmp<surfaceScalarField>
+rhorAUfConstructor
+(
+    const volScalarField& rhorAU,
+    const surfaceScalarField& linear_weights
+);
+
+tmp<surfaceScalarField>
+phiHbyAConstructor
+(
+    const volScalarField& rho,
+    const volVectorField& HbyA,
+    const surfaceScalarField& rhorAUf,
+    const surfaceScalarField& tddtCorr,
+    const surfaceScalarField& linear_weights
+);
+
 
 // fvm::div
 template<class Type>
@@ -66,6 +130,13 @@ gaussConvectionSchemeFvcDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf
+);
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+gaussConvectionSchemeFvcDiv
+(
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
 );
 
 // fvc::grad
@@ -100,6 +171,14 @@ tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+);
+
+template<class Type>
+tmp<fvMatrix<Type>>
+gaussLaplacianSchemeFvmLaplacian
+(
+    const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
@@ -147,9 +226,20 @@ GenMatrix_E(
     const surfaceScalarField& linear_weights
 );
 
+tmp<fvScalarMatrix>
+GenMatrix_p(
+    const volScalarField& rho,
+    volScalarField& p,
+    const surfaceScalarField& phiHbyA,
+    const surfaceScalarField& rhorAUf,
+    const volScalarField& phi
+);
+
 
 void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
 void check_fvmatrix_equal(fvVectorMatrix& a,fvVectorMatrix& b);
+
+void check_field_equal(Field<scalar>& a, Field<scalar>& b);
 
 
 } // End namespace Foam

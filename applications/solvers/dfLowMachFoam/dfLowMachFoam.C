@@ -72,9 +72,11 @@ Description
 #define OPT_GenMatrix_Y
 #define OPT_GenMatrix_E
 #define OPT_GenMatrix_U
+#define OPT_GenMatrix_p
 // #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
+#define OPT_GenMatrix_p_check
 
 #ifdef _CSR_
 #include "csrMatrix.H"

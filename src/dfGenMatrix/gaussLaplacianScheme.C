@@ -187,6 +187,62 @@ gaussLaplacianSchemeFvmLaplacian
 
     Info << "gaussLaplacianSchemeFvmLaplacian end" << endl;
     return tfvm;
+}
+
+template<class Type>
+tmp<fvMatrix<Type>>
+gaussLaplacianSchemeFvmLaplacian
+(
+    const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+)
+{
+    const fvMesh& mesh = vf.mesh();
+    tmp<fv::snGradScheme<Type>> tsnGradScheme_(new fv::orthogonalSnGrad<Type>(mesh));
+
+    GeometricField<scalar, fvsPatchField, surfaceMesh> gammaMagSf
+    (
+        gamma*mesh.magSf()
+    );
+
+    tmp<fvMatrix<Type>> tfvm = gaussLaplacianSchemeFvmLaplacianUncorrected
+    (
+        gammaMagSf,
+        tsnGradScheme_().deltaCoeffs(vf),
+        vf
+    );
+    fvMatrix<Type>& fvm = tfvm.ref();
+
+    if (tsnGradScheme_().corrected())
+    {
+        if (mesh.fluxRequired(vf.name()))
+        {
+            fvm.faceFluxCorrectionPtr() = new
+            GeometricField<Type, fvsPatchField, surfaceMesh>
+            (
+                gammaMagSf*tsnGradScheme_().correction(vf)
+            );
+
+            fvm.source() -=
+                mesh.V()*
+                fvc::div
+                (
+                    *fvm.faceFluxCorrectionPtr()
+                )().primitiveField();
+        }
+        else
+        {
+            fvm.source() -=
+                mesh.V()*
+                fvc::div
+                (
+                    gammaMagSf*tsnGradScheme_().correction(vf)
+                )().primitiveField();
+        }
+    }
+
+    Info << "gaussLaplacianSchemeFvmLaplacian end" << endl;
+    return tfvm;
 }  
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -196,6 +252,14 @@ tmp<fvMatrix<scalar>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
+    const GeometricField<scalar, fvPatchField, volMesh>& vf
+);
+
+template
+tmp<fvMatrix<scalar>>
+gaussLaplacianSchemeFvmLaplacian
+(
+    const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
     const GeometricField<scalar, fvPatchField, volMesh>& vf
 );
 

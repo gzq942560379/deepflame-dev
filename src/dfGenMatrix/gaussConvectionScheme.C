@@ -151,6 +151,23 @@ gaussConvectionSchemeFvcDiv
 }
 
 template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+gaussConvectionSchemeFvcDiv
+(
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
+)
+{
+    return tmp<GeometricField<Type, fvPatchField, volMesh>>
+    (
+        new GeometricField<Type, fvPatchField, volMesh>
+        (
+            "div("+ssf.name()+')',
+            fvc::surfaceIntegrate(ssf)
+        )
+    );
+}
+
+template<class Type>
 tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>
 gaussConvectionSchemeFlux
 (
@@ -191,6 +208,13 @@ gaussConvectionSchemeFvcDiv
     const GeometricField<scalar, fvPatchField, volMesh>& vf
 );
 
+
+template
+tmp<GeometricField<scalar, fvPatchField, volMesh>>
+gaussConvectionSchemeFvcDiv
+(
+    const GeometricField<scalar, fvsPatchField, surfaceMesh>& ssf
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
