@@ -40,8 +40,8 @@
         - dpdt
         - fvm::laplacian(turbulence_alphaEff, he)
         + diffAlphaD
-        //  ==
-        //     fvc::div(hDiffCorrFlux)
+         ==
+            fvc::div(hDiffCorrFlux)
     );
     E_build_org_end = MPI_Wtime();
     Info << "E_build_org_time = " << E_build_org_end - E_build_org_start << endl;
@@ -62,16 +62,20 @@
 
 #ifdef OPT_GenMatrix_E_check
     E_build_org_start = MPI_Wtime();
+    Info << "check err E" << endl;
     fvScalarMatrix EEqn_answer
     (
-        fvm::ddt(rho, he) + fvm::div(phi, he)
-        + fvc::ddt(rho, K) + fvc::div(phi, K)
+        fvm::ddt(rho, he) 
+        + fvm::div(phi, he)
+        + fvc::ddt(rho, K) 
+        + fvc::div(phi, K)
         - dpdt
         - fvm::laplacian(turbulence->alphaEff(), he)
         + diffAlphaD
-        //  ==
-        //     fvc::div(hDiffCorrFlux)
+         ==
+            fvc::div(hDiffCorrFlux)
     );
+    Info << "boundary size = " << EEqn.internalCoeffs().size() << endl;
     E_build_org_end = MPI_Wtime();
     Info << "E_build_org_time = " << E_build_org_end - E_build_org_start << endl;
     check_fvmatrix_equal(EEqn, EEqn_answer);

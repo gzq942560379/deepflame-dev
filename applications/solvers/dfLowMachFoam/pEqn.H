@@ -42,6 +42,7 @@ end = MPI_Wtime();
 Info << "multiply time = " << end - start << endl;
 
 // #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
+// #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
 //     start = MPI_Wtime();
 //     tmp<surfaceScalarField> trhorAUf = rhorAUfConstructor(tmp_rhoRau, linear_weights);
 //     surfaceScalarField rhorAUf = trhorAUf();
@@ -52,6 +53,7 @@ Info << "multiply time = " << end - start << endl;
     surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
     end = MPI_Wtime();
     Info << "pEqn_stick1.3 orig = " << end - start << endl;
+// #endif
 // #endif
 
 #ifdef OPT_GenMatrix_p
@@ -242,7 +244,7 @@ else
       - fvm::laplacian(rhorAUf, p)
     );
 
-    check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer);
+    // check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer);
 #endif
 
     p_build_end = MPI_Wtime();

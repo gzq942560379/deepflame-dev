@@ -410,8 +410,12 @@ GenMatrix_p(
 
     scalar* __restrict__ diagPtr = fvm.diag().begin();
     scalar* __restrict__ sourcePtr = fvm.source().begin();
-    scalar* __restrict__ lowerPtr = fvm.lower().begin();
     scalar* __restrict__ upperPtr = fvm.upper().begin();
+
+    if (tfvm().symmetric())
+    {
+        Info << "symmetric" << endl;
+    }
 
     const labelUList& l = fvm.lduAddr().lowerAddr();
     const labelUList& u = fvm.lduAddr().upperAddr();
@@ -465,7 +469,7 @@ GenMatrix_p(
     double *fvcDivPtr = new double[nCells]{0.};
     for(label f = 0; f < nFaces; ++f){
         var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        lowerPtr[f] = var1;
+        // lowerPtr[f] = var1;
         upperPtr[f] = var1;
         diagPtr[l[f]] -= var1;
         diagPtr[u[f]] -= var1;
