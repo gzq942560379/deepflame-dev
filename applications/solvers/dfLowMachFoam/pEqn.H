@@ -40,7 +40,7 @@ volScalarField tmp_rhoRau = rho*rAU;
 end = MPI_Wtime();
 Info << "multiply time = " << end - start << endl;
 
-#ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
+// #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
 //     start = MPI_Wtime();
 //     tmp<surfaceScalarField> trhorAUf = rhorAUfConstructor(tmp_rhoRau, linear_weights);
 //     surfaceScalarField rhorAUf = trhorAUf();
@@ -51,7 +51,7 @@ Info << "multiply time = " << end - start << endl;
     surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
     end = MPI_Wtime();
     Info << "pEqn_stick1.3 orig = " << end - start << endl;
-#endif
+// #endif
 
 #ifdef OPT_GenMatrix_p
     start = MPI_Wtime();
@@ -86,7 +86,7 @@ start = MPI_Wtime();
 
 // check_field_equal(ddtCorrTest, ddtCorrRef);
 
-#ifdef OPT_GenMatrix_p
+// #ifdef OPT_GenMatrix_p
 //     tmp<surfaceScalarField> tphiHby_test = phiHbyAConstructor(rho, HbyA, rhorAUf, tddtCorr, linear_weights);
 //     surfaceScalarField phiHby_test = tphiHby_test.ref();
 // #else
@@ -96,7 +96,7 @@ start = MPI_Wtime();
         fvc::interpolate(rho)*fvc::flux(HbyA)
         + rhorAUf*tddtCorr
     );
-#endif
+// #endif
 // construct phiHbyA directly
 
 end = MPI_Wtime();
