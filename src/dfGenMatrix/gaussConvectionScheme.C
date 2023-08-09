@@ -180,6 +180,118 @@ gaussConvectionSchemeFlux
     return faceFlux*tinterpScheme().interpolate(vf);
 }
 
+template<class Type>
+tmp
+<
+    GeometricField
+    <
+        typename innerProduct<vector, Type>::type, fvPatchField, volMesh
+    >
+>
+gaussDivFvcdiv
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+)
+{
+    const fvMesh& mesh = vf.mesh();
+    Istream& divIntScheme = mesh.divScheme("div("+vf.name()+')');
+    word divScheme(divIntScheme);
+
+    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = 
+        surfaceInterpolationScheme<Type>::New(mesh, divIntScheme);
+
+    tmp
+    <
+        GeometricField
+        <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
+    > tDiv
+    (
+        fvcSurfaceIntegrate
+        (
+            tinterpScheme_().dotInterpolate(mesh.Sf(), vf)
+        )
+    );
+    
+    return tDiv;
+}
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+fvcSurfaceIntegrate
+(
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
+)
+{
+    GeometricField<Type, fvsPatchField, surfaceMesh> ssf = tssf();
+
+    const fvMesh& mesh = ssf.mesh();
+
+    tmp<GeometricField<Type, fvPatchField, volMesh>> tvf
+    (
+        new GeometricField<Type, fvPatchField, volMesh>
+        (
+            IOobject
+            (
+                "surfaceIntegrate("+ssf.name()+')',
+                ssf.instance(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensioned<Type>
+            (
+                "0",
+                ssf.dimensions()/dimVol,
+                Zero
+            ),
+            extrapolatedCalculatedFvPatchField<Type>::typeName
+        )
+    );
+    GeometricField<Type, fvPatchField, volMesh>& vf = tvf.ref();
+
+    fvcSurfaceIntegrate(vf.primitiveFieldRef(), ssf);
+    vf.correctBoundaryConditions();
+
+    return tvf;
+}
+
+template<class Type>
+void fvcSurfaceIntegrate
+(
+    Field<Type>& ivf,
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
+)
+{
+    const fvMesh& mesh = ssf.mesh();
+
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+
+    const Field<Type>& issf = ssf;
+
+    forAll(owner, facei)
+    {
+        ivf[owner[facei]] += issf[facei];
+        ivf[neighbour[facei]] -= issf[facei];
+    }
+
+    forAll(mesh.boundary(), patchi)
+    {
+        const labelUList& pFaceCells =
+            mesh.boundary()[patchi].faceCells();
+
+        const fvsPatchField<Type>& pssf = ssf.boundaryField()[patchi];
+
+        forAll(mesh.boundary()[patchi], facei)
+        {
+            ivf[pFaceCells[facei]] += pssf[facei];
+        }
+    }
+
+    ivf /= mesh.Vsc();
+}
+
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -216,6 +328,18 @@ gaussConvectionSchemeFvcDiv
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& ssf
 );
 
+template
+tmp
+<
+    GeometricField
+    <
+        typename innerProduct<vector, vector>::type, fvPatchField, volMesh
+    >
+>
+gaussDivFvcdiv
+(
+    const GeometricField<vector, fvPatchField, volMesh>& vf
+);
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
