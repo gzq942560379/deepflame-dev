@@ -10,75 +10,62 @@ double p_total_start = MPI_Wtime();
 
 p_pre_start = MPI_Wtime();
 
+TICK0(p_pre);
+
 if (!pimple.simpleRho())
 {
     rho = thermo.rho();
 }
+TICK(p_pre, 0, 1);
 
 // Thermodynamic density needs to be updated by psi*d(p) after the
 // pressure solution
-start = MPI_Wtime();
 const volScalarField psip0(psi*p);
-end = MPI_Wtime();
-Info << "pEqn_stick1.1 = " << end - start << endl;
 
+TICK(p_pre, 1, 2);
 
 #ifdef OPT_GenMatrix_p
-    start = MPI_Wtime();
     tmp<volScalarField> trAU = rAUConstructor(UEqn);
     volScalarField& rAU = trAU.ref();
-    end = MPI_Wtime();
-    Info << "pEqn_stick1.2 opt = " << end - start << endl;
 #else
-    start = MPI_Wtime();
     volScalarField rAU(1.0/UEqn.A());
-    end = MPI_Wtime();
-    Info << "pEqn_stick1.2 orig = " << end - start << endl;
 #endif
 
-start = MPI_Wtime();
+TICK(p_pre, 2, 3);
+
 tmp<volScalarField> tmp_rhoRau = rho*rAU;
-end = MPI_Wtime();
-Info << "multiply time = " << end - start << endl;
+
+TICK(p_pre, 3, 4);
 
 // #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
-// #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
-//     start = MPI_Wtime();
 //     tmp<surfaceScalarField> trhorAUf = rhorAUfConstructor(tmp_rhoRau, linear_weights);
 //     surfaceScalarField rhorAUf = trhorAUf();
-//     end = MPI_Wtime();
-//     Info << "pEqn_stick1.3 opt = " << end - start << endl;
 // #else
-    start = MPI_Wtime();
-    surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
-    end = MPI_Wtime();
-    Info << "pEqn_stick1.3 orig = " << end - start << endl;
+surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
 // #endif
-// #endif
+
+TICK(p_pre, 4, 5);
+
 
 #ifdef OPT_GenMatrix_p
-    start = MPI_Wtime();
-    tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
-    end = MPI_Wtime();
-    Info << "pEqn_stick1.4 opt = " << end - start << endl;
+    tmp<volVectorField> tUEqnH = UEqn_H(UEqn, face_scheduling);
 #else
-    start = MPI_Wtime();
     tmp<volVectorField> tUEqnH = UEqn.H();
-    end = MPI_Wtime();
-    Info << "UEqnH_ref = " << end - start << endl;
 #endif
 
-start = MPI_Wtime();
+TICK(p_pre, 5, 6);
+
 volVectorField HbyA(constrainHbyA(rAU*tUEqnH, U, p));
+
+TICK(p_pre, 6, 7);
 
 if (pimple.nCorrPiso() <= 1)
 {
     tUEqn.clear();
 }
-end = MPI_Wtime();
-Info << "pEqn_stick1.5 = " << end - start << endl;
 
-start = MPI_Wtime();
+TICK(p_pre, 7, 8);
+
 #ifdef OPT_GenMatrix_p
     tmp<surfaceScalarField> tddtCorr = EulerDdtSchemeFvcDdtCorr(rho, U, phi, rhoUf);
     surfaceScalarField ddtCorr = tddtCorr();
@@ -86,6 +73,8 @@ start = MPI_Wtime();
     tmp<surfaceScalarField> tddtCorr = fvc::ddtCorr(rho, U, phi, rhoUf);
     surfaceScalarField ddtCorr = tddtCorr();
 #endif
+
+TICK(p_pre, 8, 9);
 
 // check_field_equal(ddtCorrTest, ddtCorrRef);
 
@@ -102,22 +91,20 @@ surfaceScalarField phiHbyA
 // #endif
 // construct phiHbyA directly
 
-end = MPI_Wtime();
-Info << "pEqn_stick2 opt = " << end - start << endl;
+TICK(p_pre, 9, 10);
 
-start = MPI_Wtime();
 fvc::makeRelative(phiHbyA, rho, U);
-end = MPI_Wtime();
-Info << "pEqn_stick3 = " << end - start << endl;
+
+TICK(p_pre, 10, 11);
 
 // Update the pressure BCs to ensure flux consistency
-start = MPI_Wtime();
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
-end = MPI_Wtime();
-Info << "pEqn_stick4 = " << end - start << endl;
+
+TICK(p_pre, 11, 12);
 
 p_pre_end = MPI_Wtime();
 p_pre_time += p_pre_end - p_pre_start;
+Info << "p pre Time : " << p_pre_time << endl;
 
 if (pimple.transonic())
 {

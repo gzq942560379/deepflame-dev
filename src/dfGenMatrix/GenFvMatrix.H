@@ -78,7 +78,8 @@ template<class Type>
 Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<Type>& UEqn
+    fvMatrix<Type>& UEqn,
+    labelList& face_scheduling
 );
 
 tmp<volScalarField>
@@ -241,7 +242,7 @@ void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
 void check_fvmatrix_equal(fvVectorMatrix& a,fvVectorMatrix& b);
 
 void check_field_equal(Field<scalar>& a, Field<scalar>& b);
-
+void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name);
 
 } // End namespace Foam
 
