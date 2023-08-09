@@ -397,14 +397,14 @@ GenMatrix_E(
         if (psf.coupled())
         {
             fvm.internalCoeffs()[patchi] =
-                pGamma*psf.gradientInternalCoeffs(pDeltaCoeffs) + patchFlux*psf.valueInternalCoeffs(pw);
+                -pGamma*psf.gradientInternalCoeffs(pDeltaCoeffs) + patchFlux*psf.valueInternalCoeffs(pw);
             fvm.boundaryCoeffs()[patchi] =
-            -pGamma*psf.gradientBoundaryCoeffs(pDeltaCoeffs) - patchFlux*psf.valueBoundaryCoeffs(pw);
+                pGamma*psf.gradientBoundaryCoeffs(pDeltaCoeffs) - patchFlux*psf.valueBoundaryCoeffs(pw);
         }
         else
         {
-            fvm.internalCoeffs()[patchi] = pGamma*psf.gradientInternalCoeffs() + patchFlux*psf.valueInternalCoeffs(pw);
-            fvm.boundaryCoeffs()[patchi] = -pGamma*psf.gradientBoundaryCoeffs() - patchFlux*psf.valueBoundaryCoeffs(pw);
+            fvm.internalCoeffs()[patchi] = - pGamma*psf.gradientInternalCoeffs() + patchFlux*psf.valueInternalCoeffs(pw);
+            fvm.boundaryCoeffs()[patchi] = pGamma*psf.gradientBoundaryCoeffs() - patchFlux*psf.valueBoundaryCoeffs(pw);
         }
         forAll(mesh.boundary()[patchi], facei)
         {
