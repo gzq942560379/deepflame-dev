@@ -183,7 +183,7 @@ GenMatrix_U(
     Field<tensor>& igGradU = gGradU;
 
     #pragma omp parallel for
-    for(size_t face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
         for(label facei = face_start; facei < face_end; ++facei){
@@ -196,7 +196,7 @@ GenMatrix_U(
         }
     }
     #pragma omp parallel for
-    for(size_t face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
         for(label facei = face_start; facei < face_end; ++facei){
@@ -311,7 +311,7 @@ GenMatrix_U(
     // }
     
     #pragma omp parallel for
-    for(size_t face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
         for(label facei = face_start; facei < face_end; ++facei){
@@ -320,7 +320,7 @@ GenMatrix_U(
         }
     }
     #pragma omp parallel for
-    for(size_t face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
         for(label facei = face_start; facei < face_end; ++facei){
@@ -413,7 +413,7 @@ GenMatrix_U(
     //     diagPtr[u[face]] -= upperPtr[face];
     // }
     #pragma omp parallel for
-    for(size_t face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
         for(label facei = face_start; facei < face_end; ++facei){
@@ -422,7 +422,7 @@ GenMatrix_U(
         }
     }
     #pragma omp parallel for
-    for(size_t face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
         for(label facei = face_start; facei < face_end; ++facei){

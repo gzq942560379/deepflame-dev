@@ -25,6 +25,18 @@ License
 
 #include "CanteraMixture.H"
 #include "fvMesh.H"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include "PstreamGlobals.H"
+
+#include "cantera/base/Solution.h"
+#include "cantera/thermo/ThermoPhase.h"
+#include "cantera/thermo/ThermoFactory.h"
+#include "cantera/kinetics/Kinetics.h"
+#include "cantera/kinetics/KineticsFactory.h"
+#include "cantera/transport/TransportBase.h"
+#include "cantera/transport/TransportFactory.h"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -60,6 +72,14 @@ Foam::CanteraMixture::CanteraMixture
     CvTemp_(nSpecies()),
     muTemp_(nSpecies())
 {
+    // buildCanteraSolution();
+    // Y_.resize(nSpecies());
+    // yTemp_.resize(nSpecies());
+    // HaTemp_.resize(nSpecies());
+    // CpTemp_.resize(nSpecies());
+    // CvTemp_.resize(nSpecies());
+    // muTemp_.resize(nSpecies());
+
     forAll(Y_, i)
     {
         species_.append(CanteraGas_->speciesName(i));
@@ -167,12 +187,76 @@ Foam::CanteraMixture::CanteraMixture
 
 }
 
+void Foam::CanteraMixture::buildCanteraSolution(){
+
+
+    // assert(CanteraMechanismFile_ end with .yaml);
+
+    int32_t count;
+
+    char* buffer;    
+    std::string CanteraMechanism;
+
+    int mpisize, mpirank;
+    MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+    MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+
+    if(mpirank == 0){
+        std::ifstream fin(CanteraMechanismFile_);
+        if (!fin) {
+            SeriousError << "open CanteraMechanismFile_ error , CanteraMechanismFile_ : " << CanteraMechanismFile_ << endl;
+            MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+        }
+        std::ostringstream oss;
+        oss << fin.rdbuf();
+        CanteraMechanism = oss.str();
+        count = CanteraMechanism.size();
+        buffer = new char[count];
+        std::copy(CanteraMechanism.begin(), CanteraMechanism.end(), buffer);
+    }
+
+    MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    if(mpirank != 0){
+        buffer = new char[count];
+    }
+
+    MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    if(mpirank != 0){
+        CanteraMechanism = string(buffer, count);
+    }
+
+    delete buffer;
+
+    // std::cout << CanteraMechanism << std::endl;
+
+    Cantera::AnyMap root = Cantera::AnyMap::fromYamlString(CanteraMechanism);
+    Cantera::AnyMap& phase = root["phases"].getMapWhere("name", "");
+
+    Cantera::newSolution(CanteraMechanismFile_, "");
+    // instantiate Solution object
+    auto CanteraSolution_ = Cantera::Solution::create();
+    // thermo phase
+    CanteraSolution_->setThermo(std::shared_ptr<Cantera::ThermoPhase>(Cantera::newPhase(phase, root)));
+    // kinetics
+    std::vector<Cantera::ThermoPhase*> phases;
+    phases.push_back(CanteraSolution_->thermo().get());
+    CanteraSolution_->setKinetics(Cantera::newKinetics(phases, phase, root));
+    // transport
+    CanteraSolution_->setTransport(std::shared_ptr<Cantera::Transport>(Cantera::newDefaultTransportMgr(CanteraSolution_->thermo().get())));
+
+    CanteraGas_ = CanteraSolution_->thermo();
+
+    CanteraTransport_ = std::shared_ptr<Cantera::Transport>(newTransportMgr(transportModelName_, CanteraGas_.get()));
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void Foam::CanteraMixture::read(const dictionary& thermoDict)
 {
     //mixture_ = ThermoType(thermoDict.subDict("mixture"));
+
 }
 
 
