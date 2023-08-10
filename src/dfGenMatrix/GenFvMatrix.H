@@ -247,7 +247,8 @@ GenMatrix_p(
     volScalarField& p,
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
-    const volScalarField& phi
+    const volScalarField& phi,
+    labelList& face_scheduling
 );
 
 

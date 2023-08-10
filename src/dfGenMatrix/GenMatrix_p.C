@@ -31,7 +31,6 @@ UEqn_H
 {
     TICK0(UEqn_H);
     const GeometricField<Type, fvPatchField, volMesh>& psi_ = UEqn.psi();
-    const scalarField& diag_ = UEqn.diag();
     const Field<Type>& source_ = UEqn.source();
     FieldField<Field, Type>& internalCoeffs_ = UEqn.internalCoeffs();
     TICK(UEqn_H, 0, 1);
@@ -92,7 +91,6 @@ UEqn_H
     const label* __restrict__ lPtr = lduAddr.lowerAddr().begin();
     const scalar* __restrict__ lowerPtr = UEqn.lower().begin();
     const scalar* __restrict__ upperPtr = UEqn.upper().begin();
-    const label nFaces = UEqn.upper().size();
     TICK(UEqn_H, 3, 4);
 
     // for (label face=0; face<nFaces; face++)
@@ -229,7 +227,14 @@ rAUConstructor
         }
     }
     TICK(rAUConstructor, 2, 3);
+
     rAU.ref().primitiveFieldRef() = 1.0 / (tdiag / mesh.V());
+
+    // #pragma omp parallel for
+    // for(label i = 0; i < diagD.size(); ++i){
+    //     rAU.ref().primitiveFieldRef()[i] = 1.0 / tdiag()[i] / mesh.V()[i];
+    // }
+
     TICK(rAUConstructor, 3, 4);
     rAU.ref().correctBoundaryConditions();
     TICK(rAUConstructor, 4, 5);
@@ -274,6 +279,7 @@ rhorAUfConstructor
     const labelUList& P = mesh.owner();
     const labelUList& N = mesh.neighbour();
 
+    #pragma omp parallel for
     for (label fi=0; fi<P.size(); fi++)
     {
         rhorAUfPtr[fi] = (linearWeightsPtr[fi]*(rhorAUPtr[P[fi]] - rhorAUPtr[N[fi]]) + rhorAUPtr[N[fi]]);
@@ -282,7 +288,6 @@ rhorAUfConstructor
     forAll(linear_weights.boundaryField(), Ki)
     {
         const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = rhorAUf.boundaryFieldRef()[Ki];
 
         if (rhorAU.boundaryField()[Ki].coupled())
@@ -355,7 +360,6 @@ phiHbyAConstructor
     forAll(linear_weights.boundaryField(), Ki)
     {
         const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = rhof.boundaryFieldRef()[Ki];
 
         if (rho.boundaryField()[Ki].coupled())
@@ -435,7 +439,8 @@ GenMatrix_p(
     volScalarField& p,
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
-    const volScalarField& psi
+    const volScalarField& psi,
+    labelList& face_scheduling
 )
 {
     TICK0(GenMatrix_p);
@@ -496,18 +501,47 @@ GenMatrix_p(
     TICK(GenMatrix_p, 1, 2);
 
     // merge
-    scalar var1;
-    // - face loop
     double *fvcDivPtr = new double[nCells]{0.};
-    for(label f = 0; f < nFaces; ++f){
-        var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        // lowerPtr[f] = var1;
-        upperPtr[f] = var1;
-        diagPtr[l[f]] -= var1;
-        diagPtr[u[f]] -= var1;
-        fvcDivPtr[l[f]] += phiHbyAPtr[f];
-        fvcDivPtr[u[f]] -= phiHbyAPtr[f];
+    
+    // for(label f = 0; f < nFaces; ++f){
+    //     scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+    //     // lowerPtr[f] = var1;
+    //     upperPtr[f] = var1;
+    //     diagPtr[l[f]] -= var1;
+    //     diagPtr[u[f]] -= var1;
+    //     fvcDivPtr[l[f]] += phiHbyAPtr[f];
+    //     fvcDivPtr[u[f]] -= phiHbyAPtr[f];
+    // }
+
+    #pragma omp parallel for
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            scalar var1 = deltaCoeffsPtr[facei] * gammaMagSfPtr[facei];
+            // lowerPtr[f] = var1;
+            upperPtr[facei] = var1;
+            diagPtr[l[facei]] -= var1;
+            diagPtr[u[facei]] -= var1;
+            fvcDivPtr[l[facei]] += phiHbyAPtr[facei];
+            fvcDivPtr[u[facei]] -= phiHbyAPtr[facei];
+        }
     }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            scalar var1 = deltaCoeffsPtr[facei] * gammaMagSfPtr[facei];
+            // lowerPtr[f] = var1;
+            upperPtr[facei] = var1;
+            diagPtr[l[facei]] -= var1;
+            diagPtr[u[facei]] -= var1;
+            fvcDivPtr[l[facei]] += phiHbyAPtr[facei];
+            fvcDivPtr[u[facei]] -= phiHbyAPtr[facei];
+        }
+    }
+
 
     TICK(GenMatrix_p, 2, 3);
     // - boundary loop
@@ -543,6 +577,8 @@ GenMatrix_p(
 
     TICK(GenMatrix_p, 3, 4);
     // - cell loop
+
+    #pragma omp parallel for
     for(label c = 0; c < nCells; ++c){
         sourcePtr[c] += rDeltaT * (rhoPtr[c] - rhoOldTimePtr[c]) * meshVPtr[c];
         sourcePtr[c] += fvcDivPtr[c];

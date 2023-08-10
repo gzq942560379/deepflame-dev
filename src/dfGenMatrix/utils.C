@@ -19,10 +19,10 @@ void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name){
         max_absulte_error = std::max(max_absulte_error, absulte_error);
         max_relative_error = std::max(max_relative_error, relative_error);
     }
-    if(max_relative_error > RELATIVE_ERROR_TOLERANCE && max_absulte_error > ABSULTE_ERROR_TOLERANCE){
         Info << name << " error : " << endl;
         Info << "max_absulte_error : " << max_absulte_error << endl;
         Info << "max_relative_error : " << max_relative_error << endl;
+    if(max_relative_error > RELATIVE_ERROR_TOLERANCE && max_absulte_error > ABSULTE_ERROR_TOLERANCE){
         MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
     }
 }

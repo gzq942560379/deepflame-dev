@@ -119,7 +119,6 @@ GenMatrix_E(
     forAll(linear_weights.boundaryField(), Ki)
     {
         const fvsPatchScalarField& pLambda = weights.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = Kf.boundaryFieldRef()[Ki];
 
         if (K.boundaryField()[Ki].coupled())
@@ -207,7 +206,6 @@ GenMatrix_E(
     forAll(linear_weights.boundaryField(), Ki)
     {
         const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = Alphaf.boundaryFieldRef()[Ki];
 
         if (alphaEff.boundaryField()[Ki].coupled())

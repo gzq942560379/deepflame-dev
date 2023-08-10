@@ -204,7 +204,7 @@ else
     p_build_start = MPI_Wtime();
 #ifdef OPT_GenMatrix_p
     start = MPI_Wtime();
-    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi);
+    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi, face_scheduling);
     fvScalarMatrix pDDtEqn = tpDDtEqn.ref();
     end = MPI_Wtime();
     Info << "pEqn_stick5 opt = " << end - start << endl;
