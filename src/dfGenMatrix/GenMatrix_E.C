@@ -274,10 +274,10 @@ GenMatrix_E(
 
     // fvcDiv(hDiffCorrFlux)
     time_begin = MPI_Wtime();
-    tmp<volScalarField> fvcDivHDiffCorrFlux = gaussDivFvcdiv(hDiffCorrFlux);
+    // tmp<volScalarField> fvcDivHDiffCorrFlux = gaussDivFvcdiv(hDiffCorrFlux);
     // final try
     // - get weights
-    /*
+    
     Istream& divIntScheme = mesh.divScheme("div("+hDiffCorrFlux.name()+')');
     word divScheme(divIntScheme);
 
@@ -329,7 +329,7 @@ GenMatrix_E(
         {
             psf = pSf & hDiffCorrFlux.boundaryField()[Ki];
         }
-    }*/
+    }
 
     time_end = MPI_Wtime();
     Info << "fvcDivVectorTime = " << time_end - time_begin << endl;
@@ -351,8 +351,8 @@ GenMatrix_E(
         diagPtr[u[f]] -= var2;
         fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
         fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
-        // fvcDiv2Ptr[l[f]] += hDiffCorrFluxf[f];
-        // fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
+        fvcDiv2Ptr[l[f]] += hDiffCorrFluxf[f];
+        fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
     }
 
     double *diagLaplacPtr = new double[nCells]{0.};
@@ -371,7 +371,7 @@ GenMatrix_E(
         const fvsPatchScalarField& patchFlux = phi.boundaryField()[patchi];
         const fvsPatchScalarField& pw_fvm = weights.boundaryField()[patchi];
         const fvsPatchScalarField& pGamma = gammaMagSf.boundaryField()[patchi];
-        // const fvsPatchScalarField& phDiffCorrFluxf = hDiffCorrFluxf.boundaryField()[patchi];
+        const fvsPatchScalarField& phDiffCorrFluxf = hDiffCorrFluxf.boundaryField()[patchi];
         const fvsPatchScalarField& pDeltaCoeffs =
             deltaCoeffs.boundaryField()[patchi];
 
@@ -394,7 +394,7 @@ GenMatrix_E(
         forAll(mesh.boundary()[patchi], facei)
         {
             fvcDivPtr[pFaceCells[facei]] += pssf[facei] * patchFlux[facei];
-            // fvcDiv2Ptr[pFaceCells[facei]] += phDiffCorrFluxf[facei];
+            fvcDiv2Ptr[pFaceCells[facei]] += phDiffCorrFluxf[facei];
         }
     }
 
@@ -412,7 +412,7 @@ GenMatrix_E(
             // - fvcDivTmp()[c];
         // sourcePtr[c] += sourceSum * meshVPtr[c];
         sourcePtr[c] -= diffAlphaD[c] * meshVscPtr[c];
-        // sourcePtr[c] += fvcDiv2Ptr[c];
+        sourcePtr[c] += fvcDiv2Ptr[c];
     }
 
 
@@ -429,7 +429,7 @@ GenMatrix_E(
     Info << "mergeTime = " << time_end - time_begin << endl;
     double total_end = MPI_Wtime();
     Info << "totalTime = " << total_end - total_begin << endl;
-    return tfvm - fvcDivHDiffCorrFlux;
+    return tfvm;
 }
 
 }
