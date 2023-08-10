@@ -45,7 +45,6 @@ GenMatrix_U(
     const surfaceScalarField& weights = mesh.surfaceInterpolation::weights(); // interpolation weight (linear)
     const surfaceScalarField& deltaCoeffs = mesh.nonOrthDeltaCoeffs();
 
-    TICK(GenMatrix_U, 0 , 1);
 
     tmp<fvVectorMatrix> tfvm
     (

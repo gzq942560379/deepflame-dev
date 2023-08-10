@@ -238,7 +238,8 @@ GenMatrix_E(
     const volScalarField& alphaEff,
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
-    const surfaceScalarField& linear_weights
+    const surfaceScalarField& linear_weights,
+    labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>
