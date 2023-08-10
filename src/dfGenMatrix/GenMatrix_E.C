@@ -62,6 +62,7 @@ GenMatrix_E(
     const scalar* const __restrict__ meshVPtr = mesh.V().begin();
     const scalar* const __restrict__ rhoOldTimePtr = rho.oldTime().primitiveField().begin();
     const scalar* const __restrict__ heOldTimePtr = he.oldTime().primitiveField().begin();
+    const scalar* const __restrict__ heTimePtr = he.primitiveField().begin();
 
     time_end = MPI_Wtime();
     Info << "fvmDdtTime = " << time_end - time_begin << endl;
@@ -93,6 +94,17 @@ GenMatrix_E(
     time_begin = MPI_Wtime();
 
     // auto fvcDivTmp = gaussConvectionSchemeFvcDiv(phi, K);
+    // - get weights TODO:time consuming
+    tmp<fv::convectionScheme<scalar>> cs_k = 
+        fv::convectionScheme<scalar>::New(mesh, phi, mesh.divScheme("div("+phi.name()+','+K.name()+')'));
+    fv::gaussConvectionScheme<scalar>& gcs_k = dynamic_cast<fv::gaussConvectionScheme<scalar>&>(cs_k.ref());
+
+    tmp<surfaceScalarField> tweightsK = gcs_k.interpScheme().weights(K);
+    const surfaceScalarField& weightsK = tweightsK();
+
+    // - pointers
+    // const scalar* const __restrict__ weightsPtr = linear_weights.primitiveField().begin(); // get linear weight
+    const scalar* const __restrict__ weightsKPtr = weightsK.primitiveField().begin(); // get weight
 
     // - interpolation
     tmp<surfaceScalarField> tKf(
@@ -110,15 +122,17 @@ GenMatrix_E(
     );
     surfaceScalarField& Kf = tKf.ref();
     scalar* KfPtr = &Kf[0];
+    K.oldTime();
     const scalar* const __restrict__ KPtr = K.primitiveField().begin();
+    const scalar* const __restrict__ KOldTimePtr = K.oldTime().primitiveField().begin();
 
     for(label f = 0; f < nFaces; ++f){
-        KfPtr[f] = weightsPtr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
+        KfPtr[f] = weightsKPtr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
     }
 
     forAll(linear_weights.boundaryField(), Ki)
     {
-        const fvsPatchScalarField& pLambda = weights.boundaryField()[Ki];
+        const fvsPatchScalarField& pLambda = weightsK.boundaryField()[Ki];
         const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = Kf.boundaryFieldRef()[Ki];
 
@@ -261,6 +275,61 @@ GenMatrix_E(
     // fvcDiv(hDiffCorrFlux)
     time_begin = MPI_Wtime();
     tmp<volScalarField> fvcDivHDiffCorrFlux = gaussDivFvcdiv(hDiffCorrFlux);
+    // final try
+    // - get weights
+    /*
+    Istream& divIntScheme = mesh.divScheme("div("+hDiffCorrFlux.name()+')');
+    word divScheme(divIntScheme);
+
+    tmp<surfaceInterpolationScheme<vector>> tinterpScheme_ = 
+        surfaceInterpolationScheme<vector>::New(mesh, divIntScheme);
+
+    tmp<surfaceScalarField> tweightshDiffCorrFlux= tinterpScheme_().weights(hDiffCorrFlux);
+    const surfaceScalarField& weightshDiffCorrFlux = tweightshDiffCorrFlux();
+
+    // - interpolation
+    const scalar* const __restrict__ weightshDiffCorrFluxPtr = weightshDiffCorrFlux.primitiveField().begin(); // get weight
+
+    tmp<surfaceScalarField> thDiffCorrFluxf(
+        new GeometricField<scalar, fvsPatchField, surfaceMesh>
+        (
+            IOobject
+            (
+                "interpolate("+hDiffCorrFlux.name()+')',
+                hDiffCorrFlux.instance(),
+                hDiffCorrFlux.db()
+            ),
+            mesh,
+            mesh.Sf().dimensions()*hDiffCorrFlux.dimensions()
+        )
+    );
+
+    surfaceScalarField hDiffCorrFluxf = thDiffCorrFluxf.ref();
+    scalar* hDiffCorrFluxfPtr = &hDiffCorrFluxf[0];
+
+    for(label f = 0; f < nFaces; ++f){
+        hDiffCorrFluxfPtr[f] = mesh.Sf()[f] & (weightshDiffCorrFluxPtr[f] * (hDiffCorrFlux[l[f]] - hDiffCorrFlux[u[f]]) + hDiffCorrFlux[u[f]]);
+    }
+
+    forAll(weightshDiffCorrFlux.boundaryField(), Ki)
+    {
+        const fvsPatchScalarField& pLambda = weightshDiffCorrFlux.boundaryField()[Ki];
+        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
+        fvsPatchScalarField& psf = hDiffCorrFluxf.boundaryFieldRef()[Ki];
+
+        if (K.boundaryField()[Ki].coupled())
+        {
+            psf = pSf
+              & (
+                    pLambda*hDiffCorrFlux.boundaryField()[Ki].patchInternalField()
+                + (1.0 - pLambda)*hDiffCorrFlux.boundaryField()[Ki].patchNeighbourField()
+                );
+        }
+        else
+        {
+            psf = pSf & hDiffCorrFlux.boundaryField()[Ki];
+        }
+    }*/
 
     time_end = MPI_Wtime();
     Info << "fvcDivVectorTime = " << time_end - time_begin << endl;
@@ -269,39 +338,40 @@ GenMatrix_E(
     time_begin = MPI_Wtime();
 
     double *fvcDivPtr = new double[nCells]{0.};
-    // double *fvcDiv2Ptr = new double[nCells]{0.};
+    double *fvcDiv2Ptr = new double[nCells]{0.};
 
     // - face loop
     double var1, var2, var3;
     for(label f = 0; f < nFaces; ++f){
         var1 = - weightsPtr[f] * phiPtr[f];
-        var2 = (- weightsPtr[f] + 1.) * phiPtr[f];
-        var3 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        lowerPtr[f] += var1 - var3;
-        upperPtr[f] += var2 - var3;
-        diagPtr[l[f]] += var3 - var1;
-        diagPtr[u[f]] += var3 - var1;
+        var2 = - weightsPtr[f] * phiPtr[f] + phiPtr[f];
+        lowerPtr[f] += var1;
+        upperPtr[f] += var2;
+        diagPtr[l[f]] -= var1;
+        diagPtr[u[f]] -= var2;
         fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
         fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
         // fvcDiv2Ptr[l[f]] += hDiffCorrFluxf[f];
         // fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
     }
 
-    // for(label f = 0; f < nFaces; ++f){
-    //     var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-    //     lowerPtr[f] -= var1;
-    //     upperPtr[f] -= var1;
-    //     diagPtr[l[f]] += var1; //negSumDiag
-    //     diagPtr[u[f]] += var1;
-    // }
+    double *diagLaplacPtr = new double[nCells]{0.};
+    for(label f = 0; f < nFaces; ++f){
+        var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+        lowerPtr[f] -= var1;
+        upperPtr[f] -= var1;
+        diagLaplacPtr[l[f]] += var1; //negSumDiag
+        diagLaplacPtr[u[f]] += var1;
+    }
 
     // - boundary loop
     forAll(he.boundaryField(), patchi)
     {
         const fvPatchField<scalar>& psf = he.boundaryField()[patchi];
         const fvsPatchScalarField& patchFlux = phi.boundaryField()[patchi];
-        const fvsPatchScalarField& pw = linear_weights.boundaryField()[patchi];
+        const fvsPatchScalarField& pw_fvm = weights.boundaryField()[patchi];
         const fvsPatchScalarField& pGamma = gammaMagSf.boundaryField()[patchi];
+        // const fvsPatchScalarField& phDiffCorrFluxf = hDiffCorrFluxf.boundaryField()[patchi];
         const fvsPatchScalarField& pDeltaCoeffs =
             deltaCoeffs.boundaryField()[patchi];
 
@@ -312,14 +382,14 @@ GenMatrix_E(
         if (psf.coupled())
         {
             fvm.internalCoeffs()[patchi] =
-                -pGamma*psf.gradientInternalCoeffs(pDeltaCoeffs) + patchFlux*psf.valueInternalCoeffs(pw);
+                -pGamma*psf.gradientInternalCoeffs(pDeltaCoeffs) + patchFlux*psf.valueInternalCoeffs(pw_fvm);
             fvm.boundaryCoeffs()[patchi] =
-                pGamma*psf.gradientBoundaryCoeffs(pDeltaCoeffs) - patchFlux*psf.valueBoundaryCoeffs(pw);
+                pGamma*psf.gradientBoundaryCoeffs(pDeltaCoeffs) - patchFlux*psf.valueBoundaryCoeffs(pw_fvm);
         }
         else
         {
-            fvm.internalCoeffs()[patchi] = - pGamma*psf.gradientInternalCoeffs() + patchFlux*psf.valueInternalCoeffs(pw);
-            fvm.boundaryCoeffs()[patchi] = pGamma*psf.gradientBoundaryCoeffs() - patchFlux*psf.valueBoundaryCoeffs(pw);
+            fvm.internalCoeffs()[patchi] = - pGamma*psf.gradientInternalCoeffs() + patchFlux*psf.valueInternalCoeffs(pw_fvm);
+            fvm.boundaryCoeffs()[patchi] = pGamma*psf.gradientBoundaryCoeffs() - patchFlux*psf.valueBoundaryCoeffs(pw_fvm);
         }
         forAll(mesh.boundary()[patchi], facei)
         {
@@ -332,15 +402,16 @@ GenMatrix_E(
     for(label c = 0; c < nCells; ++c){      // cell loop
         // ddt
         diagPtr[c] += rDeltaT * rhoPtr[c] * meshVscPtr[c];
+        diagPtr[c] += diagLaplacPtr[c];
         sourcePtr[c] += rDeltaT * rhoOldTimePtr[c] * heOldTimePtr[c] * meshVscPtr[c];
         // source
         // sourceSum = dpdt[c] - fvcDdtTmp()[c] - fvcDivTmp()[c];
-        sourceSum = dpdt[c] 
-            - rDeltaT * heOldTimePtr[c] * (rhoPtr[c] - rhoOldTimePtr[c]);
-            // - fvcDivTmp()[c];
-        sourcePtr[c] += sourceSum * meshVPtr[c];
-        sourcePtr[c] -= diffAlphaD[c] * meshVPtr[c];
+        sourcePtr[c] -= rDeltaT * (KPtr[c] * rhoPtr[c] - KOldTimePtr[c] * rhoOldTimePtr[c]) * meshVscPtr[c];
         sourcePtr[c] -= fvcDivPtr[c];
+        sourcePtr[c] += dpdt[c] * meshVPtr[c];
+            // - fvcDivTmp()[c];
+        // sourcePtr[c] += sourceSum * meshVPtr[c];
+        sourcePtr[c] -= diffAlphaD[c] * meshVscPtr[c];
         // sourcePtr[c] += fvcDiv2Ptr[c];
     }
 
