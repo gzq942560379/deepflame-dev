@@ -75,7 +75,7 @@ Description
 // #define OPT_GenMatrix_p
 // #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
-#define OPT_GenMatrix_E_check
+// #define OPT_GenMatrix_E_check
 // #define OPT_GenMatrix_p_check
 
 #ifdef _CSR_
@@ -117,6 +117,20 @@ Description
 #endif
 
 #include "renumberMeshFuncs.H"
+
+#define TIME
+#ifdef TIME 
+#define TICK0(prefix)\
+    double prefix##_tick_0 = MPI_Wtime();
+
+#define TICK(prefix,start,end)\
+    double prefix##_tick_##end = MPI_Wtime();\
+    Info << #prefix << "_time_" << #end << " : " << prefix##_tick_##end - prefix##_tick_##start << endl;
+
+#else
+#define TICK0(prefix) ;
+#define TICK(prefix,start,end) ;
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

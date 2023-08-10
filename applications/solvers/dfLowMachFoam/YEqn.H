@@ -13,24 +13,27 @@ double Y_build_new_start, Y_build_new_end, Y_build_new_time = 0.;
 double Y_phiUc_start, Y_phiUc_end, Y_phiUc_time = 0.; 
 double Y_field_multi_time = 0.0;
 
-start = MPI_Wtime();
 
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
 sumYDiffError = Zero;
 
 Y_total_start = MPI_Wtime();
+Y_phiUc_start = MPI_Wtime();
 Y_build_start = MPI_Wtime();
 forAll(Y, i)
 {
     sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
 }
 const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
-
+Y_phiUc_end = MPI_Wtime();
 Y_build_end = MPI_Wtime();
+Y_total_end = MPI_Wtime();
 Y_build_time += Y_build_end - Y_build_start;
-Y_phiUc_time += Y_build_end - Y_build_start;
+Y_phiUc_time += Y_phiUc_end - Y_phiUc_start;
+Y_total_time += Y_total_end - Y_total_start;
 
+start = MPI_Wtime();
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 //label flag_mpi_init;
 int flag_mpi_init;
@@ -51,7 +54,7 @@ if (!splitting)
 }
 
 start = MPI_Wtime();
-
+Y_total_start = MPI_Wtime();
 Y_init_start = MPI_Wtime();
 
 tmp<fv::convectionScheme<scalar>> mvConvection
@@ -69,7 +72,6 @@ volScalarField Yt(0.0*Y[0]);
 
 Y_init_end = MPI_Wtime();
 Y_init_time += Y_init_end - Y_init_start;
-Y_build_time += Y_init_end - Y_init_start;
 forAll(Y, i)
 {
     Y_build_start = MPI_Wtime();
