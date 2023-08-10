@@ -231,7 +231,7 @@ else
       - fvm::laplacian(rhorAUf, p)
     );
 
-    // check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer);
+    check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer);
 #endif
 
     p_build_end = MPI_Wtime();
