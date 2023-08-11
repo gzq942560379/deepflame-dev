@@ -1,5 +1,8 @@
+-include $(GENERAL_RULES)/mplibType
+
 EXE_INC = \
     -Wno-old-style-cast \
+	$(PFLAGS) $(PINC) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
