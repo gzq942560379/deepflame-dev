@@ -232,6 +232,8 @@ private:
 
 public:
 
+    void buildCanteraSolution();
+
     void calcCp(const scalar T, const scalar p)
     {
         const scalar RR = constant::physicoChemical::R.value()*1e3; // J/(kmol·k)

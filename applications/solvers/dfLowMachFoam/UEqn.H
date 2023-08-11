@@ -27,7 +27,7 @@ U_build_org_end = MPI_Wtime();
 U_build_org_time += U_build_org_end - U_build_org_start;
 #else
 U_build_opt_start = MPI_Wtime();
-tmp<fvVectorMatrix> tUEqn = GenMatrix_U(rho, U, phi, p, turbulence());
+tmp<fvVectorMatrix> tUEqn = GenMatrix_U(rho, U, phi, p, turbulence(), face_scheduling);
 fvVectorMatrix& UEqn = tUEqn.ref();
 U_build_opt_end = MPI_Wtime();
 U_build_opt_time = U_build_opt_end - U_build_opt_start;

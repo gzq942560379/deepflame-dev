@@ -67,7 +67,7 @@ Description
 
 // #define _CSR_
 // #define _ELL_
-// #define _DIV_
+#define _DIV_
 // #define _LDU_
 #define OPT_GenMatrix_Y
 #define OPT_GenMatrix_E
@@ -75,7 +75,7 @@ Description
 // #define OPT_GenMatrix_p
 // #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
-#define OPT_GenMatrix_E_check
+// #define OPT_GenMatrix_E_check
 // #define OPT_GenMatrix_p_check
 
 #ifdef _CSR_
@@ -117,6 +117,20 @@ Description
 #endif
 
 #include "renumberMeshFuncs.H"
+
+#define TIME
+#ifdef TIME 
+#define TICK0(prefix)\
+    double prefix##_tick_0 = MPI_Wtime();
+
+#define TICK(prefix,start,end)\
+    double prefix##_tick_##end = MPI_Wtime();\
+    Info << #prefix << "_time_" << #end << " : " << prefix##_tick_##end - prefix##_tick_##start << endl;
+
+#else
+#define TICK0(prefix) ;
+#define TICK(prefix,start,end) ;
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -206,6 +220,7 @@ int main(int argc, char *argv[])
     double refine_start, refine_end, refine_time = 0.;
     double intializeFields_start, intializeFields_end,intializeFields_time = 0.;
     double renumber_start, renumber_end, renumber_time = 0.;
+    double structureMesh_start, structureMesh_end, structureMesh_time = 0.;
 
     while (runTime.run()){
         refine_start = MPI_Wtime();
@@ -233,9 +248,15 @@ int main(int argc, char *argv[])
         break;
     }
 
+    structureMesh_start = MPI_Wtime();
+    #include "structureMesh.H"
+    structureMesh_end = MPI_Wtime();
+    structureMesh_time += structureMesh_end - structureMesh_start;
+
     Info << "Refine time : " << refine_time << endl; 
     Info << "IntializeFields time : " << intializeFields_time << endl; 
     Info << "Renumber time : " << renumber_time << endl; 
+    Info << "structureMesh time : " << structureMesh_time << endl; 
     
     double init_end = MPI_Wtime();
 
@@ -264,18 +285,11 @@ int main(int argc, char *argv[])
         double time_monitor_corrThermo=0.;
         double time_monitor_p=0.;
         double time_turbulenceCorrect=0.;
-        double time_runTimeWrite=0.;
-        double time_pimple = 0;
-        double time_timeUpdate = 0;
-        double time_minMaxT = 0;
         double start, end;
 
         double step_start = MPI_Wtime();
 
-        start = MPI_Wtime();
         timeIndex ++;
-        end = MPI_Wtime();
-        time_timeUpdate += end - start;
         
         start = MPI_Wtime();
         #include "readDyMControls.H"
@@ -295,22 +309,14 @@ int main(int argc, char *argv[])
         end = MPI_Wtime();
         time_setDeltaT += end - start;
         
-        start = MPI_Wtime();
         runTime++;
-        end = MPI_Wtime();
-        time_timeUpdate += end - start;
 
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
         // --- Pressure-velocity PIMPLE corrector loop
         int pimple_loop_count = 0;
 
-        start = MPI_Wtime();
-        bool pimple_loop = pimple.loop();
-        end = MPI_Wtime();
-        time_pimple += end - start;
-
-        while (pimple_loop)
+        while (pimple.loop())
         {
             pimple_loop_count += 1;
             if (splitting)
@@ -320,12 +326,7 @@ int main(int argc, char *argv[])
                 Info<< "YEqn_RR.H end" << nl << endl;
             }
             
-            start = MPI_Wtime();
-            bool pimpleFirstPimpleIter = pimple.firstPimpleIter();
-            end = MPI_Wtime();
-            time_pimple += end - start;
-
-            if (pimpleFirstPimpleIter || moveMeshOuterCorrectors)
+            if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
             {
                 Info<< "new rhoU start" << nl << endl;
                 start = MPI_Wtime();
@@ -340,13 +341,7 @@ int main(int argc, char *argv[])
                 Info<< "new rhoU end" << nl << endl;
             }
 
-            start = MPI_Wtime();
-            pimpleFirstPimpleIter = pimple.firstPimpleIter();
-            bool pimpleSimpleRho = pimple.simpleRho();
-            end = MPI_Wtime();
-            time_pimple += end - start;
-
-            if (pimpleFirstPimpleIter && !pimpleSimpleRho)
+            if (pimple.firstPimpleIter() && !pimple.simpleRho())
             {
                 Info<< "rhoEqn.H start" << nl << endl;
                 start = MPI_Wtime();
@@ -390,25 +385,13 @@ int main(int argc, char *argv[])
                 Info<< "chemistry->correct end" << nl << endl;
             }
 
-            // start = MPI_Wtime();
             // Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
-            // end = MPI_Wtime();
-            // time_minMaxT += end - start;
 
             // --- Pressure corrector loop
-            start = MPI_Wtime();
-            bool pimpleCorrect = pimple.correct();
-            end = MPI_Wtime();
-            time_pimple += end - start;
 
-            while (pimpleCorrect)
+            while (pimple.correct())
             {
-                start = MPI_Wtime();
-                bool pimpleConsistent = pimple.consistent();
-                end = MPI_Wtime();
-                time_pimple += end - start;
-
-                if (pimpleConsistent)
+                if (pimple.consistent())
                 {
                     Info<< "pcEqn.H start" << nl << endl;
                     #include "pcEqn.H"
@@ -423,17 +406,9 @@ int main(int argc, char *argv[])
                     end = MPI_Wtime();
                     time_monitor_p += end - start;
                 }
-                start = MPI_Wtime();
-                pimpleCorrect = pimple.correct();
-                end = MPI_Wtime();
-                time_pimple += end - start;
             }
 
-            start = MPI_Wtime();
-            bool pimpleTurbCorr = pimple.turbCorr();
-            end = MPI_Wtime();
-            time_pimple += end - start;
-            if (pimpleTurbCorr)
+            if (pimple.turbCorr())
             {
                 Info<< "turbulence->correct start" << nl << endl;
                 start = MPI_Wtime();
@@ -443,20 +418,13 @@ int main(int argc, char *argv[])
                 Info<< "turbulence->correct end" << nl << endl;
             }
 
-            start = MPI_Wtime();
-            pimple_loop = pimple.loop();
-            end = MPI_Wtime();
-            time_pimple += end - start;
         }
         start = MPI_Wtime();
         rho = thermo.rho();
         end = MPI_Wtime();
         time_monitor_rho += end - start;
 
-        start = MPI_Wtime();
         runTime.write();
-        end = MPI_Wtime();
-        time_runTimeWrite = end - start;
 
         Info << "output time index " << runTime.timeIndex() << endl;
 
@@ -478,15 +446,11 @@ int main(int argc, char *argv[])
         Info<< "thermo & Trans Properties  = " << time_monitor_corrThermo << " s" << endl;
         Info<< "p Equations                = " << time_monitor_p << " s" << endl;
         Info<< "turbulence Correction      = " << time_turbulenceCorrect << " s" << endl;
-        Info<< "runTimeWrite               = " << time_runTimeWrite << " s" << endl;
-        Info<< "pimple                     = " << time_pimple << " s" << endl;
-        Info<< "time update                = " << time_timeUpdate << " s" << endl;
-        Info<< "minMaxT                    = " << time_minMaxT << " s" << endl;
         Info<< "other                      = " << step_time \
             - time_readDyMControls - time_setDeltaT - time_monitor_rho \
             - time_monitor_U - time_monitor_corrDiff - time_monitor_chem - time_monitor_Y \
             - time_monitor_E - time_monitor_corrThermo - time_monitor_p - time_turbulenceCorrect \
-            - time_runTimeWrite - time_pimple - time_timeUpdate - time_minMaxT << endl;
+            << endl;
         Info<< "============================================"<<nl<< endl;
     }
 

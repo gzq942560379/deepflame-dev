@@ -6,20 +6,34 @@
 #include "orthogonalSnGrad.H"
 #include "lduMesh.H"
 
+#define TIME
+#ifdef TIME 
+#define TICK0(prefix)\
+    double prefix##_tick_0 = MPI_Wtime();
+
+#define TICK(prefix,start,end)\
+    double prefix##_tick_##end = MPI_Wtime();\
+    Info << #prefix << "_time_" << #end << " : " << prefix##_tick_##end - prefix##_tick_##start << endl;
+
+#else
+#define TICK0(prefix) ;
+#define TICK(prefix,start,end) ;
+#endif
 namespace Foam{
 
 template<class Type>
 Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<Type>& UEqn
+    fvMatrix<Type>& UEqn,
+    labelList& face_scheduling
 )
 {
+    TICK0(UEqn_H);
     const GeometricField<Type, fvPatchField, volMesh>& psi_ = UEqn.psi();
-    const scalarField& diag_ = UEqn.diag();
     const Field<Type>& source_ = UEqn.source();
     FieldField<Field, Type>& internalCoeffs_ = UEqn.internalCoeffs();
-
+    TICK(UEqn_H, 0, 1);
     tmp<GeometricField<Type, fvPatchField, volMesh>> tHphi
     (
         new GeometricField<Type, fvPatchField, volMesh>
@@ -38,6 +52,7 @@ UEqn_H
         )
     );
     GeometricField<Type, fvPatchField, volMesh>& Hphi = tHphi.ref();
+    TICK(UEqn_H, 1, 2);
 
     for (direction cmpt=0; cmpt<Type::nComponents; cmpt++)
     {
@@ -48,11 +63,11 @@ UEqn_H
         forAll(internalCoeffs_, patchi)
         {
             labelList addr = UEqn.lduAddr().patchAddr(patchi);
-            Field<scalar> internalCoeffs_cmpt = internalCoeffs_[patchi].component(cmpt);
-            Field<scalar> internalCoeffs_ave = cmptAv(internalCoeffs_[patchi]);
+            tmp<Field<scalar>> internalCoeffs_cmpt = internalCoeffs_[patchi].component(cmpt);
+            tmp<Field<scalar>> internalCoeffs_ave = cmptAv(internalCoeffs_[patchi]);
             forAll(addr, facei)
             {
-                boundaryDiagCmpt[addr[facei]] = -internalCoeffs_cmpt[facei] + internalCoeffs_ave[facei];
+                boundaryDiagCmpt[addr[facei]] = -internalCoeffs_cmpt()[facei] + internalCoeffs_ave()[facei];
             }
         }
 
@@ -61,6 +76,7 @@ UEqn_H
 
         Hphi.primitiveFieldRef().replace(cmpt, boundaryDiagCmpt*psiCmpt);
     }
+    TICK(UEqn_H, 2, 3);
 
     // lduMatrix::H
     const lduAddressing& lduAddr = UEqn.mesh().lduAddr();
@@ -75,16 +91,37 @@ UEqn_H
     const label* __restrict__ lPtr = lduAddr.lowerAddr().begin();
     const scalar* __restrict__ lowerPtr = UEqn.lower().begin();
     const scalar* __restrict__ upperPtr = UEqn.upper().begin();
-    const label nFaces = UEqn.upper().size();
+    TICK(UEqn_H, 3, 4);
 
-    for (label face=0; face<nFaces; face++)
-    {
-        HpsiPtr[uPtr[face]] -= lowerPtr[face]*psiPtr[lPtr[face]];
-        HpsiPtr[lPtr[face]] -= upperPtr[face]*psiPtr[uPtr[face]];
+    // for (label face=0; face<nFaces; face++)
+    // {
+    //     HpsiPtr[uPtr[face]] -= lowerPtr[face]*psiPtr[lPtr[face]];
+    //     HpsiPtr[lPtr[face]] -= upperPtr[face]*psiPtr[uPtr[face]];
+    // }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            HpsiPtr[uPtr[facei]] -= lowerPtr[facei]*psiPtr[lPtr[facei]];
+            HpsiPtr[lPtr[facei]] -= upperPtr[facei]*psiPtr[uPtr[facei]];
+        }
     }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            HpsiPtr[uPtr[facei]] -= lowerPtr[facei]*psiPtr[lPtr[facei]];
+            HpsiPtr[lPtr[facei]] -= upperPtr[facei]*psiPtr[uPtr[facei]];
+        }
+    }
+
+    TICK(UEqn_H, 4, 5);
 
     Hphi.primitiveFieldRef() += (tHpsi + source_);
 
+    TICK(UEqn_H, 5, 6);
 
     FieldField<Field, vector> boundaryCoeffs_ = UEqn.boundaryCoeffs();
     forAll(psi_.boundaryField(), patchi)
@@ -113,11 +150,15 @@ UEqn_H
             }
         }
     }
+    TICK(UEqn_H, 6, 7);
 
     // addBoundarySource(Hphi.primitiveFieldRef());
 
     Hphi.primitiveFieldRef() /= psi_.mesh().V();
+    TICK(UEqn_H, 7, 8);
+
     Hphi.correctBoundaryConditions();
+    TICK(UEqn_H, 8, 9);
 
     typename Type::labelType validComponents
     (
@@ -135,6 +176,7 @@ UEqn_H
             );
         }
     }
+    TICK(UEqn_H, 9, 10);
 
     return tHphi;
 }
@@ -145,6 +187,8 @@ rAUConstructor
     fvMatrix<vector>& UEqn
 )
 {
+    TICK0(rAUConstructor);
+
     const scalarField& diag_ = UEqn.diag();
     const GeometricField<vector, fvPatchField, volMesh>& psi_ = UEqn.psi();
     const fvMesh& mesh = psi_.mesh();
@@ -158,10 +202,12 @@ rAUConstructor
             extrapolatedCalculatedFvPatchScalarField::typeName
         )
     );
+    TICK(rAUConstructor, 0, 1);
     // D()
     FieldField<Field, vector>& internalCoeffs_ = UEqn.internalCoeffs();
     tmp<scalarField> tdiag(new scalarField(diag_)); // D
     scalarField& diagD = tdiag.ref();
+    TICK(rAUConstructor, 1, 2);
 
     // addCmptAvBoundaryDiag(tdiag.ref());
     const lduAddressing& lduAddr = UEqn.mesh().lduAddr();
@@ -174,15 +220,24 @@ rAUConstructor
         //     diag
         // );
         labelList addr = lduAddr.patchAddr(patchi);
-        Field<scalar> internalCoeffs_ave = cmptAv(internalCoeffs_[patchi]);
+        tmp<Field<scalar>> internalCoeffs_ave = cmptAv(internalCoeffs_[patchi]);
         forAll(addr, facei)
         {
-            diagD[addr[facei]] += internalCoeffs_ave[facei];
+            diagD[addr[facei]] += internalCoeffs_ave()[facei];
         }
     }
+    TICK(rAUConstructor, 2, 3);
 
     rAU.ref().primitiveFieldRef() = 1.0 / (tdiag / mesh.V());
+
+    // #pragma omp parallel for
+    // for(label i = 0; i < diagD.size(); ++i){
+    //     rAU.ref().primitiveFieldRef()[i] = 1.0 / tdiag()[i] / mesh.V()[i];
+    // }
+
+    TICK(rAUConstructor, 3, 4);
     rAU.ref().correctBoundaryConditions();
+    TICK(rAUConstructor, 4, 5);
 
     return rAU;
 }
@@ -224,6 +279,7 @@ rhorAUfConstructor
     const labelUList& P = mesh.owner();
     const labelUList& N = mesh.neighbour();
 
+    #pragma omp parallel for
     for (label fi=0; fi<P.size(); fi++)
     {
         rhorAUfPtr[fi] = (linearWeightsPtr[fi]*(rhorAUPtr[P[fi]] - rhorAUPtr[N[fi]]) + rhorAUPtr[N[fi]]);
@@ -232,7 +288,6 @@ rhorAUfConstructor
     forAll(linear_weights.boundaryField(), Ki)
     {
         const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = rhorAUf.boundaryFieldRef()[Ki];
 
         if (rhorAU.boundaryField()[Ki].coupled())
@@ -305,7 +360,6 @@ phiHbyAConstructor
     forAll(linear_weights.boundaryField(), Ki)
     {
         const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
         fvsPatchScalarField& psf = rhof.boundaryFieldRef()[Ki];
 
         if (rho.boundaryField()[Ki].coupled())
@@ -385,11 +439,11 @@ GenMatrix_p(
     volScalarField& p,
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
-    const volScalarField& psi
+    const volScalarField& psi,
+    labelList& face_scheduling
 )
 {
-    double total_time_begin = MPI_Wtime();
-
+    TICK0(GenMatrix_p);
     const fvMesh& mesh = p.mesh();
     assert(mesh.moving() == false);
 
@@ -397,7 +451,6 @@ GenMatrix_p(
     label nFaces = mesh.neighbour().size();
 
     // basic matrix
-    double time_begin = MPI_Wtime();
     tmp<fvScalarMatrix> tfvm
     (
         new fvScalarMatrix
@@ -412,43 +465,28 @@ GenMatrix_p(
     scalar* __restrict__ sourcePtr = fvm.source().begin();
     scalar* __restrict__ upperPtr = fvm.upper().begin();
 
-    if (tfvm().symmetric())
-    {
-        Info << "symmetric" << endl;
-    }
-
     const labelUList& l = fvm.lduAddr().lowerAddr();
     const labelUList& u = fvm.lduAddr().upperAddr();
 
     scalar rDeltaT = 1.0/mesh.time().deltaTValue();
-    double time_end = MPI_Wtime();
-    // Info << "prepareTime = " << time_end - time_begin << endl;
 
     // fvmddt
-    time_begin = MPI_Wtime();
     auto fvmDdtTmp = psi * correction(EulerDdtSchemeFvmDdt(p));
-    time_end = MPI_Wtime();
-    // Info << "fvmddt = " << time_end - time_begin << endl;
+
+    TICK(GenMatrix_p, 0, 1);
 
     // fvcddt
-    time_begin = MPI_Wtime();
     // auto fvcDdtTmp = EulerDdtSchemeFvcDdt(rho);
     const scalar* const __restrict__ rhoPtr = rho.primitiveField().begin();
     const scalar* const __restrict__ rhoOldTimePtr = rho.oldTime().primitiveField().begin();
     const scalar* const __restrict__ meshVPtr = mesh.V().begin();
-    time_end = MPI_Wtime();
-    // Info << "fvcddt = " << time_end - time_begin << endl;
 
     // fvcdiv
-    time_begin = MPI_Wtime();
     // auto fvcDivTmp = gaussConvectionSchemeFvcDiv(phiHbyA);
     const scalar* const __restrict__ phiHbyAPtr = phiHbyA.primitiveField().begin();
-    time_end = MPI_Wtime();
-    // Info << "fvcdiv = " << time_end - time_begin << endl;
 
     // fvmLaplacian
     // auto fvmLaplacianTmp = gaussLaplacianSchemeFvmLaplacian(rhorAUf, p);
-    time_begin = MPI_Wtime();
     tmp<fv::snGradScheme<scalar>> tsnGradScheme_(new fv::orthogonalSnGrad<scalar>(mesh));
     const surfaceScalarField& deltaCoeffs = tsnGradScheme_().deltaCoeffs(p)();
 
@@ -459,24 +497,53 @@ GenMatrix_p(
 
     const scalar* const __restrict__ deltaCoeffsPtr = deltaCoeffs.primitiveField().begin();
     const scalar* const __restrict__ gammaMagSfPtr = gammaMagSf.primitiveField().begin();
-    time_end = MPI_Wtime();
     // Info << "fvmLaplacian = " << time_end - time_begin << endl;
+    TICK(GenMatrix_p, 1, 2);
 
     // merge
-    time_begin = MPI_Wtime();
-    scalar var1;
-    // - face loop
     double *fvcDivPtr = new double[nCells]{0.};
-    for(label f = 0; f < nFaces; ++f){
-        var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        // lowerPtr[f] = var1;
-        upperPtr[f] = var1;
-        diagPtr[l[f]] -= var1;
-        diagPtr[u[f]] -= var1;
-        fvcDivPtr[l[f]] += phiHbyAPtr[f];
-        fvcDivPtr[u[f]] -= phiHbyAPtr[f];
+    
+    // for(label f = 0; f < nFaces; ++f){
+    //     scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+    //     // lowerPtr[f] = var1;
+    //     upperPtr[f] = var1;
+    //     diagPtr[l[f]] -= var1;
+    //     diagPtr[u[f]] -= var1;
+    //     fvcDivPtr[l[f]] += phiHbyAPtr[f];
+    //     fvcDivPtr[u[f]] -= phiHbyAPtr[f];
+    // }
+
+    #pragma omp parallel for
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            scalar var1 = deltaCoeffsPtr[facei] * gammaMagSfPtr[facei];
+            // lowerPtr[f] = var1;
+            upperPtr[facei] = var1;
+            diagPtr[l[facei]] -= var1;
+            diagPtr[u[facei]] -= var1;
+            fvcDivPtr[l[facei]] += phiHbyAPtr[facei];
+            fvcDivPtr[u[facei]] -= phiHbyAPtr[facei];
+        }
+    }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            scalar var1 = deltaCoeffsPtr[facei] * gammaMagSfPtr[facei];
+            // lowerPtr[f] = var1;
+            upperPtr[facei] = var1;
+            diagPtr[l[facei]] -= var1;
+            diagPtr[u[facei]] -= var1;
+            fvcDivPtr[l[facei]] += phiHbyAPtr[facei];
+            fvcDivPtr[u[facei]] -= phiHbyAPtr[facei];
+        }
     }
 
+
+    TICK(GenMatrix_p, 2, 3);
     // - boundary loop
     forAll(p.boundaryField(), patchi)
     {
@@ -508,7 +575,10 @@ GenMatrix_p(
         }
     }
 
+    TICK(GenMatrix_p, 3, 4);
     // - cell loop
+
+    #pragma omp parallel for
     for(label c = 0; c < nCells; ++c){
         sourcePtr[c] += rDeltaT * (rhoPtr[c] - rhoOldTimePtr[c]) * meshVPtr[c];
         sourcePtr[c] += fvcDivPtr[c];
@@ -520,11 +590,7 @@ GenMatrix_p(
         // + fvcDivTmp
         - fvm
     );
-    time_end = MPI_Wtime();
-    // Info << "mergeTime = " << time_end - time_begin << endl;
-
-    double total_time_end = MPI_Wtime();
-    // Info << "totalTime = " << total_time_end - total_time_begin << endl;
+    TICK(GenMatrix_p, 4, 5);
 
     return fvm_final;
 }
@@ -533,7 +599,8 @@ template
 Foam::tmp<Foam::GeometricField<vector, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<vector>& UEqn
+    fvMatrix<vector>& UEqn,
+    labelList& face_scheduling
 );
 
 }

@@ -62,9 +62,9 @@ Foam::labelList Foam::geomRenumber::renumber
     std::vector<Point> Points(points.size());
     forAll(points, i){
         Points[i].id_ = i;
-        Points[i].x_ = static_cast<label>(points[i][0] * 1e9);
-        Points[i].y_ = static_cast<label>(points[i][1] * 1e9);
-        Points[i].z_ = static_cast<label>(points[i][2] * 1e9);
+        Points[i].x_ = static_cast<label>(points[i][0] * 1e6);
+        Points[i].y_ = static_cast<label>(points[i][1] * 1e6);
+        Points[i].z_ = static_cast<label>(points[i][2] * 1e6);
     }    
     
     std::sort(Points.begin(), Points.end(), [](const auto& a, const auto& b){

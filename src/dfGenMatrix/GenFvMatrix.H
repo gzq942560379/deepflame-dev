@@ -78,7 +78,8 @@ template<class Type>
 Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<Type>& UEqn
+    fvMatrix<Type>& UEqn,
+    labelList& face_scheduling
 );
 
 tmp<volScalarField>
@@ -209,7 +210,8 @@ GenMatrix_U(
     volVectorField& U,
     const surfaceScalarField& phi,
     const volScalarField& p, 
-    compressible::turbulenceModel& turbulence
+    compressible::turbulenceModel& turbulence,
+    labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>
@@ -236,7 +238,8 @@ GenMatrix_E(
     const volScalarField& alphaEff,
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
-    const surfaceScalarField& linear_weights
+    const surfaceScalarField& linear_weights,
+    labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>
@@ -245,7 +248,8 @@ GenMatrix_p(
     volScalarField& p,
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
-    const volScalarField& phi
+    const volScalarField& phi,
+    labelList& face_scheduling
 );
 
 
@@ -253,7 +257,7 @@ void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
 void check_fvmatrix_equal(fvVectorMatrix& a,fvVectorMatrix& b);
 
 void check_field_equal(Field<scalar>& a, Field<scalar>& b);
-
+void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name);
 
 } // End namespace Foam
 

@@ -154,7 +154,7 @@ EulerDdtSchemeFvcDdtCorr
 
     GeometricField<vector, fvPatchField, volMesh> rhoU0
     (
-        rho.oldTime()*U.oldTime()
+        rho.oldTime() * U.oldTime()
     );
 
     surfaceScalarField phiCorr
@@ -195,13 +195,7 @@ EulerDdtSchemeFvcDdtPhiCoeff
 )
 {
     const fvMesh& mesh = U.mesh();
-    tmp<surfaceScalarField> tddtCouplingCoeff = scalar(1)
-      - min
-        (
-            mag(phiCorr)
-           /(mag(phi) + dimensionedScalar("small", phi.dimensions(), SMALL)),
-            scalar(1)
-        );
+    tmp<surfaceScalarField> tddtCouplingCoeff = scalar(1) - min(mag(phiCorr)/(mag(phi) + dimensionedScalar("small", phi.dimensions(), SMALL)),scalar(1));
 
     surfaceScalarField& ddtCouplingCoeff = tddtCouplingCoeff.ref();
 
@@ -210,8 +204,7 @@ EulerDdtSchemeFvcDdtPhiCoeff
     forAll(U.boundaryField(), patchi)
     {
         if
-        (
-            U.boundaryField()[patchi].fixesValue()
+        ( U.boundaryField()[patchi].fixesValue()
          || isA<cyclicAMIFvPatch>(mesh.boundary()[patchi])
         )
         {

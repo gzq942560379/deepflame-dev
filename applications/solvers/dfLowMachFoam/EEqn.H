@@ -47,7 +47,7 @@
     Info << "E_build_org_time = " << E_build_org_end - E_build_org_start << endl;
 #else
     E_build_opt_start = MPI_Wtime();
-    tmp<fvScalarMatrix> tEEqn = GenMatrix_E(rho, he, phi, K, dpdt, turbulence_alphaEff, diffAlphaD, hDiffCorrFlux, linear_weights);
+    tmp<fvScalarMatrix> tEEqn = GenMatrix_E(rho, he, phi, K, dpdt, turbulence_alphaEff, diffAlphaD, hDiffCorrFlux, linear_weights, face_scheduling);
     fvScalarMatrix& EEqn = tEEqn.ref();
     E_build_opt_end = MPI_Wtime();
     Info << "E_build_opt_time = " << E_build_opt_end - E_build_opt_start << endl;
@@ -57,11 +57,8 @@
     E_build_end = MPI_Wtime();
     E_build_time += E_build_end - E_build_start;
 
-    double E_total_end = MPI_Wtime();
-    double E_total_time = E_total_end - E_total_start;
-
 #ifdef OPT_GenMatrix_E_check
-    Info << "check err E" << endl;
+    E_build_org_start = MPI_Wtime();
     fvScalarMatrix EEqn_answer
     (
         fvm::ddt(rho, he) 
@@ -74,11 +71,10 @@
          ==
             fvc::div(hDiffCorrFlux)
     );
-    Info << "boundary size = " << EEqn.internalCoeffs().size() << endl;
+    E_build_org_end = MPI_Wtime();
+    Info << "E_build_org_time = " << E_build_org_end - E_build_org_start << endl;
     check_fvmatrix_equal(EEqn, EEqn_answer);
 #endif
-
-
 
 // #ifdef _CSR_
 //     E_convert_start = MPI_Wtime();
@@ -88,7 +84,6 @@
 // #endif
 
     E_solve_start = MPI_Wtime();
-    E_total_start = MPI_Wtime();
 // #ifdef _CSR_
 //     auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(EEqn.psi());
 //     auto& source = EEqn.source();
@@ -101,8 +96,8 @@
     E_solve_end = MPI_Wtime();
     E_solve_time += E_solve_end - E_solve_start;
 
-    E_total_end = MPI_Wtime();
-    E_total_time += E_total_end - E_total_start;
+    double E_total_end = MPI_Wtime();
+    double E_total_time = E_total_end - E_total_start;
 
     Info << "E total Time : " << E_total_time << endl;
     Info << "E build Time : " << E_build_time << endl;
