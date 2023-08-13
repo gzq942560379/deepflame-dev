@@ -59,26 +59,27 @@ Foam::CanteraMixture::CanteraMixture
         )
     ),
     CanteraMechanismFile_(CanteraTorchProperties_.lookup("CanteraMechanismFile")),
-    CanteraSolution_(Cantera::newSolution(CanteraMechanismFile_, "")),
-    CanteraGas_(CanteraSolution_->thermo()),
+    // CanteraSolution_(Cantera::newSolution(CanteraMechanismFile_, "")),
+    // CanteraGas_(CanteraSolution_->thermo()),
     transportModelName_(CanteraTorchProperties_.lookup("transportModel")),
-    CanteraTransport_(newTransportMgr(transportModelName_, CanteraGas_.get())),
-    Y_(nSpecies()),
+    // CanteraTransport_(newTransportMgr(transportModelName_, CanteraGas_.get())),
+    // Y_(nSpecies()),
     Tref_(mesh.objectRegistry::lookupObject<volScalarField>("T")),
-    pref_(mesh.objectRegistry::lookupObject<volScalarField>("p")),
-    yTemp_(nSpecies()),
-    HaTemp_(nSpecies()),
-    CpTemp_(nSpecies()),
-    CvTemp_(nSpecies()),
-    muTemp_(nSpecies())
+    pref_(mesh.objectRegistry::lookupObject<volScalarField>("p"))
+    // yTemp_(nSpecies()),
+    // HaTemp_(nSpecies()),
+    // CpTemp_(nSpecies()),
+    // CvTemp_(nSpecies()),
+    // muTemp_(nSpecies())
 {
-    // buildCanteraSolution();
-    // Y_.resize(nSpecies());
-    // yTemp_.resize(nSpecies());
-    // HaTemp_.resize(nSpecies());
-    // CpTemp_.resize(nSpecies());
-    // CvTemp_.resize(nSpecies());
-    // muTemp_.resize(nSpecies());
+    buildCanteraSolution();
+
+    Y_.resize(nSpecies());
+    yTemp_.resize(nSpecies());
+    HaTemp_.resize(nSpecies());
+    CpTemp_.resize(nSpecies());
+    CvTemp_.resize(nSpecies());
+    muTemp_.resize(nSpecies());
 
     forAll(Y_, i)
     {
@@ -188,8 +189,6 @@ Foam::CanteraMixture::CanteraMixture
 }
 
 void Foam::CanteraMixture::buildCanteraSolution(){
-
-
     // assert(CanteraMechanismFile_ end with .yaml);
 
     int32_t count;
@@ -236,7 +235,7 @@ void Foam::CanteraMixture::buildCanteraSolution(){
 
     Cantera::newSolution(CanteraMechanismFile_, "");
     // instantiate Solution object
-    auto CanteraSolution_ = Cantera::Solution::create();
+    CanteraSolution_ = Cantera::Solution::create();
     // thermo phase
     CanteraSolution_->setThermo(std::shared_ptr<Cantera::ThermoPhase>(Cantera::newPhase(phase, root)));
     // kinetics
