@@ -253,11 +253,11 @@ GenMatrix_p(
 );
 
 
-void check_fvmatrix_equal(fvScalarMatrix& a,fvScalarMatrix& b);
-void check_fvmatrix_equal(fvVectorMatrix& a,fvVectorMatrix& b);
+void check_fvmatrix_equal(const fvScalarMatrix& a,const fvScalarMatrix& b);
+void check_fvmatrix_equal(const fvVectorMatrix& a,const fvVectorMatrix& b);
 
-void check_field_equal(Field<scalar>& a, Field<scalar>& b);
-void check_field_error(Field<scalar>& a, Field<scalar>& b, const word& name);
+void check_field_equal(const Field<scalar>& a, const Field<scalar>& b);
+void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name);
 
 } // End namespace Foam
 

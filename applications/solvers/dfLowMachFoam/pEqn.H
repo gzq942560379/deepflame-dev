@@ -310,7 +310,6 @@ else
         p_post_end = MPI_Wtime();
         p_post_time += p_post_end - p_post_start;
     }
-    Info << "pEqn_stick6 = " << end - start << endl;
 }
 
 p_post_start = MPI_Wtime();

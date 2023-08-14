@@ -448,7 +448,6 @@ GenMatrix_p(
     assert(mesh.moving() == false);
 
     label nCells = mesh.nCells();
-    label nFaces = mesh.neighbour().size();
 
     // basic matrix
     tmp<fvScalarMatrix> tfvm

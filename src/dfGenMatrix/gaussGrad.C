@@ -153,20 +153,13 @@ gaussGradCalcGrad
 {
     const fvMesh& mesh = vsf.mesh();
 
-    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ =
-    tmp<surfaceInterpolationScheme<Type>>
-    (
-        new linear<Type>(mesh)
-    );
+    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = tmp<surfaceInterpolationScheme<Type>>(new linear<Type>(mesh));
 
     typedef typename outerProduct<vector, Type>::type GradType;
 
     tmp<GeometricField<Type, fvsPatchField, surfaceMesh>> tinterpolate = tinterpScheme_().interpolate(vsf);
 
-    tmp<GeometricField<GradType, fvPatchField, volMesh>> tgGrad
-    (
-        gaussGradGradf(tinterpolate.ref(), name)
-    );
+    tmp<GeometricField<GradType, fvPatchField, volMesh>> tgGrad(gaussGradGradf(tinterpolate.ref(), name));
     GeometricField<GradType, fvPatchField, volMesh>& gGrad = tgGrad.ref();
 
     gaussGradCorrectBoundaryConditions(vsf, gGrad);

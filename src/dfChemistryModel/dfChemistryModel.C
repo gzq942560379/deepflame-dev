@@ -590,7 +590,14 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     double correctThermo_part1_start, correctThermo_part1_end, correctThermo_part1_time = 0.;
     double correctThermo_part2_start, correctThermo_part2_end, correctThermo_part2_time = 0.;
     double correctThermo_start, correctThermo_end, correctThermo_time = 0.;
-    double correctThermoT_start, correctThermoT_end, correctThermoT_time = 0.;
+    double correctThermo_part1_1_time = 0.;
+    double correctThermo_part1_2_time = 0.;
+    double correctThermo_part1_3_time = 0.;
+    double correctThermo_part1_4_time = 0.;
+    double correctThermo_part1_5_time = 0.;
+    double correctThermo_part1_6_time = 0.;
+    double correctThermo_part1_7_time = 0.;
+    double correctThermo_part1_8_time = 0.;
 
     correctThermo_start = MPI_Wtime();
 
@@ -600,32 +607,41 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 
     forAll(T_, celli)
     {
+        double tick0 = MPI_Wtime();
         scalarList yTemp(mixture_.nSpecies());
         scalarList dTemp(mixture_.nSpecies());
         scalarList hrtTemp(mixture_.nSpecies());
-        
         forAll(Y_, i)
         {
             yTemp[i] = Y_[i][celli];
         }
-        correctThermoT_start = MPI_Wtime();
+        double tick1 = MPI_Wtime();
+        correctThermo_part1_1_time += tick1 - tick0;
 
         CanteraGas_->setState_PY(p_[celli], yTemp.begin());
+        double tick2 = MPI_Wtime();
+        correctThermo_part1_2_time += tick2 - tick1;
 
         CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
+        double tick3 = MPI_Wtime();
+        correctThermo_part1_3_time += tick3 - tick2;
 
         T_[celli] = CanteraGas_->temperature();
-
-        correctThermoT_end = MPI_Wtime();
-        correctThermoT_time += correctThermoT_end - correctThermoT_start;
-
+        double tick4 = MPI_Wtime();
+        correctThermo_part1_4_time += tick4 - tick3;
 
         // meanMolecularWeight() kg/kmol    RT() Joules/kmol
         psi_[celli] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+        double tick5 = MPI_Wtime();
+        correctThermo_part1_5_time += tick5 - tick4;
 
         mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
+        double tick6 = MPI_Wtime();
+        correctThermo_part1_6_time += tick6 - tick5;
 
         alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass()); // kg/(m*s)
+        double tick7 = MPI_Wtime();
+        correctThermo_part1_7_time += tick7 - tick6;
         // thermalConductivity() W/m/K
         // cp_mass()   J/kg/K
 
@@ -651,6 +667,8 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
                 hai_[i][celli] = hrtTemp[i]*RT/CanteraGas_->molecularWeight(i);
             }
         }
+        double tick8 = MPI_Wtime();
+        correctThermo_part1_8_time += tick8 - tick7;
     }
 
     correctThermo_part1_end = MPI_Wtime();
@@ -774,7 +792,14 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     Info << "correctThermo Total : " << correctThermo_time << endl;
     Info << "correctThermo part1 : " << correctThermo_part1_time << endl;
     Info << "correctThermo part2 : " << correctThermo_part2_time << endl;
-    Info << "correctThermo Temperature : " << correctThermoT_time << endl;
+    Info << "correctThermo part1 1 : " << correctThermo_part1_1_time << endl;
+    Info << "correctThermo part1 2 : " << correctThermo_part1_2_time << endl;
+    Info << "correctThermo part1 3 : " << correctThermo_part1_3_time << endl;
+    Info << "correctThermo part1 4 : " << correctThermo_part1_4_time << endl;
+    Info << "correctThermo part1 5 : " << correctThermo_part1_5_time << endl;
+    Info << "correctThermo part1 6 : " << correctThermo_part1_6_time << endl;
+    Info << "correctThermo part1 7 : " << correctThermo_part1_7_time << endl;
+    Info << "correctThermo part1 8 : " << correctThermo_part1_8_time << endl;
 }
 
 template<class ThermoType>
