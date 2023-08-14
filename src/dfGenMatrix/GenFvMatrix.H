@@ -141,6 +141,13 @@ gaussConvectionSchemeFvcDiv
 );
 
 template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+gaussConvectionSchemeFvcDiv
+(
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
+);
+
+template<class Type>
 tmp
 <
     GeometricField
@@ -193,6 +200,15 @@ tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+);
+
+// fvc::laplacian
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+gaussLaplacianSchemeFvcLaplacian
+(
+    const GeometricField<scalar, fvPatchField, volMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 

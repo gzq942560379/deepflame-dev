@@ -17,13 +17,17 @@ double Y_field_multi_time = 0.0;
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
 sumYDiffError = Zero;
+std::vector<volVectorField> gradResult; 
 
 Y_total_start = MPI_Wtime();
 Y_phiUc_start = MPI_Wtime();
 Y_build_start = MPI_Wtime();
 forAll(Y, i)
 {
-    sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
+    tmp<volVectorField> tfvcGradY = gaussGradSchemeGrad(Y[i]);
+    const volVectorField& fvcGradY = tfvcGradY();
+    sumYDiffError += chemistry->rhoD(i)*fvcGradY;
+    gradResult.push_back(fvcGradY);
 }
 const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
 Y_phiUc_end = MPI_Wtime();
@@ -85,17 +89,19 @@ forAll(Y, i)
 
     // hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * fvc::grad(Yi) - Yi * sumYDiffError);
     Y_build_grad_start = MPI_Wtime();
-    auto gradTmp = gaussGradSchemeGrad(Yi);
+    // auto gradTmp = gaussGradSchemeGrad(Yi);
     Y_build_grad_end = MPI_Wtime();
     Y_build_grad_time += Y_build_grad_end - Y_build_grad_start;
 
     Y_build_laplacian_start = MPI_Wtime();
-    auto laplacianTmp = fvc::laplacian(alpha_mul_hai, Yi);
+    // tmp<volScalarField> laplacianTmp = fvc::laplacian(alpha_mul_hai, Yi);
+    tmp<volScalarField> laplacianTmp = gaussLaplacianSchemeFvcLaplacian(alpha_mul_hai, Yi);
+
     Y_build_laplacian_end = MPI_Wtime();
     Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
 
     Y_build_grad_start = MPI_Wtime();
-    hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * gradTmp - Yi * sumYDiffError);
+    hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * gradResult[i] - Yi * sumYDiffError);
     diffAlphaD += laplacianTmp;
     Y_build_grad_end = MPI_Wtime();
     Y_field_multi_time += Y_build_grad_end - Y_build_grad_start;
