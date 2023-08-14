@@ -112,7 +112,24 @@ tmp<fvMatrix<Type>>
 gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
+);
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+fvcSurfaceIntegrate
+(
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
+    labelList& face_scheduling
+);
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+fvcSurfaceIntegrate
+(
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
+    labelList& face_scheduling
 );
 
 template<class Type>
@@ -121,7 +138,8 @@ gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name
+    const word& name,
+    labelList& face_scheduling
 );
 
 // fvc::div
@@ -130,21 +148,24 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
+    labelList& face_scheduling
 );
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
+    labelList& face_scheduling
 );
 
 template<class Type>
@@ -157,7 +178,8 @@ tmp
 >
 gaussDivFvcdiv
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 // fvc::grad
@@ -173,7 +195,8 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vsf
+    const GeometricField<Type, fvPatchField, volMesh>& vsf,
+    labelList& face_scheduling
 );
 
 
@@ -192,7 +215,8 @@ tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 template<class Type>
@@ -200,7 +224,8 @@ tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 // fvc::laplacian
@@ -209,7 +234,8 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussLaplacianSchemeFvcLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gamma,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 // turbulence->divDevRhoReff(U)
@@ -241,7 +267,8 @@ GenMatrix_Y(
     const Switch splitting,
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
-    fv::convectionScheme<scalar>& mvConvection
+    fv::convectionScheme<scalar>& mvConvection,
+    labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>

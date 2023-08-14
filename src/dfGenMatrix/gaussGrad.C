@@ -31,8 +31,6 @@ License
 namespace Foam
 {
 
-
-
 template<class Type>
 tmp
 <
@@ -45,10 +43,11 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vsf
+    const GeometricField<Type, fvPatchField, volMesh>& vsf,
+    labelList& face_scheduling
 )
 {
-    return gaussGradSchemeGrad(vsf, "grad(" + vsf.name() + ')');
+    return gaussGradSchemeGrad(vsf, "grad(" + vsf.name() + ')', face_scheduling);
 }
 
 template<class Type>
@@ -64,7 +63,8 @@ tmp
 gaussGradSchemeGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    const word& name
+    const word& name,
+    labelList& face_scheduling
 )
 {
     const fvMesh& mesh = vsf.mesh();
@@ -77,7 +77,7 @@ gaussGradSchemeGrad
         if (!mesh.objectRegistry::template foundObject<GradFieldType>(name))
         {
             solution::cachePrintMessage("Calculating and caching", name, vsf);
-            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name);
+            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name, face_scheduling);
             regIOobject::store(tgGrad.ptr());
         }
 
@@ -99,7 +99,7 @@ gaussGradSchemeGrad
             delete &gGrad;
 
             solution::cachePrintMessage("Recalculating", name, vsf);
-            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name);
+            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name, face_scheduling);
 
             solution::cachePrintMessage("Storing", name, vsf);
             regIOobject::store(tgGrad.ptr());
@@ -131,7 +131,7 @@ gaussGradSchemeGrad
         }
 
         solution::cachePrintMessage("Calculating", name, vsf);
-        return gaussGradCalcGrad(vsf, name);
+        return gaussGradCalcGrad(vsf, name, face_scheduling);
     }
 }
 
@@ -148,78 +148,20 @@ tmp
 gaussGradCalcGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    const word& name
+    const word& name,
+    labelList& face_scheduling
 )
 {
+    double gaussGradCalcGrad_start = MPI_Wtime();
     const fvMesh& mesh = vsf.mesh();
+
+    typedef typename outerProduct<vector, Type>::type GradType;
 
     tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = tmp<surfaceInterpolationScheme<Type>>(new linear<Type>(mesh));
 
-    typedef typename outerProduct<vector, Type>::type GradType;
-
     tmp<GeometricField<Type, fvsPatchField, surfaceMesh>> tinterpolate = tinterpScheme_().interpolate(vsf);
 
-    tmp<GeometricField<GradType, fvPatchField, volMesh>> tgGrad(gaussGradGradf(tinterpolate.ref(), name));
-    GeometricField<GradType, fvPatchField, volMesh>& gGrad = tgGrad.ref();
-
-    gaussGradCorrectBoundaryConditions(vsf, gGrad);
-
-    return tgGrad;
-}
-
-template<class Type>
-void gaussGradCorrectBoundaryConditions
-(
-    const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    GeometricField
-    <
-        typename outerProduct<vector, Type>::type, fvPatchField, volMesh
-    >& gGrad
-)
-{
-    typename GeometricField
-    <
-        typename outerProduct<vector, Type>::type, fvPatchField, volMesh
-    >::Boundary& gGradbf = gGrad.boundaryFieldRef();
-
-    forAll(vsf.boundaryField(), patchi)
-    {
-        if (!vsf.boundaryField()[patchi].coupled())
-        {
-            const vectorField n
-            (
-                vsf.mesh().Sf().boundaryField()[patchi]
-              / vsf.mesh().magSf().boundaryField()[patchi]
-            );
-
-            gGradbf[patchi] += n *
-            (
-                vsf.boundaryField()[patchi].snGrad()
-              - (n & gGradbf[patchi])
-            );
-        }
-     }
-}
-
-template<class Type>
-tmp
-<
-    GeometricField
-    <
-        typename outerProduct<vector, Type>::type,
-        fvPatchField,
-        volMesh
-    >
->
-gaussGradGradf
-(
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
-    const word& name
-)
-{
-    typedef typename outerProduct<vector, Type>::type GradType;
-
-    const fvMesh& mesh = ssf.mesh();
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf = tinterpolate.ref();
 
     tmp<GeometricField<GradType, fvPatchField, volMesh>> tgGrad
     (
@@ -252,12 +194,32 @@ gaussGradGradf
     Field<GradType>& igGrad = gGrad;
     const Field<Type>& issf = ssf;
 
-    forAll(owner, facei)
-    {
-        GradType Sfssf = Sf[facei]*issf[facei];
+    // forAll(owner, facei)
+    // {
+    //     GradType Sfssf = Sf[facei]*issf[facei];
+    //     igGrad[owner[facei]] += Sfssf;
+    //     igGrad[neighbour[facei]] -= Sfssf;
+    // }
 
-        igGrad[owner[facei]] += Sfssf;
-        igGrad[neighbour[facei]] -= Sfssf;
+    #pragma omp parallel for
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            GradType Sfssf = Sf[facei]*issf[facei];
+            igGrad[owner[facei]] += Sfssf;
+            igGrad[neighbour[facei]] -= Sfssf;
+        }
+    }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            GradType Sfssf = Sf[facei]*issf[facei];
+            igGrad[owner[facei]] += Sfssf;
+            igGrad[neighbour[facei]] -= Sfssf;
+        }
     }
 
     forAll(mesh.boundary(), patchi)
@@ -275,13 +237,52 @@ gaussGradGradf
         }
     }
 
-    igGrad /= mesh.V();
+    // igGrad /= mesh.V();
+    #pragma omp parallel for
+    for(label i = 0; i < igGrad.size(); ++i){
+        igGrad[i] /= mesh.V()[i];
+    }
 
     gGrad.correctBoundaryConditions();
 
+    gaussGradCorrectBoundaryConditions(vsf, gGrad);
+
+    double gaussGradCalcGrad_end = MPI_Wtime();
+    double gaussGradCalcGrad_time = gaussGradCalcGrad_end - gaussGradCalcGrad_start;
+    Info << "gaussGradCalcGrad_time : " << gaussGradCalcGrad_time << endl;
     return tgGrad;
 }
 
+template<class Type>
+void gaussGradCorrectBoundaryConditions
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vsf,
+    GeometricField<typename outerProduct<vector, Type>::type, fvPatchField, volMesh>& gGrad
+)
+{
+    typename GeometricField
+    <
+        typename outerProduct<vector, Type>::type, fvPatchField, volMesh
+    >::Boundary& gGradbf = gGrad.boundaryFieldRef();
+
+    forAll(vsf.boundaryField(), patchi)
+    {
+        if (!vsf.boundaryField()[patchi].coupled())
+        {
+            const vectorField n
+            (
+                vsf.mesh().Sf().boundaryField()[patchi]
+              / vsf.mesh().magSf().boundaryField()[patchi]
+            );
+
+            gGradbf[patchi] += n *
+            (
+                vsf.boundaryField()[patchi].snGrad()
+              - (n & gGradbf[patchi])
+            );
+        }
+     }
+}
 
 template
 tmp
@@ -295,7 +296,8 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<scalar, fvPatchField, volMesh>& vsf
+    const GeometricField<scalar, fvPatchField, volMesh>& vsf,
+    labelList& face_scheduling
 );
 
 
@@ -311,7 +313,8 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<vector, fvPatchField, volMesh>& vsf
+    const GeometricField<vector, fvPatchField, volMesh>& vsf,
+    labelList& face_scheduling
 );
 
 } // End namespace Foam

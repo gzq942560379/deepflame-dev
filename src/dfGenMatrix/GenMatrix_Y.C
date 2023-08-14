@@ -18,7 +18,8 @@ GenMatrix_Y(
     const Switch splitting,
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
-    fv::convectionScheme<scalar>& mvConvection
+    fv::convectionScheme<scalar>& mvConvection,
+    labelList& face_scheduling
 ){
     assert(splitting == false);
 
@@ -100,9 +101,7 @@ GenMatrix_Y(
     const scalar* const __restrict__ suFieldVPtr = su.field().begin();
 
 
-    // #pragma omp parallel for
-    // #pragma clang loop unroll_count(4)
-    // #pragma clang loop vectorize(enable)
+    #pragma omp parallel for
     for(label c = 0; c < nCells; ++c){
         diagPtr_ddt[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
         sourcePtr_ddt[c] = rDeltaT * rhoOldTimePtr[c] * YiOldTimePtr[c] * meshVscPtr[c] + meshVPtr[c] * suFieldVPtr[c];
@@ -112,9 +111,7 @@ GenMatrix_Y(
     // fvm_div1.upper() = fvm_div1.lower() + phi.primitiveField();
     // fvm_laplacian.upper() = deltaCoeffs.primitiveField()*gammaMagSf.primitiveField();
     
-    // #pragma omp parallel for
-    // #pragma clang loop unroll_count(4)
-    // #pragma clang loop vectorize(enable)
+    #pragma omp parallel for
     for(label f = 0; f < nFaces; ++f){
         lowerPtr_ddt[f] = - weightsPtr[f] * (phiPtr[f] + phiUcPtr[f]) - deltaCoeffsPtr[f] * gammaMagSfPtr[f];
         // upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]);
@@ -126,10 +123,29 @@ GenMatrix_Y(
     // #pragma clang loop vectorize(enable)
 
     // fvm_laplacian.negSumDiag();
-    for (label face=0; face< nFaces; ++face)
-    {
-        diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
-        diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
+    // for (label face=0; face< nFaces; ++face)
+    // {
+    //     diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
+    //     diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
+    // }
+
+    #pragma omp parallel for
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label face = face_start; face < face_end; ++face){
+            diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
+            diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
+        }
+    }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label face = face_start; face < face_end; ++face){
+            diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
+            diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
+        }
     }
 
     forAll(Yi.boundaryField(), patchi)
@@ -173,9 +189,7 @@ GenMatrix_Y(
 
             // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs(pDeltaCoeffs);
             // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs(pDeltaCoeffs);
-            // #pragma omp parallel for
-            // #pragma clang loop unroll_count(4)
-            // #pragma clang loop vectorize(enable)
+            #pragma omp parallel for
             for(label i = 0; i < internalCoeffs.size(); ++i){
                 internalCoeffsPtr[i] = (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueInternalCoeffsPtr[i] - pGammaPtr[i] * psfGradientInternalCoeffsPtr[i];
                 boundaryCoeffsPtr[i] =  - (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueBoundaryCoeffsPtr[i] + pGammaPtr[i] * psfGradientBoundaryCoeffsPtr[i];
@@ -190,9 +204,7 @@ GenMatrix_Y(
             const scalar* const __restrict__ psfGradientBoundaryCoeffsPtr = psfGradientBoundaryCoeffs->begin();
             // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs();
             // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs();
-            // #pragma omp parallel for
-            // #pragma clang loop unroll_count(4)
-            // #pragma clang loop vectorize(enable)
+            #pragma omp parallel for
             for(label i = 0; i < internalCoeffs.size(); ++i){
                 internalCoeffsPtr[i] = (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueInternalCoeffsPtr[i] - pGammaPtr[i] * psfGradientInternalCoeffsPtr[i];
                 boundaryCoeffsPtr[i] =  - (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueBoundaryCoeffsPtr[i] + pGammaPtr[i] * psfGradientBoundaryCoeffsPtr[i];
@@ -200,49 +212,6 @@ GenMatrix_Y(
         }
     }
 
-    // if (tinterpScheme_().corrected())
-    // {
-    //     Info << "tinterpScheme_().corrected() 1" << endl;
-    //     fvm += fvc::surfaceIntegrate(phi*tinterpScheme_().correction(Yi));
-    // }
-
-    // if (tinterpScheme_().corrected())
-    // {
-    //     Info << "tinterpScheme_().corrected() 2" << endl;
-    //     fvm += fvc::surfaceIntegrate(phiUc*tinterpScheme_().correction(Yi));
-    // }
-
-    // if (tsnGradScheme_().corrected())
-    // {
-    //     Info << "tsnGradScheme_().corrected()" << endl;
-
-    //     if (mesh.fluxRequired(Yi.name()))
-    //     {
-    //         Info << "mesh.fluxRequired(Yi.name())" << endl;
-    //         fvm_laplacian.faceFluxCorrectionPtr() = new
-    //         surfaceScalarField
-    //         (
-    //             gammaMagSf * tsnGradScheme_().correction(Yi)
-    //         );
-
-    //         fvm_laplacian.source() -=
-    //             mesh.V()*
-    //             fvc::div
-    //             (
-    //                 *fvm_laplacian.faceFluxCorrectionPtr()
-    //             )().primitiveField();
-    //     }
-    //     else
-    //     {
-    //         Info << "not mesh.fluxRequired(Yi.name())" << endl;
-    //         fvm_laplacian.source() -=
-    //             mesh.V()*
-    //             fvc::div
-    //             (
-    //                 gammaMagSf*tsnGradScheme_().correction(Yi)
-    //             )().primitiveField();
-    //     }
-    // }
 
     return tfvm;
 }

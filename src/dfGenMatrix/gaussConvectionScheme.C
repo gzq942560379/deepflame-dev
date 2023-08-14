@@ -43,11 +43,10 @@ gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name
+    const word& name,
+    labelList& face_scheduling
 )
 {
-    Info << "gaussConvectionSchemeFvmDiv start" << endl;
-
     const fvMesh& mesh = vf.mesh();
 
     tmp<fv::convectionScheme<Type>> cs = fv::convectionScheme<Type>::New(mesh,faceFlux,mesh.divScheme(name));
@@ -79,9 +78,8 @@ gaussConvectionSchemeFvmDiv
     }
     if (gcs.interpScheme().corrected())
     {
-        fvm += fvc::surfaceIntegrate(faceFlux*gcs.interpScheme().correction(vf));
+        fvm += fvcSurfaceIntegrate(faceFlux*gcs.interpScheme().correction(vf), face_scheduling);
     }
-    Info << "gaussConvectionSchemeFvmDiv end" << endl;
     return tfvm;
 }
 
@@ -90,23 +88,12 @@ tmp<fvMatrix<Type>>
 gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 )
 {
     word name("div("+faceFlux.name()+','+vf.name()+')');
-    return gaussConvectionSchemeFvmDiv(faceFlux,vf,name);
-}
-
-template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh>>
-gaussConvectionSchemeFvcDiv
-(
-    const surfaceScalarField& faceFlux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf
-)
-{
-    word name("div("+faceFlux.name()+','+vf.name()+')');
-    return gaussConvectionSchemeFvcDiv(faceFlux, vf, name);
+    return gaussConvectionSchemeFvmDiv(faceFlux, vf, name, face_scheduling);
 }
 
 template<class Type>
@@ -115,31 +102,33 @@ gaussConvectionSchemeFvcDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name
+    labelList& face_scheduling
 )
 {
-    Info << "gaussConvectionSchemeFvcDiv start" << endl;
-    
+    word name("div("+faceFlux.name()+','+vf.name()+')');
+    return gaussConvectionSchemeFvcDiv(faceFlux, vf, name, face_scheduling);
+}
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+gaussConvectionSchemeFvcDiv
+(
+    const surfaceScalarField& faceFlux,
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const word& name,
+    labelList& face_scheduling
+)
+{
     const fvMesh& mesh = vf.mesh();
 
     Istream& divIntScheme = mesh.divScheme(name);
     word divScheme(divIntScheme);
     
-    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = 
-        surfaceInterpolationScheme<Type>::New(mesh, faceFlux, divIntScheme);
+    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = surfaceInterpolationScheme<Type>::New(mesh, faceFlux, divIntScheme);
 
-    // tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = 
-    // tmp<surfaceInterpolationScheme<Type>>
-    // (
-    //     new linear<Type>(mesh)
-    // );
-
-    
-    // surfaceInterpolationScheme<Type> interpScheme_ = tinterpScheme_.ref();
-    
     tmp<GeometricField<Type, fvPatchField, volMesh>> tConvection
     (
-        fvc::surfaceIntegrate(gaussConvectionSchemeFlux(faceFlux, vf, tinterpScheme_))
+        fvcSurfaceIntegrate(gaussConvectionSchemeFlux(faceFlux, vf, tinterpScheme_), face_scheduling)
     );
 
     tConvection.ref().rename
@@ -154,7 +143,8 @@ template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
+    labelList& face_scheduling
 )
 {
     return tmp<GeometricField<Type, fvPatchField, volMesh>>
@@ -162,7 +152,7 @@ gaussConvectionSchemeFvcDiv
         new GeometricField<Type, fvPatchField, volMesh>
         (
             "div("+ssf.name()+')',
-            fvc::surfaceIntegrate(ssf)
+            fvcSurfaceIntegrate(ssf,face_scheduling)
         )
     );
 }
@@ -171,7 +161,8 @@ template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
+    labelList& face_scheduling
 )
 {
     // const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf = tssf();
@@ -180,7 +171,7 @@ gaussConvectionSchemeFvcDiv
         new GeometricField<Type, fvPatchField, volMesh>
         (
             "div("+tssf->name()+')',
-            fvcSurfaceIntegrate(tssf)
+            fvcSurfaceIntegrate(tssf,face_scheduling)
         )
     );
 }
@@ -194,7 +185,6 @@ gaussConvectionSchemeFlux
     tmp<surfaceInterpolationScheme<Type>> tinterpScheme
 )
 {
-    Info << vf.name() <<tinterpScheme().interpolate(vf) << endl;
     return faceFlux*tinterpScheme().interpolate(vf);
 }
 
@@ -208,25 +198,22 @@ tmp
 >
 gaussDivFvcdiv
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vf
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 )
 {
     const fvMesh& mesh = vf.mesh();
     Istream& divIntScheme = mesh.divScheme("div("+vf.name()+')');
     word divScheme(divIntScheme);
 
-    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = 
-        surfaceInterpolationScheme<Type>::New(mesh, divIntScheme);
+    tmp<surfaceInterpolationScheme<Type>> tinterpScheme_ = surfaceInterpolationScheme<Type>::New(mesh, divIntScheme);
 
-    tmp
-    <
-        GeometricField
-        <typename innerProduct<vector, Type>::type, fvPatchField, volMesh>
-    > tDiv
+    tmp<GeometricField<typename innerProduct<vector, Type>::type, fvPatchField, volMesh>> tDiv
     (
         fvcSurfaceIntegrate
         (
-            tinterpScheme_().dotInterpolate(mesh.Sf(), vf)
+            tinterpScheme_().dotInterpolate(mesh.Sf(), vf),
+            face_scheduling
         )
     );
     
@@ -237,11 +224,22 @@ template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 fvcSurfaceIntegrate
 (
-    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
+    labelList& face_scheduling
 )
 {
-    GeometricField<Type, fvsPatchField, surfaceMesh> ssf = tssf();
+    return fvcSurfaceIntegrate(tssf(), face_scheduling);
+}
 
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh>>
+fvcSurfaceIntegrate
+(
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
+    labelList& face_scheduling
+)
+{
     const fvMesh& mesh = ssf.mesh();
 
     tmp<GeometricField<Type, fvPatchField, volMesh>> tvf
@@ -267,31 +265,36 @@ fvcSurfaceIntegrate
         )
     );
     GeometricField<Type, fvPatchField, volMesh>& vf = tvf.ref();
-
-    fvcSurfaceIntegrate(vf.primitiveFieldRef(), ssf);
-    vf.correctBoundaryConditions();
-
-    return tvf;
-}
-
-template<class Type>
-void fvcSurfaceIntegrate
-(
-    Field<Type>& ivf,
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
-)
-{
-    const fvMesh& mesh = ssf.mesh();
+    Field<Type>& ivf = vf.primitiveFieldRef();
 
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
 
     const Field<Type>& issf = ssf;
 
-    forAll(owner, facei)
-    {
-        ivf[owner[facei]] += issf[facei];
-        ivf[neighbour[facei]] -= issf[facei];
+    // forAll(owner, facei)
+    // {
+    //     ivf[owner[facei]] += issf[facei];
+    //     ivf[neighbour[facei]] -= issf[facei];
+    // }
+
+    #pragma omp parallel for
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            ivf[owner[facei]] += issf[facei];
+            ivf[neighbour[facei]] -= issf[facei];
+        }
+    }
+    #pragma omp parallel for
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for(label facei = face_start; facei < face_end; ++facei){
+            ivf[owner[facei]] += issf[facei];
+            ivf[neighbour[facei]] -= issf[facei];
+        }
     }
 
     forAll(mesh.boundary(), patchi)
@@ -307,10 +310,17 @@ void fvcSurfaceIntegrate
         }
     }
 
-    ivf /= mesh.Vsc();
+    // ivf /= mesh.Vsc();
+    auto meshVsc = mesh.Vsc();
+    #pragma omp parallel for
+    for(label c = 0; c < ivf.size(); ++c){
+        ivf[c] /= meshVsc()[c];
+    }
+
+    vf.correctBoundaryConditions();
+
+    return tvf;
 }
-
-
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -319,7 +329,8 @@ tmp<fvMatrix<scalar>>
 gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<scalar, fvPatchField, volMesh>& vf
+    const GeometricField<scalar, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 template
@@ -327,7 +338,8 @@ tmp<fvMatrix<vector>>
 gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<vector, fvPatchField, volMesh>& vf
+    const GeometricField<vector, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 template
@@ -335,7 +347,8 @@ tmp<GeometricField<scalar, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<scalar, fvPatchField, volMesh>& vf
+    const GeometricField<scalar, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 
@@ -343,7 +356,8 @@ template
 tmp<GeometricField<scalar, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const GeometricField<scalar, fvsPatchField, surfaceMesh>& ssf
+    const GeometricField<scalar, fvsPatchField, surfaceMesh>& ssf,
+    labelList& face_scheduling
 );
 
 template
@@ -356,14 +370,16 @@ tmp
 >
 gaussDivFvcdiv
 (
-    const GeometricField<vector, fvPatchField, volMesh>& vf
+    const GeometricField<vector, fvPatchField, volMesh>& vf,
+    labelList& face_scheduling
 );
 
 template
 tmp<GeometricField<scalar, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const tmp<GeometricField<scalar, fvsPatchField, surfaceMesh>>& tssf
+    const tmp<GeometricField<scalar, fvsPatchField, surfaceMesh>>& tssf,
+    labelList& face_scheduling
 );
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
