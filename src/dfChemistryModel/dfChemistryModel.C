@@ -622,6 +622,7 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         double tick2 = MPI_Wtime();
         correctThermo_part1_2_time += tick2 - tick1;
 
+        // cost
         CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
         double tick3 = MPI_Wtime();
         correctThermo_part1_3_time += tick3 - tick2;
@@ -635,6 +636,7 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         double tick5 = MPI_Wtime();
         correctThermo_part1_5_time += tick5 - tick4;
 
+        // cost
         mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
         double tick6 = MPI_Wtime();
         correctThermo_part1_6_time += tick6 - tick5;

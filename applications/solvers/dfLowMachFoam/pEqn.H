@@ -104,7 +104,6 @@ TICK(p_pre, 11, 12);
 
 p_pre_end = MPI_Wtime();
 p_pre_time += p_pre_end - p_pre_start;
-Info << "p pre Time : " << p_pre_time << endl;
 
 if (pimple.transonic())
 {

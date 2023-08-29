@@ -130,12 +130,8 @@ if (readDict)
     const word dictName("renumberMeshDict");
     #include "setSystemMeshDictionaryIO.H"
 
-    Info<< "Renumber according to " << dictName << nl << endl;
-
     renumberDictPtr.reset(new IOdictionary(dictIO));
     const IOdictionary& renumberDict = renumberDictPtr();
-
-    Info << "renumberDict : " << renumberDict << endl;
 
     renumberPtr = renumberMethod::New(renumberDict);
 

@@ -71,14 +71,11 @@ GenMatrix_E(
     tmp<surfaceScalarField> tweights_he = gcs_he.interpScheme().weights(he);
     const surfaceScalarField& weights_he = tweights_he();    
 
-
     // TODO expancive
     // tmp<surfaceScalarField> tweights_K = surfaceInterpolationScheme_linear().weights(K);
     // tmp<surfaceScalarField> tweights_K = tsurfaceInterpolationScheme_limitedLinear_1().weights(K);
     tmp<surfaceScalarField> tweights_K = gcs_K.interpScheme().weights(K);
     const surfaceScalarField& weights_K = tweights_K();
-
-
 
     tmp<surfaceScalarField> tweightshDiffCorrFlux= surfaceInterpolationScheme_vector_linear().weights(hDiffCorrFlux);
     tmp<surfaceScalarField> tlaplacianWeight = surfaceInterpolationScheme_linear().weights(alphaEff);
