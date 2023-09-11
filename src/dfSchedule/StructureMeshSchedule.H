@@ -34,7 +34,7 @@ public:
 
     virtual ~StructureMeshSchedule(){};
 
-    const labelList& face_scheduling(){return face_scheduling;};
+    const labelList& face_scheduling(){return face_scheduling_;};
     
 };
 

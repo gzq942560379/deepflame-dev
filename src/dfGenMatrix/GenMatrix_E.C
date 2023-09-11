@@ -33,8 +33,7 @@ GenMatrix_E(
     const volScalarField& alphaEff,
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
-    const surfaceScalarField& linear_weights,
-    labelList& face_scheduling
+    const surfaceScalarField& linear_weights
 ){
     const fvMesh& mesh = he.mesh();
     assert(mesh.moving() == false);
@@ -226,6 +225,7 @@ GenMatrix_E(
     //     fvcDiv2Ptr[l[f]] += hDiffCorrFluxf[f];
     //     fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
     // }
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
 
     #pragma omp parallel for
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){

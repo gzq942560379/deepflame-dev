@@ -25,7 +25,7 @@ Y_build_start = MPI_Wtime();
 TICK0(Y_phiUc);
 forAll(Y, i)
 {
-    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * gaussGradSchemeGrad(Y[i], face_scheduling);
+    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * gaussGradSchemeGrad(Y[i]);
     const volVectorField& fvcGradY = tfvcGradY();
     sumYDiffError += fvcGradY;
     gradResult.push_back(fvcGradY);
@@ -98,7 +98,7 @@ forAll(Y, i)
 
     Y_build_laplacian_start = MPI_Wtime();
     // tmp<volScalarField> laplacianTmp = fvc::laplacian(alpha_mul_hai, Yi);
-    tmp<volScalarField> laplacianTmp = gaussLaplacianSchemeFvcLaplacian(alpha_mul_hai, Yi, face_scheduling);
+    tmp<volScalarField> laplacianTmp = gaussLaplacianSchemeFvcLaplacian(alpha_mul_hai, Yi);
 
     Y_build_laplacian_end = MPI_Wtime();
     Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
@@ -135,7 +135,7 @@ forAll(Y, i)
         Y_build_old_time += Y_build_old_end - Y_build_old_start;
 #else
         Y_build_new_start = MPI_Wtime();
-        tmp<fvScalarMatrix> tYiEqn = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref(), face_scheduling);
+        tmp<fvScalarMatrix> tYiEqn = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref());
         fvScalarMatrix& YiEqn = tYiEqn.ref();
         Y_build_new_end = MPI_Wtime();
         Y_build_new_time += Y_build_new_end - Y_build_new_start;

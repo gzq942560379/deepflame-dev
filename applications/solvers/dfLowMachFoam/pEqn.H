@@ -48,7 +48,7 @@ TICK(p_pre, 4, 5);
 
 
 #ifdef OPT_GenMatrix_p
-    tmp<volVectorField> tUEqnH = UEqn_H(UEqn, face_scheduling);
+    tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
 #else
     tmp<volVectorField> tUEqnH = UEqn.H();
 #endif
@@ -203,7 +203,7 @@ else
     p_build_start = MPI_Wtime();
 #ifdef OPT_GenMatrix_p
     p_build_opt_start = MPI_Wtime();
-    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi, face_scheduling);
+    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi);
     fvScalarMatrix pDDtEqn = tpDDtEqn.ref();
     p_build_opt_end = MPI_Wtime();
     p_build_opt_time += p_build_opt_end - p_build_opt_start;

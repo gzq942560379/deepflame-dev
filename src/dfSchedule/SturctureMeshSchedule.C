@@ -1,7 +1,7 @@
 #include "StructureMeshSchedule.H"
 
 void Foam::StructureMeshSchedule::Setup(const fvMesh& mesh){
-    nCells__ = mesh.nCells_();
+    nCells_ = mesh.nCells();
     
     const labelUList& face_ptr = mesh.lduAddr().ownerStartAddr();
     const labelUList& l = mesh.lduAddr().lowerAddr();
@@ -13,8 +13,8 @@ void Foam::StructureMeshSchedule::Setup(const fvMesh& mesh){
     }
 
     x_dim_ = 1;
-    for(size_t i = 1; i < points.size(); ++i){
-        if(std::get<1>(points[i]) == std::get<1>(points[i-1])){
+    for(size_t i = 1; i < points_.size(); ++i){
+        if(std::get<1>(points_[i]) == std::get<1>(points_[i-1])){
             x_dim_ += 1;
         }else{
             break;
@@ -22,8 +22,8 @@ void Foam::StructureMeshSchedule::Setup(const fvMesh& mesh){
     }
 
     y_dim_ = 1;
-    for(size_t i = 1; i < points.size(); ++i){
-        if(std::get<2>(points[i]) == std::get<2>(points[i-1])){
+    for(size_t i = 1; i < points_.size(); ++i){
+        if(std::get<2>(points_[i]) == std::get<2>(points_[i-1])){
             y_dim_ += 1;
         }else{
             break;
@@ -39,7 +39,7 @@ void Foam::StructureMeshSchedule::Setup(const fvMesh& mesh){
     cell_scheduling_[0] = 0;
     face_scheduling_[0] = 0;
 
-    for(label i = 0 ; i < z_count; i++){
+    for(label i = 0 ; i < z_dim_; i++){
         cell_scheduling_[i+1] = cell_scheduling_[i] + (x_dim_ * y_dim_);
         face_scheduling_[i+1] = face_ptr[cell_scheduling_[i+1]];
     }

@@ -47,7 +47,7 @@
     Info << "E_build_org_time = " << E_build_org_end - E_build_org_start << endl;
 #else
     E_build_opt_start = MPI_Wtime();
-    tmp<fvScalarMatrix> tEEqn = GenMatrix_E(rho, he, phi, K, dpdt, turbulence_alphaEff, diffAlphaD, hDiffCorrFlux, linear_weights, face_scheduling);
+    tmp<fvScalarMatrix> tEEqn = GenMatrix_E(rho, he, phi, K, dpdt, turbulence_alphaEff, diffAlphaD, hDiffCorrFlux, linear_weights);
     fvScalarMatrix& EEqn = tEEqn.ref();
     E_build_opt_end = MPI_Wtime();
     Info << "E_build_opt_time = " << E_build_opt_end - E_build_opt_start << endl;

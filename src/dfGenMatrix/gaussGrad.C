@@ -23,6 +23,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
+#include "GenFvMatrix.H"
 #include "gaussGrad.H"
 #include "extrapolatedCalculatedFvPatchField.H"
 
@@ -43,11 +44,10 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vsf
 )
 {
-    return gaussGradSchemeGrad(vsf, "grad(" + vsf.name() + ')', face_scheduling);
+    return gaussGradSchemeGrad(vsf, "grad(" + vsf.name() + ')');
 }
 
 template<class Type>
@@ -63,8 +63,7 @@ tmp
 gaussGradSchemeGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    const word& name,
-    labelList& face_scheduling
+    const word& name
 )
 {
     const fvMesh& mesh = vsf.mesh();
@@ -77,7 +76,7 @@ gaussGradSchemeGrad
         if (!mesh.objectRegistry::template foundObject<GradFieldType>(name))
         {
             solution::cachePrintMessage("Calculating and caching", name, vsf);
-            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name, face_scheduling);
+            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name);
             regIOobject::store(tgGrad.ptr());
         }
 
@@ -99,7 +98,7 @@ gaussGradSchemeGrad
             delete &gGrad;
 
             solution::cachePrintMessage("Recalculating", name, vsf);
-            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name, face_scheduling);
+            tmp<GradFieldType> tgGrad = gaussGradCalcGrad(vsf, name);
 
             solution::cachePrintMessage("Storing", name, vsf);
             regIOobject::store(tgGrad.ptr());
@@ -131,7 +130,7 @@ gaussGradSchemeGrad
         }
 
         solution::cachePrintMessage("Calculating", name, vsf);
-        return gaussGradCalcGrad(vsf, name, face_scheduling);
+        return gaussGradCalcGrad(vsf, name);
     }
 }
 
@@ -148,8 +147,7 @@ tmp
 gaussGradCalcGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    const word& name,
-    labelList& face_scheduling
+    const word& name
 )
 {
     double gaussGradCalcGrad_start = MPI_Wtime();
@@ -200,6 +198,7 @@ gaussGradCalcGrad
     //     igGrad[owner[facei]] += Sfssf;
     //     igGrad[neighbour[facei]] -= Sfssf;
     // }
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
 
     #pragma omp parallel for
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
@@ -296,8 +295,7 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<scalar, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const GeometricField<scalar, fvPatchField, volMesh>& vsf
 );
 
 
@@ -313,8 +311,7 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<vector, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const GeometricField<vector, fvPatchField, volMesh>& vsf
 );
 
 } // End namespace Foam
