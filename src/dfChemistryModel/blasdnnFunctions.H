@@ -68,10 +68,11 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
                 yPre_[i] = Y_[i][cellI];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 NNInputs0[offset + 2 + i] = (yBCT_[i] - Xmu0_[i+2]) / Xstd0_[i+2];
             }
+            NNInputs0[offset + 2 + CanteraGas_->nSpecies()] = 0.; // Y_AR
         }
         #pragma omp for
         for(size_t celli = 0; celli<Cell1.size(); ++celli){
@@ -86,10 +87,11 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
                 yPre_[i] = Y_[i][cellI];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 NNInputs1[offset + 2 + i] = (yBCT_[i] - Xmu1_[i+2]) / Xstd1_[i+2];
             }
+            NNInputs1[offset + 2 + CanteraGas_->nSpecies()] = 0.; // Y_AR
         }
         #pragma omp for
         for(size_t celli = 0; celli<Cell2.size(); ++celli){
@@ -104,10 +106,11 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
                 yPre_[i] = Y_[i][cellI];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies(); i++) // minus 1 for Y_AR
             {
                 NNInputs2[offset + 2 + i] = (yBCT_[i] - Xmu2_[i+2]) / Xstd2_[i+2];
             }
+            NNInputs2[offset + 2 + CanteraGas_->nSpecies()] = 0.; // Y_AR
         }
     }
 
@@ -115,7 +118,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     double prepare_dnn_input_end = MPI_Wtime();
 
     // module inference
-    assert(mixture_.nSpecies() + 2 == 9);
+    assert(mixture_.nSpecies() + 2 == 23);
     int output_dim = mixture_.nSpecies() + 2;
     std::vector<double> results0(Cell0.size() * output_dim);
     std::vector<double> results1(Cell1.size() * output_dim);
@@ -147,20 +150,20 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         {
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
             scalar Yt = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yPre_[i] = Y_[i][Cell0[cellI]];
                 yTmp_[i] = Y_[i][Cell0[cellI]];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)//
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 u_[i] = results0[offset + i + 2]*Ystd0_[i]+Ymu0_[i];
                 yTmp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
                 Yt += yTmp_[i]; // normalization
             }
             Qdot_[Cell0[cellI]] = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yTmp_[i] = yTmp_[i] / Yt;
                 RR_[i][Cell0[cellI]] = (yTmp_[i] - Y_[i][Cell0[cellI]])*rho_[Cell0[cellI]]/1e-6;
@@ -173,20 +176,20 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         {
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
             scalar Yt = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yPre_[i] = Y_[i][Cell1[cellI]];
                 yTmp_[i] = Y_[i][Cell1[cellI]];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
             }
-            for (size_t i=0; i<(CanteraGas_->nSpecies()); i++)//
+            for (size_t i=0; i<(CanteraGas_->nSpecies() - 1); i++) // minus 1 for Y_AR
             {
                 u_[i] = results1[offset + i + 2]*Ystd1_[i]+Ymu1_[i];
                 yTmp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
                 Yt += yTmp_[i];
             }
             Qdot_[Cell1[cellI]] = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yTmp_[i] = yTmp_[i] / Yt;
                 RR_[i][Cell1[cellI]] = (yTmp_[i] - Y_[i][Cell1[cellI]])*rho_[Cell1[cellI]]/1e-6;
@@ -199,20 +202,20 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         {
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
             scalar Yt = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yPre_[i] = Y_[i][Cell2[cellI]];
                 yTmp_[i] = Y_[i][Cell2[cellI]];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
             }
-            for (size_t i=0; i<(CanteraGas_->nSpecies()); i++)//
+            for (size_t i=0; i<(CanteraGas_->nSpecies() - 1); i++) // minus 1 for Y_AR
             {
                 u_[i] = results2[offset + i + 2]*Ystd2_[i]+Ymu2_[i];
                 yTmp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
                 Yt += yTmp_[i];
             }
             Qdot_[Cell2[cellI]] = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yTmp_[i] = yTmp_[i] / Yt;
                 RR_[i][Cell2[cellI]] = (yTmp_[i] - Y_[i][Cell2[cellI]])*rho_[Cell2[cellI]]/1e-6;
