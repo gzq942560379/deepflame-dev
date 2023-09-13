@@ -43,7 +43,9 @@ void Foam::divMatrix::SpMV
     const scalarField& psi
 ) const
 {
+#ifdef __ARM_FEATURE_SVE
     assert(svcntd() == 8);
+#endif
     if(block_count_ > 1){
         if(row_block_size_ == 32){
 #ifdef __ARM_FEATURE_SVE

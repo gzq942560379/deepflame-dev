@@ -18,9 +18,10 @@ DNNInferencer_blas::DNNInferencer_blas() {
     output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[2]));
     output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[3]));
     output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[4]));
+    output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[5]));
 
-    FLOPs_per_sample_ = 2. * (layers_[0] * layers_[1] + layers_[1] * layers_[2] + layers_[2] * layers_[3] + layers_[3] * layers_[4]);
-}
+    FLOPs_per_sample_ = 2. * (layers_[0] * layers_[1] + layers_[1] * layers_[2] + layers_[2] * layers_[3] + layers_[3] * layers_[4] + layers_[4] * layers_[5]);
+}                
 
 DNNInferencer_blas::~DNNInferencer_blas() {
     for(int i = 0;i < model0_.size(); ++i){
@@ -43,17 +44,20 @@ void DNNInferencer_blas::load_models(const std::string dir){
     model0_.push_back(new LinearGELU<float>(layers_[0],layers_[1]));
     model0_.push_back(new LinearGELU<float>(layers_[1],layers_[2]));
     model0_.push_back(new LinearGELU<float>(layers_[2],layers_[3]));
-    model0_.push_back(new Linear<float>(layers_[3],layers_[4]));
+    model0_.push_back(new LinearGELU<float>(layers_[3],layers_[4]));
+    model0_.push_back(new Linear<float>(layers_[4],layers_[5]));
 
     model1_.push_back(new LinearGELU<float>(layers_[0],layers_[1]));
     model1_.push_back(new LinearGELU<float>(layers_[1],layers_[2]));
     model1_.push_back(new LinearGELU<float>(layers_[2],layers_[3]));
-    model1_.push_back(new Linear<float>(layers_[3],layers_[4]));
+    model1_.push_back(new LinearGELU<float>(layers_[3],layers_[4]));
+    model1_.push_back(new Linear<float>(layers_[4],layers_[5]));
     
     model2_.push_back(new LinearGELU<float>(layers_[0],layers_[1]));
     model2_.push_back(new LinearGELU<float>(layers_[1],layers_[2]));
     model2_.push_back(new LinearGELU<float>(layers_[2],layers_[3]));
-    model2_.push_back(new Linear<float>(layers_[3],layers_[4]));
+    model2_.push_back(new LinearGELU<float>(layers_[3],layers_[4]));
+    model2_.push_back(new Linear<float>(layers_[4],layers_[5]));
     // load parameters
     for(int i = 0; i < model0_.size(); ++i){
         model0_[i]->load_parameters(dir+"/0", i);
@@ -86,17 +90,19 @@ void DNNInferencer_blas::Inference_multiDNNs(
             Tensor<float> input_tensor_2({sample_len, layers_[2]}, output_buffer_[1].data());
             Tensor<float> input_tensor_3({sample_len, layers_[3]}, output_buffer_[2].data());
             Tensor<float> input_tensor_4({sample_len, layers_[4]}, output_buffer_[3].data());
+            Tensor<float> input_tensor_5({sample_len, layers_[5]}, output_buffer_[4].data());
 
             model0_[0]->forward(input_tensor_0, input_tensor_1);
             model0_[1]->forward(input_tensor_1, input_tensor_2);
             model0_[2]->forward(input_tensor_2, input_tensor_3);
             model0_[3]->forward(input_tensor_3, input_tensor_4);
+            model0_[4]->forward(input_tensor_4, input_tensor_5);
 
             double* __restrict__ output0_ptr = output0.data() + sample_start * output_dim();
-            const float* const __restrict__ input_tensor_4_ptr = input_tensor_4.data();
+            const float* const __restrict__ input_tensor_5_ptr = input_tensor_5.data();
 
-            for(int i = 0; i < input_tensor_4.element_num(); ++i){
-                output0_ptr[i] = input_tensor_4_ptr[i];
+            for(int i = 0; i < input_tensor_5.element_num(); ++i){
+                output0_ptr[i] = input_tensor_5_ptr[i];
             }
         }
     }
@@ -113,17 +119,19 @@ void DNNInferencer_blas::Inference_multiDNNs(
             Tensor<float> input_tensor_2({sample_len, layers_[2]}, output_buffer_[1].data());
             Tensor<float> input_tensor_3({sample_len, layers_[3]}, output_buffer_[2].data());
             Tensor<float> input_tensor_4({sample_len, layers_[4]}, output_buffer_[3].data());
+            Tensor<float> input_tensor_5({sample_len, layers_[5]}, output_buffer_[4].data());
 
             model1_[0]->forward(input_tensor_0, input_tensor_1);
             model1_[1]->forward(input_tensor_1, input_tensor_2);
             model1_[2]->forward(input_tensor_2, input_tensor_3);
             model1_[3]->forward(input_tensor_3, input_tensor_4);
+            model1_[4]->forward(input_tensor_4, input_tensor_5);
 
             double* __restrict__ output1_ptr = output1.data() + sample_start * output_dim();
-            const float* const __restrict__ input_tensor_4_ptr = input_tensor_4.data();
+            const float* const __restrict__ input_tensor_5_ptr = input_tensor_5.data();
 
-            for(int i = 0; i < input_tensor_4.element_num(); ++i){
-                output1_ptr[i] = input_tensor_4_ptr[i];
+            for(int i = 0; i < input_tensor_5.element_num(); ++i){
+                output1_ptr[i] = input_tensor_5_ptr[i];
             }
         }
     }
@@ -140,17 +148,19 @@ void DNNInferencer_blas::Inference_multiDNNs(
             Tensor<float> input_tensor_2({sample_len, layers_[2]}, output_buffer_[1].data());
             Tensor<float> input_tensor_3({sample_len, layers_[3]}, output_buffer_[2].data());
             Tensor<float> input_tensor_4({sample_len, layers_[4]}, output_buffer_[3].data());
+            Tensor<float> input_tensor_5({sample_len, layers_[5]}, output_buffer_[4].data());
 
             model2_[0]->forward(input_tensor_0, input_tensor_1);
             model2_[1]->forward(input_tensor_1, input_tensor_2);
             model2_[2]->forward(input_tensor_2, input_tensor_3);
             model2_[3]->forward(input_tensor_3, input_tensor_4);
+            model2_[4]->forward(input_tensor_4, input_tensor_5);
 
             double* __restrict__ output2_ptr = output2.data() + sample_start * output_dim();
-            const float* const __restrict__ input_tensor_4_ptr = input_tensor_4.data();
+            const float* const __restrict__ input_tensor_5_ptr = input_tensor_5.data();
 
-            for(int i = 0; i < input_tensor_4.element_num(); ++i){
-                output2_ptr[i] = input_tensor_4_ptr[i];
+            for(int i = 0; i < input_tensor_5.element_num(); ++i){
+                output2_ptr[i] = input_tensor_5_ptr[i];
             }
         }
     }
@@ -165,7 +175,10 @@ void DNNInferencer_blas::Inference_multiDNNs(
     double peak = TFLOPS * 100. / theoretical_peak;
 
     int mpirank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+
+    if(flag_mpi_init) MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
 
     if(mpirank == 0){
         std::cout << "Inference Performance ---------------" << std::endl;
