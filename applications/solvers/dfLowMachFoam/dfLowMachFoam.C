@@ -386,7 +386,7 @@ int main(int argc, char *argv[])
                 Info<< "chemistry->correct end" << nl << endl;
             }
 
-            // Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
+            Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
 
             // --- Pressure corrector loop
 
