@@ -29,6 +29,7 @@ License
 #include "runtime_assert.H"
 #include <omp.h>
 #include <mpi.h>
+#include <yaml-cpp/yaml.h>
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -113,7 +114,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         scalar(0.0)
     )
 {
-
 #if defined USE_LIBTORCH || defined USE_PYTORCH
     useDNN = true;
     if (!Qdot_.typeHeaderOk<volScalarField>())
@@ -295,148 +295,76 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     {
         hc_[i] = CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
     }
+
     // set normalization parameters
-#if defined USE_TENSORFLOW || defined USE_BLASDNN
-    Xmu0_ = {956.4666683951323,
-                              1.2621251609602075,
-                              -8.482865855078037,
-                              -8.60195200775564,
-                              -7.5687249938092975,
-                              -8.739604352829021,
-                              -3.0365348658864555,
-                              -4.044646973729736,
-                              -0.12868046894653598};
-    Xstd0_ = {144.56082979138094,
-                               0.4316114858005481,
-                               1.3421800304159297,
-                               1.3271564927376922,
-                               1.964747648182199,
-                               1.1993472911833807,
-                               1.2594695379275647,
-                               1.3518816605077604,
-                               0.17392016053354714};
-    Ymu0_ = {8901.112679962635,
-                              27135.624769093312,
-                              30141.97503208172,
-                              24712.755148584696,
-                              -372.9651472886253,
-                              -493.34322699725413,
-                              -4.31138850114707e-12};
-    Ystd0_ = {8901.112679962635,
-                               27135.624769093312,
-                               30141.97503208172,
-                               24712.755148584696,
-                               372.96514728862553,
-                               493.3432269972544,
-                               9.409165181242247e-11};
-    Xmu1_ = {1933.118541482812,
-                              1.2327983023706526,
-                              -5.705591538151852,
-                              -6.446971251373195,
-                              -4.169802387800032,
-                              -6.1200334699867165,
-                              -4.266343396329115,
-                              -2.6007437468608616,
-                              -0.4049762774428252};
-    Xstd1_ = {716.6568054751183,
-                               0.43268544913281914,
-                               2.0857655247141387,
-                               2.168997234412133,
-                               2.707064105162402,
-                               2.2681157746245897,
-                               2.221785173612795,
-                               1.5510851480805254,
-                               0.30283229364455927};
-    Ymu1_ = {175072.98234441387,
-                              125434.41067566245,
-                              285397.9376620931,
-                              172924.8443087139,
-                              -97451.53428068386,
-                              -7160.953630852251,
-                              -9.791262408691773e-10};
-    Ystd1_ = {179830.51132577812,
-                               256152.83860126554,
-                               285811.9455262339,
-                               263600.5448448552,
-                               98110.53711881173,
-                               11752.979335965118,
-                               4.0735353885293555e-09};
-    Xmu2_ = {2717.141719004927,
-                              1.2871371577864235,
-                              -5.240181052513087,
-                              -4.8947914078286345,
-                              -3.117070179161789,
-                              -4.346362771443917,
-                              -4.657258124450032,
-                              -4.537442872141596,
-                              -0.11656950757756744};
-    Xstd2_ = {141.48030419772115,
-                               0.4281422992061657,
-                               0.6561518672685264,
-                               0.9820405777881894,
-                               1.0442969662425572,
-                               0.7554583907448359,
-                               1.7144519099198097,
-                               1.1299391466695952,
-                               0.15743252221610685};
-    Ymu2_ = {-611.0636921032669,
-                              -915.1244682112174,
-                              519.5930550881994,
-                              -11.949500174512165,
-                              -2660.9187297995336,
-                              159.56360614662788,
-                              -7.136459430073843e-11};
-    Ystd2_ = {611.0636921032669,
-                               915.1244682112174,
-                               519.5930550881994,
-                               342.3100987934528,
-                               2754.8463649064784,
-                               313.3717647966624,
-                               2.463374792192512e-10};
 
-
+#ifdef USE_BLASDNN
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     useDNN = true;
     if (!Qdot_.typeHeaderOk<volScalarField>())
     {
         useDNN = false;
     }
-#endif
-
-
-#ifdef USE_TENSORFLOW
-    if(torchSwitch_){
-        tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
-        tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
-        tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
-
-        std::ifstream input_file0(tfModelPath0_, std::ios::binary);
-        std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
-        std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
-        std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
-        input_file0.close();
-
-        std::ifstream input_file1(tfModelPath1_, std::ios::binary);
-        std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
-        std::cout<<"model_data1 = "<<model_data0.size()<<std::endl;
-        input_file1.close();
-
-        std::ifstream input_file2(tfModelPath2_, std::ios::binary);
-        std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
-        std::cout<<"model_data2 = "<<model_data0.size()<<std::endl;
-        input_file2.close();
-
-        DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
-        DNNInferencertf_ = DNNInferencertf;
-    }
-#endif
-
-#ifdef USE_BLASDNN
+    
     if(torchSwitch_){
         BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
         DNNInferencer_blas_.load_models(BLASDNNModelPath_);
         // DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
     }
+
+    YAML::Node norm = YAML::LoadFile(BLASDNNModelPath_ + "/norm.yaml");
+
+    YAML::Node Xmu0Node = norm["Xmu0"];
+    for (size_t i = 0; i < Xmu0Node.size(); i++){
+        Xmu0_.push_back(Xmu0Node[i].as<double>());
+    }
+    YAML::Node Xstd0Node = norm["Xstd0"];
+    for (size_t i = 0; i < Xstd0Node.size(); i++){
+        Xstd0_.push_back(Xstd0Node[i].as<double>());
+    }
+    YAML::Node Ymu0Node = norm["Ymu0"];
+    for (size_t i = 0; i < Ymu0Node.size(); i++){
+        Ymu0_.push_back(Ymu0Node[i].as<double>());
+    }
+    YAML::Node Ystd0Node = norm["Ystd0"];
+    for (size_t i = 0; i < Ystd0Node.size(); i++){
+        Ystd0_.push_back(Ystd0Node[i].as<double>());
+    }
+
+    YAML::Node Xmu1Node = norm["Xmu1"];
+    for (size_t i = 0; i < Xmu1Node.size(); i++){
+        Xmu1_.push_back(Xmu1Node[i].as<double>());
+    }
+    YAML::Node Xstd1Node = norm["Xstd1"];
+    for (size_t i = 0; i < Xstd1Node.size(); i++){
+        Xstd1_.push_back(Xstd1Node[i].as<double>());
+    }
+    YAML::Node Ymu1Node = norm["Ymu1"];
+    for (size_t i = 0; i < Ymu1Node.size(); i++){
+        Ymu1_.push_back(Ymu1Node[i].as<double>());
+    }
+    YAML::Node Ystd1Node = norm["Ystd1"];
+    for (size_t i = 0; i < Ystd1Node.size(); i++){
+        Ystd1_.push_back(Ystd1Node[i].as<double>());
+    }
+
+    YAML::Node Xmu2Node = norm["Xmu2"];
+    for (size_t i = 0; i < Xmu2Node.size(); i++){
+        Xmu2_.push_back(Xmu2Node[i].as<double>());
+    }
+    YAML::Node Xstd2Node = norm["Xstd2"];
+    for (size_t i = 0; i < Xstd2Node.size(); i++){
+        Xstd2_.push_back(Xstd2Node[i].as<double>());
+    }
+    YAML::Node Ymu2Node = norm["Ymu2"];
+    for (size_t i = 0; i < Ymu2Node.size(); i++){
+        Ymu2_.push_back(Ymu2Node[i].as<double>());
+    }
+    YAML::Node Ystd2Node = norm["Ystd2"];
+    for (size_t i = 0; i < Ystd2Node.size(); i++){
+        Ystd2_.push_back(Ystd2Node[i].as<double>());
+    }
+
 #endif
 }
 
@@ -467,23 +395,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve
         if (useDNN)
         {
             result = solve_DNN(deltaT);
-        }
-        else
-        {
-            result = solve_CVODE(deltaT);
-            useDNN = true;
-        }
-    }
-    else
-    {
-        result = solve_CVODE(deltaT);
-    }
-#elif defined(USE_TENSORFLOW)
-    if(torchSwitch_)
-    {
-        if (useDNN)
-        {
-            result = solve_DNN_tf(deltaT);
         }
         else
         {
@@ -1061,10 +972,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
     Info<<"=== end solve_CVODE === "<<endl;
     return updateReactionRates(incomingSolutions, List);
 }
-
-#ifdef USE_TENSORFLOW
-#include "tensorflowFunctions.H"
-#endif
 
 #ifdef USE_BLASDNN
 #include "blasdnnFunctions.H"
