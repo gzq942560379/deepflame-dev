@@ -30,6 +30,7 @@ License
 #include <omp.h>
 #include <mpi.h>
 #include <yaml-cpp/yaml.h>
+#include "PstreamGlobals.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -305,17 +306,51 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     {
         useDNN = false;
     }
-    
     if(torchSwitch_){
         BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
         DNNInferencer_blas_.load_models(BLASDNNModelPath_);
-        // DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
     }
 
-    YAML::Node norm = YAML::LoadFile(BLASDNNModelPath_ + "/norm.yaml");
+    int mpisize, mpirank;
+    MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+    MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
 
+    int count;
+    std::string norm_str;
+    char* buffer;
+
+    if (mpirank == 0){
+        std::ifstream fin(BLASDNNModelPath_ + "/norm.yaml");
+        if (!fin) {
+            SeriousError << "open norm error , norm path : " << BLASDNNModelPath_ + "/norm.yaml" << endl;
+            MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+        }
+        std::ostringstream oss;
+        oss << fin.rdbuf();
+        norm_str = oss.str();
+        count = norm_str.size();
+        fin.close();
+        buffer = new char[count];
+        std::copy(norm_str.begin(), norm_str.end(), buffer);
+    }
+
+    MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    if (mpirank != 0){
+        buffer = new char[count];
+    }
+
+    MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    if (mpirank != 0){
+        norm_str = std::string(buffer, count);
+    }
+    delete[] buffer;
+
+    YAML::Node norm = YAML::Load(norm_str);
     YAML::Node Xmu0Node = norm["Xmu0"];
     for (size_t i = 0; i < Xmu0Node.size(); i++){
+
         Xmu0_.push_back(Xmu0Node[i].as<double>());
     }
     YAML::Node Xstd0Node = norm["Xstd0"];
@@ -330,7 +365,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     for (size_t i = 0; i < Ystd0Node.size(); i++){
         Ystd0_.push_back(Ystd0Node[i].as<double>());
     }
-
     YAML::Node Xmu1Node = norm["Xmu1"];
     for (size_t i = 0; i < Xmu1Node.size(); i++){
         Xmu1_.push_back(Xmu1Node[i].as<double>());
@@ -347,7 +381,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     for (size_t i = 0; i < Ystd1Node.size(); i++){
         Ystd1_.push_back(Ystd1Node[i].as<double>());
     }
-
     YAML::Node Xmu2Node = norm["Xmu2"];
     for (size_t i = 0; i < Xmu2Node.size(); i++){
         Xmu2_.push_back(Xmu2Node[i].as<double>());

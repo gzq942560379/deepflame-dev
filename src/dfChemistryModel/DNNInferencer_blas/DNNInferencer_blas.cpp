@@ -32,10 +32,53 @@ DNNInferencer_blas::~DNNInferencer_blas() {
 
 
 void DNNInferencer_blas::load_models(const std::string dir){
+    // mpi 
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+
+    int32_t count;
+    char* buffer;
+    std::string setting0_str;
+
+    if(mpirank == 0){
+        std::ifstream fin(dir + "/0/setting.yaml");
+        if (!fin) {
+            std::cerr << "open setting file error , setting path : " << dir + "/0/setting.yaml" << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        std::ostringstream oss;
+        oss << fin.rdbuf();
+        fin.close();
+        setting0_str = oss.str();
+        count = setting0_str.size();
+        buffer = new char[count];
+        std::copy(setting0_str.begin(), setting0_str.end(), buffer);
+    }
+
+    MPI_Bcast(&count, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if(mpirank != 0){
+        buffer = new char[count];
+    }
+
+    MPI_Bcast(buffer, count, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+    if(mpirank != 0){
+        setting0_str = std::string(buffer, count);
+    }
+
+    delete[] buffer;
+
     // init model
-    YAML::Node setting0 = YAML::LoadFile(dir + "/0/setting.yaml");
-    YAML::Node setting1 = YAML::LoadFile(dir + "/1/setting.yaml");
-    YAML::Node setting2 = YAML::LoadFile(dir + "/2/setting.yaml");
+    YAML::Node setting0 = YAML::Load(setting0_str);
     YAML::Node layersNode0 = setting0["layers"];
     for(size_t i = 0; i < layersNode0.size(); ++i){
         layers_.push_back(layersNode0[i].as<int64_t>());
@@ -44,8 +87,8 @@ void DNNInferencer_blas::load_models(const std::string dir){
     YAML::Node modelNode0 = setting0["model"];
     for(size_t i = 0; i < modelNode0.size(); ++i){
         std::string layerType = modelNode0[i]["layer"]["type"].as<std::string>();
-        std::string weight_path = modelNode0[i]["layer"]["weight_path"].as<std::string>();
-        std::string bias_path = modelNode0[i]["layer"]["bias_path"].as<std::string>();
+        // std::string weight_path = modelNode0[i]["layer"]["weight_path"].as<std::string>();
+        // std::string bias_path = modelNode0[i]["layer"]["bias_path"].as<std::string>();
         int64_t in_features = modelNode0[i]["layer"]["in_features"].as<int64_t>();
         int64_t out_features = modelNode0[i]["layer"]["out_features"].as<int64_t>();
         if(layerType == "LinearGELU"){
@@ -57,11 +100,11 @@ void DNNInferencer_blas::load_models(const std::string dir){
         }
     }
 
-    YAML::Node modelNode1 = setting1["model"];
+    YAML::Node modelNode1 = setting0["model"];
     for(size_t i = 0; i < modelNode1.size(); ++i){
         std::string layerType = modelNode1[i]["layer"]["type"].as<std::string>();
-        std::string weight_path = modelNode1[i]["layer"]["weight_path"].as<std::string>();
-        std::string bias_path = modelNode1[i]["layer"]["bias_path"].as<std::string>();
+        // std::string weight_path = modelNode1[i]["layer"]["weight_path"].as<std::string>();
+        // std::string bias_path = modelNode1[i]["layer"]["bias_path"].as<std::string>();
         int64_t in_features = modelNode1[i]["layer"]["in_features"].as<int64_t>();
         int64_t out_features = modelNode1[i]["layer"]["out_features"].as<int64_t>();
         if(layerType == "LinearGELU"){
@@ -73,11 +116,11 @@ void DNNInferencer_blas::load_models(const std::string dir){
         }
     }
     
-    YAML::Node modelNode2 = setting2["model"];
+    YAML::Node modelNode2 = setting0["model"];
     for(size_t i = 0; i < modelNode2.size(); ++i){
         std::string layerType = modelNode2[i]["layer"]["type"].as<std::string>();
-        std::string weight_path = modelNode2[i]["layer"]["weight_path"].as<std::string>();
-        std::string bias_path = modelNode2[i]["layer"]["bias_path"].as<std::string>();
+        // std::string weight_path = modelNode2[i]["layer"]["weight_path"].as<std::string>();
+        // std::string bias_path = modelNode2[i]["layer"]["bias_path"].as<std::string>();
         int64_t in_features = modelNode2[i]["layer"]["in_features"].as<int64_t>();
         int64_t out_features = modelNode2[i]["layer"]["out_features"].as<int64_t>();
         if(layerType == "LinearGELU"){
@@ -113,10 +156,6 @@ void DNNInferencer_blas::Inference_multiDNNs(
     const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
     const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2
 ){
-    std::cout << "input_count0 : " << input_count0 << std::endl;
-    std::cout << "input_count1 : " << input_count1 << std::endl;
-    std::cout << "input_count2 : " << input_count2 << std::endl;
-
     double dnn_infer_start = MPI_Wtime();
 
     if(input_count0 > 0){

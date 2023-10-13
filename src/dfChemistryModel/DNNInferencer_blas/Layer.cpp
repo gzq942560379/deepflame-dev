@@ -5,6 +5,7 @@
 #include <fstream>
 #include <cassert>
 #include <iostream>
+#include <mpi.h>
     
 #ifdef __cplusplus
 extern "C" {
@@ -49,56 +50,86 @@ void Linear<float>::forward(const Tensor<float>& input, Tensor<float>& output){
 
 template<>
 void Linear<float>::load_parameters(const std::string& dir, int64_t layer_id){
-    std::stringstream ss1,ss2;
-    ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
-    std::string weights_path = ss1.str();
-    ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
-    std::string bias_path = ss2.str();
-
-    // weights
-    std::ifstream weights_file(weights_path, std::ios::binary);
-    if(!weights_file.is_open()){
-        std::cerr << "open weights file error : " << weights_path << std::endl << std::flush;
-        abort();
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    weights_file.read(reinterpret_cast<char*>(weights_.data()), weights_.bytes_num());
-    weights_file.close();
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
 
-    // bias
-    std::ifstream bias_file(bias_path, std::ios::binary);
-    if(!bias_file.is_open()){
-        std::cerr << "open bias file error : " << bias_path << std::endl << std::flush;
-        abort();
+    if(mpirank == 0){
+        std::stringstream ss1,ss2;
+        ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
+        std::string weights_path = ss1.str();
+        ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
+        std::string bias_path = ss2.str();
+        // weights
+        std::ifstream weights_file(weights_path, std::ios::binary);
+        if(!weights_file.is_open()){
+            std::cerr << "open weights file error : " << weights_path << std::endl << std::flush;
+            abort();
+        }
+        weights_file.read(reinterpret_cast<char*>(weights_.data()), weights_.bytes_num());
+        weights_file.close();
+        // bias
+        std::ifstream bias_file(bias_path, std::ios::binary);
+        if(!bias_file.is_open()){
+            std::cerr << "open bias file error : " << bias_path << std::endl << std::flush;
+            abort();
+        }
+        bias_file.read(reinterpret_cast<char*>(bias_.data()), bias_.bytes_num());
+        bias_file.close();
     }
-    bias_file.read(reinterpret_cast<char*>(bias_.data()), bias_.bytes_num());
-    bias_file.close();
+
+    MPI_Bcast(weights_.data(), weights_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(bias_.data(), bias_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
 }
 
 template<>
 void LinearGELU<float>::load_parameters(const std::string& dir, int64_t layer_id){
-    std::stringstream ss1,ss2;
-    ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
-    std::string weights_path = ss1.str();
-    ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
-    std::string bias_path = ss2.str();
-    
-    // weights
-    std::ifstream weights_file(weights_path, std::ios::binary);
-    if(!weights_file.is_open()){
-        std::cerr << "open weights file error : " << weights_path << std::endl << std::flush;
-        abort();
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    weights_file.read(reinterpret_cast<char*>(weights_.data()), weights_.bytes_num());
-    weights_file.close();
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
 
-    // bias
-    std::ifstream bias_file(bias_path, std::ios::binary);
-    if(!bias_file.is_open()){
-        std::cerr << "open bias file error : " << bias_path << std::endl << std::flush;
-        abort();
+    if(mpirank == 0){
+        std::stringstream ss1,ss2;
+        ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
+        std::string weights_path = ss1.str();
+        ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
+        std::string bias_path = ss2.str();
+        
+        // weights
+        std::ifstream weights_file(weights_path, std::ios::binary);
+        if(!weights_file.is_open()){
+            std::cerr << "open weights file error : " << weights_path << std::endl << std::flush;
+            abort();
+        }
+        weights_file.read(reinterpret_cast<char*>(weights_.data()), weights_.bytes_num());
+        weights_file.close();
+
+        // bias
+        std::ifstream bias_file(bias_path, std::ios::binary);
+        if(!bias_file.is_open()){
+            std::cerr << "open bias file error : " << bias_path << std::endl << std::flush;
+            abort();
+        }
+        bias_file.read(reinterpret_cast<char*>(bias_.data()), bias_.bytes_num());
+        bias_file.close();
     }
-    bias_file.read(reinterpret_cast<char*>(bias_.data()), bias_.bytes_num());
-    bias_file.close();
+
+    MPI_Bcast(weights_.data(), weights_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(bias_.data(), bias_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
 }
 
 
