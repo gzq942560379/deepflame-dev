@@ -25,8 +25,7 @@ template<class Type>
 Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<Type>& UEqn,
-    const labelList& face_scheduling
+    fvMatrix<Type>& UEqn
 )
 {
     TICK0(UEqn_H);
@@ -98,6 +97,9 @@ UEqn_H
     //     HpsiPtr[uPtr[face]] -= lowerPtr[face]*psiPtr[lPtr[face]];
     //     HpsiPtr[lPtr[face]] -= upperPtr[face]*psiPtr[uPtr[face]];
     // }
+
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
+
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
@@ -447,8 +449,7 @@ GenMatrix_p(
     volScalarField& p,
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
-    const volScalarField& psi,
-    const labelList& face_scheduling
+    const volScalarField& psi
 )
 {
     TICK0(GenMatrix_p);
@@ -519,6 +520,7 @@ GenMatrix_p(
     //     fvcDivPtr[l[f]] += phiHbyAPtr[f];
     //     fvcDivPtr[u[f]] -= phiHbyAPtr[f];
     // }
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
 
 #ifdef _OPENMP
     #pragma omp parallel for
@@ -612,8 +614,7 @@ template
 Foam::tmp<Foam::GeometricField<vector, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<vector>& UEqn,
-    const labelList& face_scheduling
+    fvMatrix<vector>& UEqn
 );
 
 }

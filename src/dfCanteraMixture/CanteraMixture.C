@@ -192,7 +192,6 @@ void Foam::CanteraMixture::buildCanteraSolution(){
     // assert(CanteraMechanismFile_ end with .yaml);
 
     int32_t count;
-
     char* buffer;    
     std::string CanteraMechanism;
 
@@ -212,6 +211,7 @@ void Foam::CanteraMixture::buildCanteraSolution(){
         count = CanteraMechanism.size();
         buffer = new char[count];
         std::copy(CanteraMechanism.begin(), CanteraMechanism.end(), buffer);
+        fin.close();
     }
 
     MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
@@ -226,7 +226,7 @@ void Foam::CanteraMixture::buildCanteraSolution(){
         CanteraMechanism = string(buffer, count);
     }
 
-    delete buffer;
+    delete[] buffer;
 
     // std::cout << CanteraMechanism << std::endl;
 

@@ -72,11 +72,7 @@ SourceFiles
 #include "OFstream.H"
 #include "IOmanip.H"
 #include "PstreamGlobals.H"
-// tensorflow
-#ifdef USE_TENSORFLOW
-#include "DNNInferencertf.H"
-#endif
-// blas
+// blasdnn
 #ifdef USE_BLASDNN
 #include "DNNInferencer_blas.H"
 #endif
@@ -137,14 +133,14 @@ public IOdictionary
         // DNN selection fields
         volScalarField selectDNN_;
 
-#if defined USE_TENSORFLOW || defined USE_BLASDNN
+#if defined(USE_BLASDNN)
         std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
                             Xmu1_, Xstd1_, Ymu1_, Ystd1_,
                             Xmu2_, Xstd2_, Ymu2_, Ystd2_;
 
 #endif
 
-#if defined USE_LIBTORCH || defined USE_PYTORCH || defined USE_TENSORFLOW || defined USE_BLASDNN
+#if defined USE_LIBTORCH || defined USE_PYTORCH || defined USE_BLASDNN
         bool useDNN;
         Switch torchSwitch_;
         Switch gpu_;
@@ -174,14 +170,6 @@ public IOdictionary
         word torchModelName1_;
         word torchModelName2_;
         word torchModelName3_;
-#endif
-
-#ifdef USE_TENSORFLOW
-        // tensorflow
-        DNNInferencertf DNNInferencertf_;
-        string tfModelPath0_;
-        string tfModelPath1_;
-        string tfModelPath2_;
 #endif
 
 #ifdef USE_BLASDNN
@@ -249,11 +237,6 @@ public IOdictionary
         //- Solve the reaction system with DLB algorithm
         template<class DeltaTType>
         scalar solve_CVODE(const DeltaTType& deltaT);
-
-#ifdef USE_TENSORFLOW
-        template<class DeltaTType>
-        scalar solve_DNN_tf(const DeltaTType& deltaT);
-#endif
 
 #ifdef USE_BLASDNN
         template<class DeltaTType>

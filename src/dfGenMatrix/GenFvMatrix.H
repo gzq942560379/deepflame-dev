@@ -11,8 +11,9 @@
 #include "turbulentFluidThermoModel.H"
 #include "CombustionModel.H"
 #include <mpi.h>
-#include <algorithm>
-#include "PstreamGlobals.H"
+// #include <algorithm>
+// #include "PstreamGlobals.H"
+#include "StructureMeshSchedule.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -78,8 +79,7 @@ template<class Type>
 Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
-    fvMatrix<Type>& UEqn,
-    const labelList& face_scheduling
+    fvMatrix<Type>& UEqn
 );
 
 tmp<volScalarField>
@@ -112,24 +112,21 @@ tmp<fvMatrix<Type>>
 gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 fvcSurfaceIntegrate
 (
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
 );
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 fvcSurfaceIntegrate
 (
-    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
-    const labelList& face_scheduling
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
 );
 
 template<class Type>
@@ -138,8 +135,7 @@ gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const word& name,
-    const labelList& face_scheduling
+    const word& name
 );
 
 // fvc::div
@@ -148,24 +144,21 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
     const surfaceScalarField& faceFlux,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf
 );
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
-    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
-    const labelList& face_scheduling
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf
 );
 
 template<class Type>
@@ -178,8 +171,7 @@ tmp
 >
 gaussDivFvcdiv
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 // fvc::grad
@@ -195,8 +187,7 @@ tmp
 >
 gaussGradSchemeGrad
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vsf
 );
 
 
@@ -215,8 +206,7 @@ tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 template<class Type>
@@ -224,8 +214,7 @@ tmp<fvMatrix<Type>>
 gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 // fvc::laplacian
@@ -234,8 +223,7 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussLaplacianSchemeFvcLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gamma,
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const labelList& face_scheduling
+    const GeometricField<Type, fvPatchField, volMesh>& vf
 );
 
 // turbulence->divDevRhoReff(U)
@@ -252,8 +240,7 @@ GenMatrix_U(
     volVectorField& U,
     const surfaceScalarField& phi,
     const volScalarField& p, 
-    compressible::turbulenceModel& turbulence,
-    const labelList& face_scheduling
+    compressible::turbulenceModel& turbulence
 );
 
 tmp<fvScalarMatrix>
@@ -267,8 +254,7 @@ GenMatrix_Y(
     const Switch splitting,
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
-    fv::convectionScheme<scalar>& mvConvection,
-    const labelList& face_scheduling
+    fv::convectionScheme<scalar>& mvConvection
 );
 
 tmp<fvScalarMatrix>
@@ -281,8 +267,7 @@ GenMatrix_E(
     const volScalarField& alphaEff,
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
-    const surfaceScalarField& linear_weights,
-    const labelList& face_scheduling
+    const surfaceScalarField& linear_weights
 );
 
 tmp<fvScalarMatrix>
@@ -291,8 +276,7 @@ GenMatrix_p(
     volScalarField& p,
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
-    const volScalarField& phi,
-    const labelList& face_scheduling
+    const volScalarField& phi
 );
 
 

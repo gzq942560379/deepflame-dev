@@ -51,18 +51,14 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     std::vector<float> NNInputs1(Cell1.size() * input_dim);
     std::vector<float> NNInputs2(Cell2.size() * input_dim);
 
-#ifdef _OPENMP
     #pragma omp parallel
-#endif
     {
         scalarList yPre_(mixture_.nSpecies());
         scalarList yBCT_(mixture_.nSpecies());
         scalarList yTmp_(mixture_.nSpecies());
         scalarList u_(mixture_.nSpecies());
         // get problems
-#ifdef _OPENMP
         #pragma omp for
-#endif
         for(size_t celli = 0; celli<Cell0.size(); ++celli){
             size_t cellI = Cell0[celli];
 
@@ -82,9 +78,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             }
             NNInputs0[offset + 2 + CanteraGas_->nSpecies()] = 0.; // Y_AR
         }
-#ifdef _OPENMP
         #pragma omp for
-#endif
         for(size_t celli = 0; celli<Cell1.size(); ++celli){
             size_t cellI = Cell1[celli];
             scalar Ti = T_[cellI];
@@ -103,9 +97,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             }
             NNInputs1[offset + 2 + CanteraGas_->nSpecies()] = 0.; // Y_AR
         }
-#ifdef _OPENMP
         #pragma omp for
-#endif
         for(size_t celli = 0; celli<Cell2.size(); ++celli){
             size_t cellI = Cell2[celli];
             scalar Ti = T_[cellI];
@@ -149,18 +141,14 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     double update_start = MPI_Wtime();
 
     // update Q & RR
-#ifdef _OPENMP
     #pragma omp parallel
-#endif
     {
         scalarList yPre_(mixture_.nSpecies());
         scalarList yBCT_(mixture_.nSpecies());
         scalarList yTmp_(mixture_.nSpecies());
         scalarList u_(mixture_.nSpecies());
         // - NN0
-#ifdef _OPENMP
         #pragma omp for
-#endif
         for(size_t cellI = 0; cellI<Cell0.size(); cellI ++)
         {
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
@@ -186,9 +174,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             }
         }
         // - NN1
-#ifdef _OPENMP
         #pragma omp for
-#endif
         for(size_t cellI = 0; cellI<Cell1.size(); cellI ++)
         {
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
@@ -214,9 +200,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             }
         }
         // - NN2
-#ifdef _OPENMP
         #pragma omp for
-#endif
         for(size_t cellI = 0; cellI<Cell2.size(); cellI ++)
         {
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);

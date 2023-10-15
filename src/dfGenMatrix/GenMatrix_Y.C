@@ -18,8 +18,7 @@ GenMatrix_Y(
     const Switch splitting,
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
-    fv::convectionScheme<scalar>& mvConvection,
-    const labelList& face_scheduling
+    fv::convectionScheme<scalar>& mvConvection
 ){
     assert(splitting == false);
 
@@ -133,6 +132,7 @@ GenMatrix_Y(
     //     diagPtr_ddt[l[face]] -= lowerPtr_ddt[face];
     //     diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
     // }
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
 
 #ifdef _OPENMP
     #pragma omp parallel for
