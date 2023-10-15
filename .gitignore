@@ -35,6 +35,7 @@ linux*Clang*/
 linux*Gcc*/
 linux*Icc*/
 linux*Fujitsu*/
+linux*SW*/
 
 solaris*Gcc*/
 SunOS*Gcc*/
