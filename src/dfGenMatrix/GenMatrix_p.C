@@ -26,7 +26,7 @@ Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
     fvMatrix<Type>& UEqn,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     TICK0(UEqn_H);
@@ -98,7 +98,9 @@ UEqn_H
     //     HpsiPtr[uPtr[face]] -= lowerPtr[face]*psiPtr[lPtr[face]];
     //     HpsiPtr[lPtr[face]] -= upperPtr[face]*psiPtr[uPtr[face]];
     // }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -107,7 +109,9 @@ UEqn_H
             HpsiPtr[lPtr[facei]] -= upperPtr[facei]*psiPtr[uPtr[facei]];
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -230,7 +234,9 @@ rAUConstructor
 
     rAU.ref().primitiveFieldRef() = 1.0 / (tdiag / mesh.V());
 
+// #ifdef _OPENMP
     // #pragma omp parallel for
+// #endif
     // for(label i = 0; i < diagD.size(); ++i){
     //     rAU.ref().primitiveFieldRef()[i] = 1.0 / tdiag()[i] / mesh.V()[i];
     // }
@@ -279,7 +285,9 @@ rhorAUfConstructor
     const labelUList& P = mesh.owner();
     const labelUList& N = mesh.neighbour();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for (label fi=0; fi<P.size(); fi++)
     {
         rhorAUfPtr[fi] = (linearWeightsPtr[fi]*(rhorAUPtr[P[fi]] - rhorAUPtr[N[fi]]) + rhorAUPtr[N[fi]]);
@@ -440,7 +448,7 @@ GenMatrix_p(
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
     const volScalarField& psi,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     TICK0(GenMatrix_p);
@@ -512,7 +520,9 @@ GenMatrix_p(
     //     fvcDivPtr[u[f]] -= phiHbyAPtr[f];
     // }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -526,7 +536,9 @@ GenMatrix_p(
             fvcDivPtr[u[facei]] -= phiHbyAPtr[facei];
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -577,7 +589,9 @@ GenMatrix_p(
     TICK(GenMatrix_p, 3, 4);
     // - cell loop
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){
         sourcePtr[c] += rDeltaT * (rhoPtr[c] - rhoOldTimePtr[c]) * meshVPtr[c];
         sourcePtr[c] += fvcDivPtr[c];
@@ -599,7 +613,7 @@ Foam::tmp<Foam::GeometricField<vector, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
     fvMatrix<vector>& UEqn,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 }

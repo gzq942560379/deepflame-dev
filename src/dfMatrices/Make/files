@@ -93,7 +93,7 @@ $(ellMatrix)/solvers/ELLGAMG/ellInterfaceFields/processorELLGAMGInterfaceField/p
 $(ellMatrix)/solvers/ELLGAMG/ellInterfaceFields/processorCyclicELLGAMGInterfaceField/processorCyclicELLGAMGInterfaceField.C
 $(ellMatrix)/solvers/ELLGAMG/ellInterfaceFields/cyclicELLGAMGInterfaceField/cyclicELLGAMGInterfaceField.C
 
-lduMatrix=lduMatrix
+lduMatrix=LDUMatrix
 
 $(lduMatrix)/solvers/NBPBiCGStab/NBPBiCGStab.C
 $(lduMatrix)/solvers/PBiCGStab/PBiCGStab.C

@@ -24,6 +24,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "divMatrix.H"
+#include "divJacobiSmoother.H"
 #include "divSymGaussSeidelSmoother.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -85,6 +86,34 @@ Foam::autoPtr<Foam::divMatrix::smoother> Foam::divMatrix::smoother::New
     // not (yet?) needed:
     // const dictionary& controls = e.isDict() ? e.dict() : dictionary::null;
 
+    if(name == "Jacobi"){
+        return autoPtr<divMatrix::smoother>
+        (
+            new divJacobiSmoother
+            (
+                fieldName,
+                matrix,
+                interfaceBouCoeffs,
+                interfaceIntCoeffs,
+                interfaces
+            )
+        );
+    }else if(name == "symGaussSeidel"){
+        return autoPtr<divMatrix::smoother>
+        (
+            new divSymGaussSeidelSmoother
+            (
+                fieldName,
+                matrix,
+                interfaceBouCoeffs,
+                interfaceIntCoeffs,
+                interfaces
+            )
+        );
+    }else{
+        Info << "Foam::divMatrix::smoother::New name : " << name << endl;
+    }
+
     if (matrix.symmetric())
     {
         symMatrixConstructorTable::iterator constructorIter =
@@ -111,18 +140,6 @@ Foam::autoPtr<Foam::divMatrix::smoother> Foam::divMatrix::smoother::New
                 interfaces
             )
         );
-
-        // return autoPtr<divMatrix::smoother>
-        // (
-        //     new divSymGaussSeidelSmoother
-        //     (
-        //         fieldName,
-        //         matrix,
-        //         interfaceBouCoeffs,
-        //         interfaceIntCoeffs,
-        //         interfaces
-        //     )
-        // );
     }
     else if (matrix.asymmetric())
     {

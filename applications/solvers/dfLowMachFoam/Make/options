@@ -49,12 +49,6 @@ EXE_INC = -std=c++14 \
     -I$(LIB_SRC)/parallel/decompose/decompositionMethods/lnInclude
 
 EXE_LIBS = \
-    -lcompressibleTransportModels \
-    -lturbulenceModels \
-    -lfiniteVolume \
-    -ldynamicFvMesh \
-    -lmeshTools \
-    -lsampling \
     -L$(DF_LIBBIN) \
     -ldfFluidThermophysicalModels \
     -ldfCompressibleTurbulenceModels \
@@ -65,7 +59,20 @@ EXE_LIBS = \
     -ldfGenMatrix \
     -ldfMatrices \
     -ldfSchedule \
-    $(CANTERA_ROOT)/lib/libcantera.so \
+    -ldfRenumber \
+    -lcompressibleTransportModels \
+    -lturbulenceModels \
+    -lfiniteVolume \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -ldecompositionMethods \
+    -lmeshTools \
+    -lsampling \
+    -L$(FOAM_LIBBIN)/dummy -lscotchDecomp -lptscotchDecomp \
+    -lsurfMesh \
+    -lfileFormats \
+    -lgenericPatchFields \
+    -lrenumberMethods \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \
@@ -75,18 +82,12 @@ EXE_LIBS = \
     $(if $(PYTHON_LIB_DIR),-lpython3,) \
     $(if $(USE_TENSORFLOW),$(LIBTENSORFLOW_ROOT)/lib/libtensorflow_cc.so,) \
     $(if $(USE_TENSORFLOW),$(DF_SRC)/dfChemistryModel/DNNInferencer_tf/build/libDNNInferencertf.so,) \
-    $(if $(USE_BLASDNN),$(DF_SRC)/dfChemistryModel/DNNInferencer_blas/build/libDNNInferencer_blas.so,) \
-    -ldecompositionMethods \
-    -L$(FOAM_LIBBIN)/dummy -lscotchDecomp -lptscotchDecomp \
-    -lsurfMesh \
-    -lfileFormats \
-    -ldynamicMesh \
-    -lmeshTools \
-    -ldynamicMesh \
-    -lfiniteVolume \
-    -lgenericPatchFields \
-    -lrenumberMethods \
-    -ldfRenumber
-    
+    $(if $(USE_BLASDNN), -L$(DF_SRC)/dfChemistryModel/DNNInferencer_blas/build -lDNNInferencer_blas,) \
+    -L$(CANTERA_ROOT)/lib -lcantera \
+    -L/home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/sundials-5.3.0/lib64 -lsundials_cvode -lsundials_cvodes -lsundials_sunlinsollapackband -lsundials_sunlinsollapackdense \
+    /home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/xMath-SACA/libswlapack.a \
+    /home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/xMath-SACA/libswblas.a \
+    -L/home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/yaml-cpp-0.7.0/lib64 -lyaml-cpp \
+    -lgfortran    
     
     

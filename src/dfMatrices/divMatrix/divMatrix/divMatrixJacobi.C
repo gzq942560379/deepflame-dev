@@ -29,7 +29,9 @@ Description
 
 #include "divMatrix.H"
 #include <cassert>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <mpi.h>
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
@@ -79,13 +81,19 @@ void Foam::divMatrix::Jacobi_naive
     const scalar* const __restrict__ diagPtr = diag_value_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel 
+#endif
     {
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label row = 0; row < row_; ++row){
             psiCopyPtr[row] = psiPtr[row];
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = 0; bi < block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             label rbe = DIV_BLOCK_END(rbs);
@@ -141,13 +149,19 @@ void Foam::divMatrix::Jacobi_split_unroll32_sve
     svint64_t zero = svdup_s64(static_cast<label>(0));
     svint64_t max_row = svdup_s64(static_cast<label>(row_ - 1));
 
+#ifdef _OPENMP
     #pragma omp parallel 
+#endif
     {
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label row = 0; row < row_; ++row){
             psiCopyPtr[row] = psiPtr[row];
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = 0; bi < head_block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
@@ -226,7 +240,9 @@ void Foam::divMatrix::Jacobi_split_unroll32_sve
             svst1_vnum(ptrue, psiPtr_offset, 2, vpsi2);
             svst1_vnum(ptrue, psiPtr_offset, 3, vpsi3);
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = head_block_count_; bi < block_count_ - tail_block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
@@ -278,7 +294,9 @@ void Foam::divMatrix::Jacobi_split_unroll32_sve
             svst1_vnum(ptrue, psiPtr_offset, 2, vpsi2);
             svst1_vnum(ptrue, psiPtr_offset, 3, vpsi3);
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = block_count_ - tail_block_count_; bi < block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             label rbe = DIV_BLOCK_END(rbs);
@@ -378,13 +396,19 @@ void Foam::divMatrix::Jacobi_split
     const scalar* const __restrict__ diagPtr = diag_value_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel 
+#endif
     {
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label row = 0; row < row_; ++row){
             psiCopyPtr[row] = psiPtr[row];
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = 0; bi < head_block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             label rbe = DIV_BLOCK_END(rbs);
@@ -415,7 +439,9 @@ void Foam::divMatrix::Jacobi_split
                 psiPtr_offset[br] /= diagPtr_offset[br];
             }
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = head_block_count_; bi < block_count_ - tail_block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             label rbe = DIV_BLOCK_END(rbs);
@@ -438,7 +464,9 @@ void Foam::divMatrix::Jacobi_split
                 psiPtr_offset[br] /= diagPtr_offset[br];
             }
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = block_count_ - tail_block_count_; bi < block_count_; ++bi){
             label rbs = DIV_BLOCK_START(bi);
             label rbe = DIV_BLOCK_END(rbs);

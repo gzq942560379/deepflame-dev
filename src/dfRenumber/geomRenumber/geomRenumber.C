@@ -80,7 +80,9 @@ Foam::labelList Foam::geomRenumber::renumber
     }
     z_split_ptr.push_back(points.size());
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(size_t z_split_index = 0; z_split_index < z_split_ptr.size() - 1; ++z_split_index){
         label z_start_index = z_split_ptr[z_split_index];
         label z_end_index = z_split_ptr[z_split_index+1];

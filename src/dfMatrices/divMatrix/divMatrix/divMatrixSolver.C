@@ -44,6 +44,22 @@ Foam::autoPtr<Foam::divMatrix::solver> Foam::divMatrix::solver::New
     }
     else if (matrix.symmetric())
     {
+        if(name == "PCG"){
+            return autoPtr<divMatrix::solver>
+            (
+                new DIVPCG
+                (
+                    fieldName,
+                    matrix,
+                    interfaceBouCoeffs,
+                    interfaceIntCoeffs,
+                    interfaces,
+                    solverControls
+                )
+            );
+        }else{
+            Info << "Foam::divMatrix::solver::New symmetric name : " << name << endl;
+        }
         symMatrixConstructorTable::iterator constructorIter =
             symMatrixConstructorTablePtr_->find(name);
 
@@ -68,22 +84,25 @@ Foam::autoPtr<Foam::divMatrix::solver> Foam::divMatrix::solver::New
                 solverControls
             )
         );
-
-        // return autoPtr<divMatrix::solver>
-        // (
-        //     new DIVSmootherPCG
-        //     (
-        //         fieldName,
-        //         matrix,
-        //         interfaceBouCoeffs,
-        //         interfaceIntCoeffs,
-        //         interfaces,
-        //         solverControls
-        //     )
-        // );
     }
     else if (matrix.asymmetric())
     {
+        if(name == "PBiCGStab"){
+            return autoPtr<divMatrix::solver>
+            (
+                new DIVPBiCGStab
+                (
+                    fieldName,
+                    matrix,
+                    interfaceBouCoeffs,
+                    interfaceIntCoeffs,
+                    interfaces,
+                    solverControls
+                )
+            );
+        }else{
+            Info << "Foam::divMatrix::solver::New asymmetric name : " << name << endl;
+        }
         asymMatrixConstructorTable::iterator constructorIter =
             asymMatrixConstructorTablePtr_->find(name);
 
@@ -107,18 +126,6 @@ Foam::autoPtr<Foam::divMatrix::solver> Foam::divMatrix::solver::New
                 solverControls
             )
         );
-        // return autoPtr<divMatrix::solver>
-        // (
-        //     new DIVPBiCGStab
-        //     (
-        //         fieldName,
-        //         matrix,
-        //         interfaceBouCoeffs,
-        //         interfaceIntCoeffs,
-        //         interfaces,
-        //         solverControls
-        //     )
-        // );
     }
     else
     {

@@ -34,6 +34,9 @@ Foam::autoPtr<Foam::DIVGAMGInterfaceField> Foam::DIVGAMGInterfaceField::New
 )
 {
     const word coupleType(fineInterface.interfaceFieldType());
+    if(coupleType != "processor"){
+        Info << "Foam::DIVGAMGInterfaceField::New 1 coupleType : " << coupleType << endl;
+    }
 
     lduInterfaceFieldConstructorTable::iterator cstrIter =
         lduInterfaceFieldConstructorTablePtr_->find(coupleType);
@@ -60,6 +63,8 @@ Foam::autoPtr<Foam::DIVGAMGInterfaceField> Foam::DIVGAMGInterfaceField::New
 )
 {
     const word coupleType(GAMGCp.type());
+    
+    Info << "Foam::DIVGAMGInterfaceField::New 2 coupleType : " << coupleType << endl;
 
     lduInterfaceConstructorTable::iterator cstrIter =
         lduInterfaceConstructorTablePtr_->find(coupleType);

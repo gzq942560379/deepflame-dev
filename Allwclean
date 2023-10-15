@@ -16,6 +16,13 @@ wclean ./src/dfCombustionModels
 wclean ./src/TurbulenceModels/compressible
 wclean ./src/TurbulenceModels/turbulenceModels
 wclean ./src/dfCanteraMixture
+
+wclean src/dfUtils
+wclean src/dfRenumber
+wclean src/dfGenMatrix
+wclean src/dfMatrices
+wclean src/dfSchedule
+
 wclean ./applications/utilities/flameSpeed
 wclean ./applications/solvers/dfSprayFoam
 wclean ./applications/solvers/df0DFoam

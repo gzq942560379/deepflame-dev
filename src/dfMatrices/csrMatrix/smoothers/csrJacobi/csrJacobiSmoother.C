@@ -139,13 +139,19 @@ void Foam::csrJacobiSmoother::smooth
         const label* const __restrict__ off_diag_colidx_Ptr = matrix_.off_diag_colidx().begin();
         const scalar* const __restrict__ off_diag_value_Ptr = matrix_.off_diag_value().begin();
 
+#ifdef _OPENMP
         #pragma omp parallel 
+#endif
         {
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label r = 0; r < nCells; ++r){
                 psiCopyPtr[r] = psi[r];
             }
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label r = 0; r < nCells; ++r){
                 scalar sum = bPrimePtr[r];
                 for(label index = off_diag_rowptr_Ptr[r]; index < off_diag_rowptr_Ptr[r+1]; ++index){

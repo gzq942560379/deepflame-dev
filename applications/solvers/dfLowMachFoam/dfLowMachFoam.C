@@ -59,7 +59,9 @@ Description
 #include "PstreamGlobals.H"
 #include "basicThermo.H"
 #include "CombustionModel.H"
+#include "laminar.H"
 #include "CorrectPhi.H"
+#include "clockTime.H"
 
 #include "StructureMeshSchedule.H"
 #include <typeinfo>
@@ -70,10 +72,10 @@ Description
 // #define _ELL_
 #define _DIV_
 // #define _LDU_
-#define OPT_GenMatrix_Y
+// #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
-#define OPT_GenMatrix_U
-#define OPT_GenMatrix_p
+// #define OPT_GenMatrix_U
+// #define OPT_GenMatrix_p
 // #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
@@ -105,13 +107,15 @@ Description
 #include "decompositionMethod.H"
 #include "renumberMethod.H"
 #include "zeroGradientFvPatchFields.H"
-#include "CuthillMcKeeRenumber.H"
 #include "geomRenumber.H"
+#include "CuthillMcKeeRenumber.H"
 #include "fvMeshSubset.H"
 #include "cellSet.H"
 #include "faceSet.H"
 #include "pointSet.H"
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 #ifdef FOAM_USE_ZOLTAN
     #include "zoltanRenumber.H"
@@ -119,7 +123,7 @@ Description
 
 #include "renumberMeshFuncs.H"
 
-#define TIME
+// #define TIME
 #ifdef TIME 
 #define TICK0(prefix)\
     double prefix##_tick_0 = MPI_Wtime();
@@ -133,6 +137,9 @@ Description
 #define TICK(prefix,start,end) ;
 #endif
 
+#include <mpi.h>
+#include <iostream>
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -141,22 +148,19 @@ int main(int argc, char *argv[])
     pybind11::scoped_interpreter guard{};//start python interpreter
 #endif
 
-    double postProcess_start = omp_get_wtime();
+    clockTime postProcess_clock;;
     #include "postProcess.H"
-    double postProcess_end = omp_get_wtime();
-    double postProcess_time = postProcess_end - postProcess_start;
+    double postProcess_time = postProcess_clock.elapsedTime();
 
     // #include "setRootCaseLists.H"
-    double listOptions_start = omp_get_wtime();
+    clockTime listOptions_clock;;
     #include "listOptions.H"
-    double listOptions_end = omp_get_wtime();
-    double listOptions_time = listOptions_end - listOptions_start;
+    double listOptions_time = listOptions_clock.elapsedTime();
 
     // MPI init here
-    double setRootCase2_start = omp_get_wtime();
+    clockTime setRootCase2_clock;;
     #include "setRootCase2.H"
-    double setRootCase2_end = omp_get_wtime();
-    double setRootCase2_time = setRootCase2_end - setRootCase2_start;
+    double setRootCase2_time = setRootCase2_clock.elapsedTime();
     
     Info << "postProcess time : " << postProcess_time << endl;
     Info << "listOptions time : " << listOptions_time << endl;
@@ -263,7 +267,7 @@ int main(int argc, char *argv[])
 
     double init_time = init_end - init_start;
 
-    Info << "Init time : " << init_time << endl;
+    Info << "Total Init time : " << init_time << endl;
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -387,6 +391,8 @@ int main(int argc, char *argv[])
             }
 
             // Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
+            // Info << "min/max(U) = " << min(U).value() << ", " << max(U).value() << endl;
+            // Info << "min/max(p) = " << min(U).value() << ", " << max(p).value() << endl;
 
             // --- Pressure corrector loop
 

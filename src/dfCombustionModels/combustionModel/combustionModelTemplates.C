@@ -79,6 +79,13 @@ Foam::autoPtr<CombustionModel> Foam::combustionModel::New
     typename cstrTableType::iterator thermoCstrIter =
         cstrTable->find(thermoCombModelName);
 
+    if(compCombModelName == "laminar<basicThermo>" && thermoCombModelName == "laminar<basicThermo,CanteraMixture>"){
+        return CombustionModel::NewLaminar(combModelName, thermo, turb, combustionProperties);
+    }else{
+        Info << "Selecting combustion model : compCombModelName " << compCombModelName << endl;
+        Info << "Selecting combustion model : thermoCombModelName " << thermoCombModelName << endl;
+    }
+    
     if (compCstrIter == cstrTable->end() && thermoCstrIter == cstrTable->end())
     {
         FatalErrorInFunction

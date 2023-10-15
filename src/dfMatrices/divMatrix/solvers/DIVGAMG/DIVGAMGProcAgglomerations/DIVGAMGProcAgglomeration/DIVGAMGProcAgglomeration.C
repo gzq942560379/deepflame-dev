@@ -360,6 +360,7 @@ Foam::autoPtr<Foam::DIVGAMGProcAgglomeration> Foam::DIVGAMGProcAgglomeration::Ne
     {
         InfoInFunction << "Constructing DIVGAMGProcAgglomeration" << endl;
     }
+    Info << "Foam::DIVGAMGProcAgglomeration::New type : " << type << endl;
 
     DIVGAMGAgglomerationConstructorTable::iterator cstrIter =
         DIVGAMGAgglomerationConstructorTablePtr_->find(type);

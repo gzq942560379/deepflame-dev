@@ -135,7 +135,7 @@ gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     const fvMesh& mesh = vf.mesh();
@@ -196,7 +196,7 @@ gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     const fvMesh& mesh = vf.mesh();
@@ -252,7 +252,7 @@ gaussLaplacianSchemeFvcLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     return gaussLaplacianSchemeFvcLaplacian
@@ -271,7 +271,7 @@ gaussLaplacianSchemeFvcLaplacian
     const GeometricField<scalar, fvPatchField, volMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
     const word& name,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     const fvMesh& mesh = vf.mesh();
@@ -302,7 +302,7 @@ gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
     const GeometricField<scalar, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template
@@ -311,7 +311,7 @@ gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
     const GeometricField<scalar, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template
@@ -320,7 +320,7 @@ gaussLaplacianSchemeFvcLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gamma,
     const GeometricField<scalar, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

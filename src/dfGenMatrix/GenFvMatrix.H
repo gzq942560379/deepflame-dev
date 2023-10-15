@@ -79,7 +79,7 @@ Foam::tmp<Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>>
 UEqn_H
 (
     fvMatrix<Type>& UEqn,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 tmp<volScalarField>
@@ -113,7 +113,7 @@ gaussConvectionSchemeFvmDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -121,7 +121,7 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 fvcSurfaceIntegrate
 (
     const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -129,7 +129,7 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 fvcSurfaceIntegrate
 (
     const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -139,7 +139,7 @@ gaussConvectionSchemeFvmDiv
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
     const word& name,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 // fvc::div
@@ -149,7 +149,7 @@ gaussConvectionSchemeFvcDiv
 (
     const surfaceScalarField& faceFlux,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -157,7 +157,7 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
     const GeometricField<Type, fvsPatchField, surfaceMesh>& ssf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -165,7 +165,7 @@ tmp<GeometricField<Type, fvPatchField, volMesh>>
 gaussConvectionSchemeFvcDiv
 (
     const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -179,7 +179,7 @@ tmp
 gaussDivFvcdiv
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 // fvc::grad
@@ -196,7 +196,7 @@ tmp
 gaussGradSchemeGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 
@@ -216,7 +216,7 @@ gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gammaScalarVol,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 template<class Type>
@@ -225,7 +225,7 @@ gaussLaplacianSchemeFvmLaplacian
 (
     const GeometricField<scalar, fvsPatchField, surfaceMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 // fvc::laplacian
@@ -235,7 +235,7 @@ gaussLaplacianSchemeFvcLaplacian
 (
     const GeometricField<scalar, fvPatchField, volMesh>& gamma,
     const GeometricField<Type, fvPatchField, volMesh>& vf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 // turbulence->divDevRhoReff(U)
@@ -253,7 +253,7 @@ GenMatrix_U(
     const surfaceScalarField& phi,
     const volScalarField& p, 
     compressible::turbulenceModel& turbulence,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>
@@ -268,7 +268,7 @@ GenMatrix_Y(
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
     fv::convectionScheme<scalar>& mvConvection,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>
@@ -282,7 +282,7 @@ GenMatrix_E(
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
     const surfaceScalarField& linear_weights,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 tmp<fvScalarMatrix>
@@ -292,7 +292,7 @@ GenMatrix_p(
     const surfaceScalarField& phiHbyA,
     const surfaceScalarField& rhorAUf,
     const volScalarField& phi,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 

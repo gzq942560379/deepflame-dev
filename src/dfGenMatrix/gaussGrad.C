@@ -44,7 +44,7 @@ tmp
 gaussGradSchemeGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     return gaussGradSchemeGrad(vsf, "grad(" + vsf.name() + ')', face_scheduling);
@@ -64,7 +64,7 @@ gaussGradSchemeGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
     const word& name,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     const fvMesh& mesh = vsf.mesh();
@@ -149,7 +149,7 @@ gaussGradCalcGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vsf,
     const word& name,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 )
 {
     double gaussGradCalcGrad_start = MPI_Wtime();
@@ -201,7 +201,9 @@ gaussGradCalcGrad
     //     igGrad[neighbour[facei]] -= Sfssf;
     // }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -211,7 +213,9 @@ gaussGradCalcGrad
             igGrad[neighbour[facei]] -= Sfssf;
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -238,7 +242,9 @@ gaussGradCalcGrad
     }
 
     // igGrad /= mesh.V();
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label i = 0; i < igGrad.size(); ++i){
         igGrad[i] /= mesh.V()[i];
     }
@@ -297,7 +303,7 @@ tmp
 gaussGradSchemeGrad
 (
     const GeometricField<scalar, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 
@@ -314,7 +320,7 @@ tmp
 gaussGradSchemeGrad
 (
     const GeometricField<vector, fvPatchField, volMesh>& vsf,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 );
 
 } // End namespace Foam

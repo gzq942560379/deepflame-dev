@@ -29,7 +29,9 @@ Description
 
 #include "LDUMatrix.H"
 #include <cassert>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <mpi.h>
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 

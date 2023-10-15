@@ -3,7 +3,9 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
 #endif
@@ -40,10 +42,12 @@ void env_show(){
     std::cout << "env show --------------------------------" << std::endl;
     std::cout << "dnn_batch_size : " << dnn_batch_size << std::endl;
     std::cout << "row_block_bit : " << row_block_bit << std::endl;
+#ifdef _OPENMP
     std::cout << "max_threads : " << omp_get_max_threads() << std::endl;
-    #ifdef __ARM_FEATURE_SVE
+#endif
+#ifdef __ARM_FEATURE_SVE
     std::cout << "simd width : " << svcntd() * 64 << std::endl;
-    #endif
+#endif
     std::cout << "-----------------------------------------" << std::endl;
 }
 

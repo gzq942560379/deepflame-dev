@@ -180,4 +180,34 @@ bool Foam::combustionModels::laminar<ReactionThermo>::read()
 }
 
 
+template<class ReactionThermo>
+Foam::autoPtr<Foam::CombustionModel<ReactionThermo>>
+Foam::CombustionModel<ReactionThermo>::NewLaminar
+(
+    word combModelName,
+    ReactionThermo& thermo,
+    const compressibleTurbulenceModel& turb,
+    const word& combustionProperties
+)
+{
+    return autoPtr<CombustionModel>(
+        new combustionModels::laminar<ReactionThermo>(combModelName, thermo, turb, combustionProperties)
+    );
+}
+
+template<>
+Foam::autoPtr<Foam::CombustionModel<Foam::basicThermo>>
+Foam::CombustionModel<Foam::basicThermo>::NewLaminar
+(
+    word combModelName,
+    basicThermo& thermo,
+    const compressibleTurbulenceModel& turb,
+    const word& combustionProperties
+){
+    return autoPtr<CombustionModel>(
+        new combustionModels::laminar<basicThermo>(combModelName, thermo, turb, combustionProperties)
+    );
+}
+
+
 // ************************************************************************* //

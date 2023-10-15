@@ -19,7 +19,7 @@ GenMatrix_Y(
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
     fv::convectionScheme<scalar>& mvConvection,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 ){
     assert(splitting == false);
 
@@ -101,7 +101,9 @@ GenMatrix_Y(
     const scalar* const __restrict__ suFieldVPtr = su.field().begin();
 
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){
         diagPtr_ddt[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
         sourcePtr_ddt[c] = rDeltaT * rhoOldTimePtr[c] * YiOldTimePtr[c] * meshVscPtr[c] + meshVPtr[c] * suFieldVPtr[c];
@@ -111,13 +113,16 @@ GenMatrix_Y(
     // fvm_div1.upper() = fvm_div1.lower() + phi.primitiveField();
     // fvm_laplacian.upper() = deltaCoeffs.primitiveField()*gammaMagSf.primitiveField();
     
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label f = 0; f < nFaces; ++f){
         lowerPtr_ddt[f] = - weightsPtr[f] * (phiPtr[f] + phiUcPtr[f]) - deltaCoeffsPtr[f] * gammaMagSfPtr[f];
         // upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]);
         upperPtr_ddt[f] = (- weightsPtr[f] + 1.) * (phiPtr[f] + phiUcPtr[f]) - deltaCoeffsPtr[f] * gammaMagSfPtr[f];
     }
 
+// #ifdef _OPENMP
     // #pragma omp parallel for
     // #pragma clang loop unroll_count(4)
     // #pragma clang loop vectorize(enable)
@@ -129,7 +134,9 @@ GenMatrix_Y(
     //     diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
     // }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -138,7 +145,9 @@ GenMatrix_Y(
             diagPtr_ddt[u[face]] -= upperPtr_ddt[face];
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -189,7 +198,9 @@ GenMatrix_Y(
 
             // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs(pDeltaCoeffs);
             // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs(pDeltaCoeffs);
+#ifdef _OPENMP
             #pragma omp parallel for
+#endif
             for(label i = 0; i < internalCoeffs.size(); ++i){
                 internalCoeffsPtr[i] = (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueInternalCoeffsPtr[i] - pGammaPtr[i] * psfGradientInternalCoeffsPtr[i];
                 boundaryCoeffsPtr[i] =  - (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueBoundaryCoeffsPtr[i] + pGammaPtr[i] * psfGradientBoundaryCoeffsPtr[i];
@@ -204,7 +215,9 @@ GenMatrix_Y(
             const scalar* const __restrict__ psfGradientBoundaryCoeffsPtr = psfGradientBoundaryCoeffs->begin();
             // fvm.internalCoeffs()[patchi] = (patchFlux_phi + patchFlux_phiUc) * psf.valueInternalCoeffs(pw) - pGamma * psf.gradientInternalCoeffs();
             // fvm.boundaryCoeffs()[patchi] = - (patchFlux_phi + patchFlux_phiUc) * psf.valueBoundaryCoeffs(pw) + pGamma * psf.gradientBoundaryCoeffs();
+#ifdef _OPENMP
             #pragma omp parallel for
+#endif
             for(label i = 0; i < internalCoeffs.size(); ++i){
                 internalCoeffsPtr[i] = (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueInternalCoeffsPtr[i] - pGammaPtr[i] * psfGradientInternalCoeffsPtr[i];
                 boundaryCoeffsPtr[i] =  - (patchFlux_phiPtr[i] + patchFlux_phiUcPtr[i]) * psfValueBoundaryCoeffsPtr[i] + pGammaPtr[i] * psfGradientBoundaryCoeffsPtr[i];

@@ -1,4 +1,4 @@
-workDir=$(SRC_ORIG)/thermophysicalModels/thermophysicalProperties/
+workDir=$(SRC_ORIG)/thermophysicalModels/thermophysicalProperties
 $(workDir)/thermophysicalFunctions/thermophysicalFunction/thermophysicalFunction.C
 
 NSRDSfunctions = $(workDir)/thermophysicalFunctions/NSRDSfunctions
@@ -57,9 +57,9 @@ solidProperties/solidProperties/solidProperties.C
 solidProperties/solidProperties/solidPropertiesNew.C
 $(workDir)/solidProperties/solidMixtureProperties/solidMixtureProperties.C
 
-$(workDir)solidProperties/ash/ash.C
-$(workDir)solidProperties/C/C.C
-$(workDir)solidProperties/CaCO3/CaCO3.C
+$(workDir)/solidProperties/ash/ash.C
+$(workDir)/solidProperties/C/C.C
+$(workDir)/solidProperties/CaCO3/CaCO3.C
 
 
 LIB = $(DF_LIBBIN)/libdfThermophysicalProperties

@@ -30,6 +30,7 @@ License
 #include "DIVGAMGInterface.H"
 #include "DIVGAMGProcAgglomeration.H"
 #include "pairDIVGAMGAgglomeration.H"
+#include "faceAreaPairDIVGAMGAgglomeration.H"
 #include "IOmanip.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -303,6 +304,11 @@ const Foam::DIVGAMGAgglomeration& Foam::DIVGAMGAgglomeration::New
             "geometricDIVGAMGAgglomerationLibs",
             lduMeshConstructorTablePtr_
         );
+        if(agglomeratorType == "faceAreaPair"){
+            return store(autoPtr<DIVGAMGAgglomeration>(new faceAreaPairDIVGAMGAgglomeration(mesh, controlDict)).ptr());
+        }else{
+            Info << "Foam::DIVGAMGAgglomeration::New agglomeratorType : " << agglomeratorType << endl;
+        }
 
         lduMeshConstructorTable::iterator cstrIter =
             lduMeshConstructorTablePtr_->find(agglomeratorType);

@@ -106,6 +106,13 @@ public:
             const word& combustionProperties=combustionPropertiesName
         );
 
+        static autoPtr<CombustionModel> NewLaminar
+        (
+            word combModelName,
+            ReactionThermo& thermo,
+            const compressibleTurbulenceModel& turb,
+            const word& combustionProperties=combustionPropertiesName
+        );
 
     //- Destructor
     virtual ~CombustionModel();

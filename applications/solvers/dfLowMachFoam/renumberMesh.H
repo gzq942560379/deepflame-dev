@@ -133,8 +133,13 @@ if (readDict)
     renumberDictPtr.reset(new IOdictionary(dictIO));
     const IOdictionary& renumberDict = renumberDictPtr();
 
-    renumberPtr = renumberMethod::New(renumberDict);
-
+    const word methodType(renumberDict.lookup("method"));
+    if(methodType == "geom"){
+        renumberPtr = autoPtr<renumberMethod>(new geomRenumber(renumberDict));
+    }else{
+        Info << "renumberMethod::New renumberDict : " << renumberDict << endl;
+        renumberPtr = renumberMethod::New(renumberDict);
+    }
     sortCoupledFaceCells = renumberDict.lookupOrDefault
     (
         "sortCoupledFaceCells",

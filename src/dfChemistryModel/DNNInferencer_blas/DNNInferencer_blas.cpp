@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <mpi.h>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 DNNInferencer_blas::DNNInferencer_blas() {
     char* env_tmp = getenv("DNN_BATCH_SIZE");
@@ -158,7 +160,12 @@ void DNNInferencer_blas::Inference_multiDNNs(
     double dnn_infer_end = MPI_Wtime();
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
     double FLOPs = (input_count0 + input_count1 + input_count2) * FLOPs_per_sample_;
+    
+#ifdef _OPENMP
     int num_threads = omp_get_max_threads();
+#else
+    int num_threads = 1;
+#endif
     double theoretical_peak = 3.3792 / 48. * 2. * num_threads;
     double FLOPS = FLOPs / dnn_infer_time;
     double TFLOPS = FLOPS * 1e-12;

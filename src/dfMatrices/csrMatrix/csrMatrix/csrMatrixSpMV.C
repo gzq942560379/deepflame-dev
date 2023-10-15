@@ -30,7 +30,9 @@ Description
 #include "csrMatrix.H"
 #include <cassert>
 #include <typeinfo>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
 #endif
@@ -58,7 +60,9 @@ void Foam::csrMatrix::SpMV_naive
     const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for (label r = 0; r < row_; ++r){
         scalar tmp = diagPtr[r] * psiPtr[r];
         for(label index = off_diag_rowptr_Ptr[r]; index < off_diag_rowptr_Ptr[r+1]; ++index){
@@ -81,7 +85,9 @@ void Foam::csrMatrix::SpMV_UNROOL
     const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for (label r = 0; r < row_; ++r){
         scalar tmp = diagPtr[r] * psiPtr[r];
         const label row_len = off_diag_rowptr_Ptr[r+1] - off_diag_rowptr_Ptr[r];

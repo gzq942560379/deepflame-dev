@@ -27,7 +27,9 @@ License
 #include "UniformField.H"
 #include "clockTime.H"
 #include "runtime_assert.H"
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <mpi.h>
 
 
@@ -1021,20 +1023,27 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
         balancer_.updateState(allProblems);
         t_updateState = timer.timeIncrement();
 
+        Info<<"solve_CVODE 1"<<endl;
+
         timer.timeIncrement();
         auto guestProblems = balancer_.balance(allProblems);
+        Info<<"solve_CVODE 2"<<endl;
         auto ownProblems = balancer_.getRemaining(allProblems);
         t_balance = timer.timeIncrement();
+        Info<<"solve_CVODE 3"<<endl;
 
         timer.timeIncrement();
         auto ownSolutions = solveList(ownProblems);
+        Info<<"solve_CVODE 4"<<endl;
         auto guestSolutions = solveBuffer(guestProblems);
         t_solveBuffer = timer.timeIncrement();
+        Info<<"solve_CVODE 5"<<endl;
 
         timer.timeIncrement();
         incomingSolutions = balancer_.unbalance(guestSolutions);
         incomingSolutions.append(ownSolutions);
         t_unbalance = timer.timeIncrement();
+        Info<<"solve_CVODE 6"<<endl;
     }
     else
     {

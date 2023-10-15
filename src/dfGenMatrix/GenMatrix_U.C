@@ -27,7 +27,7 @@ GenMatrix_U(
     const surfaceScalarField& phi,
     const volScalarField& p, 
     compressible::turbulenceModel& turbulence,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 ){
     TICK0(GenMatrix_U);
 
@@ -111,7 +111,9 @@ GenMatrix_U(
     const scalar* const __restrict__ pPtr = p.primitiveField().begin();
     const scalar* const __restrict__ gammaPtr = gamma.primitiveField().begin();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label facei = 0; facei < nFaces; ++facei){
         pfPtr[facei] = weightsPtr[facei] * (pPtr[l[facei]] - pPtr[u[facei]]) + pPtr[u[facei]];
         Uf[facei] = weightsPtr[facei] * (UOldTimePtr[l[facei]] - UOldTimePtr[u[facei]]) + UOldTimePtr[u[facei]];
@@ -181,7 +183,9 @@ GenMatrix_U(
     Field<vector>& igGrad = gGrad;
     Field<tensor>& igGradU = gGradU;
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -194,7 +198,9 @@ GenMatrix_U(
             igGradU[u[facei]] -= USfssf;
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -230,7 +236,9 @@ GenMatrix_U(
 
     // igGradU /= mesh.V();
     
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){
         igGradU[c] /= mesh.V()[c];
     }
@@ -297,7 +305,9 @@ GenMatrix_U(
 
     TICK(GenMatrix_U, 13, 14);
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for (label facei = 0; facei < nFaces; ++facei)
     {
         gGradUCoeff_f[facei] = mesh.Sf()[facei] & (weightsPtr[facei]*(gGradUCoeffPtr[l[facei]] - gGradUCoeffPtr[u[facei]]) + gGradUCoeffPtr[u[facei]]);
@@ -309,7 +319,9 @@ GenMatrix_U(
     //     igDivGradUCoeff[u[facei]] -= gGradUCoeff_f[facei];
     // }
     
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -318,7 +330,9 @@ GenMatrix_U(
             igDivGradUCoeff[u[facei]] -= gGradUCoeff_f[facei];
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -388,7 +402,9 @@ GenMatrix_U(
 
     TICK(GenMatrix_U, 19, 20);
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){
         diagPtr[c] = rDeltaT * rhoPtr[c] * meshVscPtr[c];
         sourcePtr[c] = rDeltaT * rhoOldTimePtr[c] * UOldTimePtr[c] * meshVscPtr[c];
@@ -397,7 +413,9 @@ GenMatrix_U(
     }
     TICK(GenMatrix_U, 20, 21);
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label f = 0; f < nFaces; ++f){
         lowerPtr[f] = - weightsPtr[f] * phiPtr[f];
         upperPtr[f] = (- weightsPtr[f] + 1.) * phiPtr[f];
@@ -411,7 +429,9 @@ GenMatrix_U(
     //     diagPtr[l[face]] -= lowerPtr[face];
     //     diagPtr[u[face]] -= upperPtr[face];
     // }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -420,7 +440,9 @@ GenMatrix_U(
             diagPtr[u[facei]] -= upperPtr[facei];
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];

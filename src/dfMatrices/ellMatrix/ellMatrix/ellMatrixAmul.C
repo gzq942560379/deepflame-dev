@@ -169,8 +169,9 @@ void Foam::ellMatrix::sumA
 
     const scalar* const __restrict__ diagPtr = diag().begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
-
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label rbs = 0; rbs < row_; rbs += row_block_size_){
         label rbe = ELL_BLOCK_END(rbs);
         label rbl = ELL_BLOCK_LEN(rbs,rbe);

@@ -150,7 +150,9 @@ void Foam::csrMatrix::sumA
 
     const scalar* __restrict__ diagPtr = diag().begin();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for (label r = 0; r < row_; ++r){
         scalar tmp = diagPtr[r];
         for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){

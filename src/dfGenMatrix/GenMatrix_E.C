@@ -34,7 +34,7 @@ GenMatrix_E(
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
     const surfaceScalarField& linear_weights,
-    labelList& face_scheduling
+    const labelList& face_scheduling
 ){
     const fvMesh& mesh = he.mesh();
     assert(mesh.moving() == false);
@@ -128,7 +128,9 @@ GenMatrix_E(
     scalar* hDiffCorrFluxfPtr = hDiffCorrFluxf.begin();
     const scalar* const __restrict__ weightshDiffCorrFluxPtr = weightshDiffCorrFlux.primitiveField().begin(); // get weight
     
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label f = 0; f < nFaces; ++f){
         KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
         alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
@@ -227,7 +229,9 @@ GenMatrix_E(
     //     fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
     // }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -244,7 +248,9 @@ GenMatrix_E(
             fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -270,7 +276,9 @@ GenMatrix_E(
     //     diagLaplacPtr[u[f]] += var1;
     // }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -282,7 +290,9 @@ GenMatrix_E(
             diagLaplacPtr[u[f]] += var1;
         }
     }
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
         label face_start = face_scheduling[face_scheduling_i]; 
         label face_end = face_scheduling[face_scheduling_i+1];
@@ -328,7 +338,9 @@ GenMatrix_E(
         }
     }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){      // cell loop
         diagPtr[c] += rDeltaT * rhoPtr[c] * meshVscPtr[c];
         diagPtr[c] += diagLaplacPtr[c];

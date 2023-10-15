@@ -83,7 +83,9 @@ defineTypeNameAndDebug(csrMatrix, 1);
 
 //     label face_count = mesh().neighbour().size();
 
+// #ifdef _OPENMP
 //     #pragma omp parallel for
+// #endif
 //     for(label i = 0; i < face_count; ++i){
 //         off_diag_value_[face2lower_[i]] = ldu_lower[i];
 //         off_diag_value_[face2upper_[i]] = ldu_upper_[i];

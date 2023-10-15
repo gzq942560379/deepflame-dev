@@ -25,6 +25,7 @@ License
 
 #include "divMatrix.H"
 #include "divNoPreconditioner.H"
+#include "DIVGAMGPreconditioner.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -81,6 +82,29 @@ Foam::divMatrix::preconditioner::New
 
     const dictionary& controls = e.isDict() ? e.dict() : dictionary::null;
 
+    if(name == "GAMG"){
+        return autoPtr<divMatrix::preconditioner>
+        (
+            new DIVGAMGPreconditioner
+            (
+                sol,
+                controls
+            )
+        );
+    }else if(name == "none"){ 
+        return autoPtr<divMatrix::preconditioner>
+        (
+            new divNoPreconditioner
+            (
+                sol,
+                controls
+            )
+        );
+    }else{
+        Info << "Foam::divMatrix::preconditioner::New name : " << name << endl;
+    }
+
+
     if (sol.matrix().symmetric())
     {
         symMatrixConstructorTable::iterator constructorIter =
@@ -106,14 +130,6 @@ Foam::divMatrix::preconditioner::New
                 controls
             )
         );
-        // return autoPtr<divMatrix::preconditioner>
-        // (
-        //     new divNoPreconditioner
-        //     (
-        //         sol,
-        //         controls
-        //     )
-        // );
     }
     else if (sol.matrix().asymmetric())
     {
@@ -140,14 +156,6 @@ Foam::divMatrix::preconditioner::New
                 controls
             )
         );
-        // return autoPtr<divMatrix::preconditioner>
-        // (
-        //     new divNoPreconditioner
-        //     (
-        //         sol,
-        //         controls
-        //     )
-        // );
     }
     else
     {

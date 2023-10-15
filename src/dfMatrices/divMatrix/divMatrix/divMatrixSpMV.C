@@ -30,7 +30,9 @@ Description
 #include "divMatrix.H"
 #include <cassert>
 #include <typeinfo>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <algorithm>
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
@@ -43,7 +45,9 @@ void Foam::divMatrix::SpMV
     const scalarField& psi
 ) const
 {
+#ifdef __ARM_FEATURE_SVE
     assert(svcntd() == 8);
+#endif
     if(block_count_ > 1){
         if(row_block_size_ == 32){
 #ifdef __ARM_FEATURE_SVE
@@ -70,7 +74,9 @@ void Foam::divMatrix::SpMV_naive
     const scalar* const __restrict__ diagPtr = diag_value_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label bi = 0; bi < block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);
@@ -115,9 +121,13 @@ void Foam::divMatrix::SpMV_split_unroll32_sve
     svint64_t zero = svdup_s64(static_cast<label>(0));
     svint64_t max_row = svdup_s64(static_cast<label>(row_ - 1));
 
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
+#ifdef _OPENMP
     #pragma omp for
+#endif
     for(label bi = 0; bi < head_block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         scalar* ApsiPtr_offset = ApsiPtr + rbs;
@@ -194,7 +204,9 @@ void Foam::divMatrix::SpMV_split_unroll32_sve
         svst1_vnum(ptrue, ApsiPtr_offset, 3, vApsi3);
     }
     
+#ifdef _OPENMP
     #pragma omp for
+#endif
     for(label bi = head_block_count_; bi < block_count_ - tail_block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         scalar* ApsiPtr_offset = ApsiPtr + rbs;
@@ -244,7 +256,9 @@ void Foam::divMatrix::SpMV_split_unroll32_sve
         svst1_vnum(ptrue, ApsiPtr_offset, 3, vApsi3);
     }
     
+#ifdef _OPENMP
     #pragma omp for
+#endif
     for(label bi = block_count_ - tail_block_count_; bi < block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);
@@ -336,7 +350,9 @@ void Foam::divMatrix::SpMV_split
     const scalar* const __restrict__ diagPtr = diag_value_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label bi = 0; bi < head_block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);
@@ -364,7 +380,9 @@ void Foam::divMatrix::SpMV_split
         }
     }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label bi = head_block_count_; bi < block_count_ - tail_block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);
@@ -384,7 +402,9 @@ void Foam::divMatrix::SpMV_split
         }
     }
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label bi = block_count_ - tail_block_count_; bi < block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);

@@ -216,12 +216,16 @@ void Foam::ellMatrix::SymGaussSeidel_B8_colored
     const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
         scalarField tmp(row_block_size_);
         scalar* __restrict__ tmpPtr = tmp.begin();
         for(label color = 0; color < num_color_; ++color){
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
                 label bi = nodes_of_color_[node_index];
                 label rbs = ELL_BLOCK_START(bi);
@@ -259,7 +263,9 @@ void Foam::ellMatrix::SymGaussSeidel_B8_colored
             }
         }
         for(label color = num_color_ - 1; color >= 0; --color){
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
                 label bi = nodes_of_color_[node_index];
                 label rbs = ELL_BLOCK_START(bi);

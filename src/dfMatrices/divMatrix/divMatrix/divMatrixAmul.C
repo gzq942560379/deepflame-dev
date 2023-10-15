@@ -170,7 +170,9 @@ void Foam::divMatrix::sumA
     const scalar* const __restrict__ diagPtr = diag().begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
     
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for(label bi = 0; bi < block_count_; ++bi){
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);

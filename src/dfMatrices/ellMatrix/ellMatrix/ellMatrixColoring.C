@@ -29,7 +29,9 @@ Description
 
 #include "ellMatrix.H"
 #include <cassert>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 
 // #define HASH_BETA 997
 #define HASH_BETA 997
@@ -40,13 +42,17 @@ void Foam::ellMatrix::build_graph() {
     blocked_off_diag_count_.resize(block_count_);
 
     // build graph of blocked matrix
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
         // #pragma omp for
         // for(size_t i = 0; i < blocked_off_diag_colidx_.size(); ++i){
         //     blocked_off_diag_colidx_[i] = -1;
         // }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label i = 0; i < blocked_off_diag_count_.size(); ++i){
             blocked_off_diag_count_[i] = 0;
         }    
@@ -54,7 +60,9 @@ void Foam::ellMatrix::build_graph() {
         labelList tmp(row_block_size_ * max_count_);
         label tmp_size = 0;
         
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = 0; bi < block_count_; ++bi){
             label rbs = ELL_BLOCK_START(bi);
             label rbe = ELL_BLOCK_END(rbs);
@@ -120,17 +128,28 @@ void Foam::ellMatrix::hash_coloring(){
 
         labelList hash_value(block_count_);
 
+        
+#ifdef _OPENMP
         labelList num_colored_node_thread(omp_get_max_threads());
+#else
+        labelList num_colored_node_thread(1);
+#endif
 
+#ifdef _OPENMP
         #pragma omp parallel
+#endif
         {
             label num_colored_node_this_thread = 0;
 
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label bi = 0; bi < block_count_; ++bi){
                 hash_value[bi] = bi % hash_beta;
             } 
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label bi = 0; bi < block_count_; ++bi){
                 // 如果该节点还没染色
                 if(old_color[bi] == -1){
@@ -185,8 +204,12 @@ void Foam::ellMatrix::hash_coloring(){
                     }
                 }
             }
-        
+
+#ifdef _OPENMP
             label tid = omp_get_thread_num();
+#else
+            label tid = 0;
+#endif
             num_colored_node_thread[tid] = num_colored_node_this_thread;
         }
 
@@ -235,17 +258,27 @@ void Foam::ellMatrix::jpl_coloring(){
 
         labelList hash_value(block_count_);
 
+#ifdef _OPENMP
         labelList num_colored_node_thread(omp_get_max_threads());
+#else
+        labelList num_colored_node_thread(1);
+#endif
 
+#ifdef _OPENMP
         #pragma omp parallel
+#endif
         {
             label num_colored_node_this_thread = 0;
 
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label bi = 0; bi < block_count_; ++bi){
                 hash_value[bi] = bi % hash_beta;
             } 
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label bi = 0; bi < block_count_; ++bi){
                 // 如果该节点还没染色
                 if(old_color[bi] == -1){
@@ -282,7 +315,11 @@ void Foam::ellMatrix::jpl_coloring(){
                 }
             }
         
+#ifdef _OPENMP
             label tid = omp_get_thread_num();
+#else
+            label tid = 0;
+#endif
             num_colored_node_thread[tid] = num_colored_node_this_thread;
         }
         

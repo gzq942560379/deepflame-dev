@@ -29,7 +29,9 @@ Description
 
 #include "ellMatrix.H"
 #include <cassert>
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <mpi.h>
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
@@ -76,13 +78,19 @@ void Foam::ellMatrix::Jacobi_naive
     const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
+#ifdef _OPENMP
     #pragma omp parallel 
+#endif
     {
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label row = 0; row < row_; ++row){
             psiCopyPtr[row] = psiPtr[row];
         }
+#ifdef _OPENMP
         #pragma omp for
+#endif
         for(label bi = 0; bi < block_count_; ++bi){
             label rbs = ELL_BLOCK_START(bi);
             label rbe = ELL_BLOCK_END(rbs);
@@ -133,18 +141,30 @@ void Foam::ellMatrix::Jacobi_UNLOOP32_SVE
     svbool_t ptrue = svptrue_b64();
 
     if(block_count_ > 12){
+#ifdef _OPENMP
         #pragma omp parallel 
+#endif
         {
+#ifdef _OPENMP
             #pragma omp for
+#endif
             for(label row = 0; row < row_; ++row){
                 psiCopyPtr[row] = psiPtr[row];
             }
 
+#ifdef _OPENMP
             int thread_rank = omp_get_thread_num();
             int thread_size = omp_get_num_threads();
+#else
+            int thread_rank = 0;
+            int thread_size = 1;
+#endif
+
             label local_start = (thread_rank * block_count_) / thread_size;
             label local_end = ((thread_rank + 1) * block_count_) / thread_size;
+// #ifdef _OPENMP
             // #pragma omp for schedule(static, 1)
+// #endif
             // for(label bi = 0; bi < block_count_; ++bi){
             for(label bi = local_start; bi < local_end; ++bi){
                 label rbs = ELL_BLOCK_START(bi);
