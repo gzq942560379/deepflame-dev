@@ -319,7 +319,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     int count;
     std::string norm_str;
-    char* buffer;
+    char* buffer = nullptr;
 
     if (mpirank == 0){
         std::ifstream fin(BLASDNNModelPath_ + "/norm.yaml");

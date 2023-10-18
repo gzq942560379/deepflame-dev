@@ -250,7 +250,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
 #else
     int num_threads = 1;
 #endif
-    double theoretical_peak = 3.3792 / 48. * 2. * num_threads;
+    double theoretical_peak = 14./6.; // per node of sw  
     double FLOPS = FLOPs / dnn_infer_time;
     double TFLOPS = FLOPS * 1e-12;
     double peak = TFLOPS * 100. / theoretical_peak;
@@ -268,6 +268,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
         std::cout << "Time : " << dnn_infer_time << std::endl;
         std::cout << "FLOPS : " << FLOPs << std::endl;
         std::cout << "TFLOPS : " << TFLOPS << std::endl;
+        std::cout << "Theoretical Peak : " << theoretical_peak << std::endl;
         std::cout << "Peak : " << peak << std::endl;
         std::cout << "-------------------------------------" << std::endl;
     } 

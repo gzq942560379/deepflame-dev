@@ -10,10 +10,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     double prepare_dnn_input_start = MPI_Wtime();
 
     scalar deltaTMin = great;
-    if (!this->chemistry_)
-    {
-        return deltaTMin;
-    }
+
     Info<<"=== begin solve_DNN with BLASDNN === "<<endl;
 
     std::vector<size_t> Cell0, Cell1, Cell2;
@@ -260,5 +257,9 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     Info << "update time : " << update_time << endl;
     Info << "other time : " << solve_DNN_blas_time - prepare_dnn_input_time - dnn_infer_time - update_time << endl;
 
+    if (!this->chemistry_)
+    {
+        return deltaTMin;
+    }
     return deltaTMin;
 }
