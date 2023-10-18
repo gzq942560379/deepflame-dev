@@ -48,7 +48,7 @@ TICK(p_pre, 4, 5);
 
 
 #ifdef OPT_GenMatrix_p
-    tmp<volVectorField> tUEqnH = UEqn_H(UEqn, face_scheduling);
+    tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
 #else
     tmp<volVectorField> tUEqnH = UEqn.H();
 #endif
@@ -104,7 +104,6 @@ TICK(p_pre, 11, 12);
 
 p_pre_end = MPI_Wtime();
 p_pre_time += p_pre_end - p_pre_start;
-Info << "p pre Time : " << p_pre_time << endl;
 
 if (pimple.transonic())
 {
@@ -204,7 +203,7 @@ else
     p_build_start = MPI_Wtime();
 #ifdef OPT_GenMatrix_p
     p_build_opt_start = MPI_Wtime();
-    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi, face_scheduling);
+    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi);
     fvScalarMatrix pDDtEqn = tpDDtEqn.ref();
     p_build_opt_end = MPI_Wtime();
     p_build_opt_time += p_build_opt_end - p_build_opt_start;
@@ -310,7 +309,6 @@ else
         p_post_end = MPI_Wtime();
         p_post_time += p_post_end - p_post_start;
     }
-    Info << "pEqn_stick6 = " << end - start << endl;
 }
 
 p_post_start = MPI_Wtime();

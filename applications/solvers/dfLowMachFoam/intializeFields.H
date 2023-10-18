@@ -3,24 +3,35 @@ Info<< "Reading data from file\n" << endl;
 const string filePath = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("filePath", string(""));
 const label girdSize = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("girdSize", 0);
 
-std::vector<double *> filedata;
-std::ifstream infile;
-std::string str;
-infile.open(filePath);
-while (std::getline(infile, str))
-{
-    double * data = new double[girdSize]{0.0};
-    std::stringstream sumstr(str);
-    string out;
-    int i = 0;
-    while (sumstr >> out)
-    {
-        double a = std::stod(out); 
-        data[i] = a;
-        i++;
+label row = Y.size() + 2;
+label col = girdSize;
+double* filedata = new double[row * col];
+
+int mpirank, mpisize;
+MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+
+if(mpirank == 0){
+    std::ifstream infile;
+    std::string str;
+    infile.open(filePath);
+    for(label r = 0; r < row; ++r){
+        std::getline(infile, str);
+        std::stringstream ss(str);
+        string tmp;
+        for(label j = 0; j < col; ++j)
+        {
+            ss >> tmp;
+            filedata[r * col + j] = std::stod(tmp); 
+        }
     }
-    filedata.push_back(data);
 }
+
+MPI_Bcast(filedata, row * col, MPI_DOUBLE, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+const double* filedata_x = filedata;
+const double* filedata_T = filedata + col;
+const double* filedata_Y = filedata + 2 * col;
 
 scalar x, y, z;
 label index;
@@ -31,9 +42,9 @@ forAll(mesh.C(), celli)
     z = mesh.C()[celli][2];
 
     // set scalar fields
-    index = round((x/0.001) / filedata[0][1]);
+    index = round((x/0.001) / filedata_x[1]);
     
-    T[celli] = filedata[1][index]; 
+    T[celli] = filedata_T[index]; 
 }
 T.correctBoundaryConditions();
 
@@ -55,11 +66,11 @@ forAll(mesh.C(), celli)
     y = mesh.C()[celli][1];
     z = mesh.C()[celli][2];
 
-    index = round((x/0.001) / filedata[0][1]);
+    index = round((x/0.001) / filedata_x[1]);
 
     for (int speciI = 0; speciI < Y.size(); speciI++)
     {
-        Y[speciI][celli] = filedata[2+speciI][index];
+        Y[speciI][celli] = filedata_Y[speciI * col + index];
     }
 }
 for (int speciI = 0; speciI < Y.size(); speciI++)

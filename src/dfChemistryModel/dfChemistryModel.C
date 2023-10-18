@@ -29,6 +29,8 @@ License
 #include "runtime_assert.H"
 #include <omp.h>
 #include <mpi.h>
+#include <yaml-cpp/yaml.h>
+#include "PstreamGlobals.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -113,7 +115,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         scalar(0.0)
     )
 {
-
 #if defined USE_LIBTORCH || defined USE_PYTORCH
     useDNN = true;
     if (!Qdot_.typeHeaderOk<volScalarField>())
@@ -295,152 +296,108 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     {
         hc_[i] = CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
     }
+
     // set normalization parameters
-#if defined USE_TENSORFLOW || defined USE_BLASDNN
-    Xmu0_ = {1707.7933656206317,
-        1.2482029000220745,
-        -7.079377975560381,
-        -7.68783461787545,
-        -7.973913054952772,
-        -6.285170340613194,
-        -7.7557750537570085,
-        -6.785791739333655,
-        -8.520136177813685,
-        -8.494909715292977,
-        -8.930878236602421,
-        -7.953755690163596,
-        -7.503540503165012,
-        -6.525716610693632,
-        -7.348782940527677,
-        -8.776529622697412,
-        -8.197226332457896,
-        -9.274271790048202,
-        -7.294248753530667,
-        -8.764521385304334,
-        -8.415549405795145,
-        -0.11927610214074733,
-        -10.0};
-    Xstd0_ = {785.9332076994402,
-        0.43302710595536104,
-        1.8515749063880493,
-        1.3055575808732673,
-        1.6798336028361684,
-        2.447928294804928,
-        1.5006601128562425,
-        2.258596083009175,
-        1.0695134196355123,
-        1.2716949907973987,
-        0.9670265336526266,
-        1.5082631217656783,
-        2.1971957246092937,
-        2.1231987035110436,
-        2.2224053468986456,
-        0.8075207314978867,
-        1.310900174356785,
-        0.6755691314768086,
-        2.499461159595155,
-        1.114407603965824,
-        1.622599294780544,
-        0.20281311961438814,
-        0.0};
-    Ymu0_ = {226228.87909773926,
-        -1.0002294411891734e-14,
-        70408.69549323348,
-        81238.7753677898,
-        60075.92722025813,
-        6256.692526973864,
-        85294.2320385505,
-        73667.01943306449,
-        52683.94214685393,
-        48832.495774154704,
-        22237.241951896645,
-        80399.34708396545,
-        33017.1522832487,
-        96672.96118619267,
-        44616.643675052255,
-        32243.428115007016,
-        65705.79343464803,
-        5056.177570193191,
-        60158.77480255935,
-        21154.32083517093,
-        26728.95867398989,
-        -2.9093186935800843e-11,
-        0.0};
-    Ystd0_ = {309784.6041536913,
-        1.281141802203683e-10,
-        71768.1714353984,
-        91778.64902440316,
-        77404.8698226368,
-        12534.115160354222,
-        102459.40125048182,
-        75000.66624369178,
-        68611.47945922047,
-        78901.34371862051,
-        71345.1801005712,
-        100224.6046398111,
-        44582.767400327175,
-        96915.23336099398,
-        45284.20463356352,
-        89324.98707548868,
-        83612.5218755913,
-        54836.63938591858,
-        67880.36729929173,
-        69192.37346905247,
-        59451.686150352514,
-        3.489220678333161e-10,
-        0.0};
-    Xmu1_ = Xmu0_;
-    Xstd1_ = Xstd0_;
-    Ymu1_ = Ymu0_;
-    Ystd1_ = Ystd0_;
-    Xmu2_ = Xmu0_;
-    Xstd2_ = Xstd0_;
-    Ymu2_ = Ymu0_;
-    Ystd2_ = Ystd0_;
 
-
+#ifdef USE_BLASDNN
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     useDNN = true;
     if (!Qdot_.typeHeaderOk<volScalarField>())
     {
         useDNN = false;
     }
-#endif
-
-
-#ifdef USE_TENSORFLOW
-    if(torchSwitch_){
-        tfModelPath0_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath0", string(""));
-        tfModelPath1_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath1", string(""));
-        tfModelPath2_ = this->subDict("TorchSettings").lookupOrDefault("tfModelPath2", string(""));
-
-        std::ifstream input_file0(tfModelPath0_, std::ios::binary);
-        std::cout<<"tfModelPath0_ = "<<tfModelPath0_<<std::endl;
-        std::vector<char> model_data0((std::istreambuf_iterator<char>(input_file0)), (std::istreambuf_iterator<char>()));
-        std::cout<<"model_data0 = "<<model_data0.size()<<std::endl;
-        input_file0.close();
-
-        std::ifstream input_file1(tfModelPath1_, std::ios::binary);
-        std::vector<char> model_data1((std::istreambuf_iterator<char>(input_file1)), (std::istreambuf_iterator<char>()));
-        std::cout<<"model_data1 = "<<model_data0.size()<<std::endl;
-        input_file1.close();
-
-        std::ifstream input_file2(tfModelPath2_, std::ios::binary);
-        std::vector<char> model_data2((std::istreambuf_iterator<char>(input_file2)), (std::istreambuf_iterator<char>()));
-        std::cout<<"model_data2 = "<<model_data0.size()<<std::endl;
-        input_file2.close();
-
-        DNNInferencertf DNNInferencertf(model_data0, model_data1, model_data2);
-        DNNInferencertf_ = DNNInferencertf;
-    }
-#endif
-
-#ifdef USE_BLASDNN
     if(torchSwitch_){
         BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
         DNNInferencer_blas_.load_models(BLASDNNModelPath_);
-        // DNNInferencer_blas_.alloc_buffer(mesh_.nCells());
     }
+
+    int mpisize, mpirank;
+    MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+    MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+
+    int count;
+    std::string norm_str;
+    char* buffer;
+
+    if (mpirank == 0){
+        std::ifstream fin(BLASDNNModelPath_ + "/norm.yaml");
+        if (!fin) {
+            SeriousError << "open norm error , norm path : " << BLASDNNModelPath_ + "/norm.yaml" << endl;
+            MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+        }
+        std::ostringstream oss;
+        oss << fin.rdbuf();
+        norm_str = oss.str();
+        count = norm_str.size();
+        fin.close();
+        buffer = new char[count];
+        std::copy(norm_str.begin(), norm_str.end(), buffer);
+    }
+
+    MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    if (mpirank != 0){
+        buffer = new char[count];
+    }
+
+    MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    if (mpirank != 0){
+        norm_str = std::string(buffer, count);
+    }
+    delete[] buffer;
+
+    YAML::Node norm = YAML::Load(norm_str);
+    YAML::Node Xmu0Node = norm["Xmu0"];
+    for (size_t i = 0; i < Xmu0Node.size(); i++){
+
+        Xmu0_.push_back(Xmu0Node[i].as<double>());
+    }
+    YAML::Node Xstd0Node = norm["Xstd0"];
+    for (size_t i = 0; i < Xstd0Node.size(); i++){
+        Xstd0_.push_back(Xstd0Node[i].as<double>());
+    }
+    YAML::Node Ymu0Node = norm["Ymu0"];
+    for (size_t i = 0; i < Ymu0Node.size(); i++){
+        Ymu0_.push_back(Ymu0Node[i].as<double>());
+    }
+    YAML::Node Ystd0Node = norm["Ystd0"];
+    for (size_t i = 0; i < Ystd0Node.size(); i++){
+        Ystd0_.push_back(Ystd0Node[i].as<double>());
+    }
+    YAML::Node Xmu1Node = norm["Xmu1"];
+    for (size_t i = 0; i < Xmu1Node.size(); i++){
+        Xmu1_.push_back(Xmu1Node[i].as<double>());
+    }
+    YAML::Node Xstd1Node = norm["Xstd1"];
+    for (size_t i = 0; i < Xstd1Node.size(); i++){
+        Xstd1_.push_back(Xstd1Node[i].as<double>());
+    }
+    YAML::Node Ymu1Node = norm["Ymu1"];
+    for (size_t i = 0; i < Ymu1Node.size(); i++){
+        Ymu1_.push_back(Ymu1Node[i].as<double>());
+    }
+    YAML::Node Ystd1Node = norm["Ystd1"];
+    for (size_t i = 0; i < Ystd1Node.size(); i++){
+        Ystd1_.push_back(Ystd1Node[i].as<double>());
+    }
+    YAML::Node Xmu2Node = norm["Xmu2"];
+    for (size_t i = 0; i < Xmu2Node.size(); i++){
+        Xmu2_.push_back(Xmu2Node[i].as<double>());
+    }
+    YAML::Node Xstd2Node = norm["Xstd2"];
+    for (size_t i = 0; i < Xstd2Node.size(); i++){
+        Xstd2_.push_back(Xstd2Node[i].as<double>());
+    }
+    YAML::Node Ymu2Node = norm["Ymu2"];
+    for (size_t i = 0; i < Ymu2Node.size(); i++){
+        Ymu2_.push_back(Ymu2Node[i].as<double>());
+    }
+    YAML::Node Ystd2Node = norm["Ystd2"];
+    for (size_t i = 0; i < Ystd2Node.size(); i++){
+        Ystd2_.push_back(Ystd2Node[i].as<double>());
+    }
+
 #endif
 }
 
@@ -471,23 +428,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve
         if (useDNN)
         {
             result = solve_DNN(deltaT);
-        }
-        else
-        {
-            result = solve_CVODE(deltaT);
-            useDNN = true;
-        }
-    }
-    else
-    {
-        result = solve_CVODE(deltaT);
-    }
-#elif defined(USE_TENSORFLOW)
-    if(torchSwitch_)
-    {
-        if (useDNN)
-        {
-            result = solve_DNN_tf(deltaT);
         }
         else
         {
@@ -594,7 +534,14 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     double correctThermo_part1_start, correctThermo_part1_end, correctThermo_part1_time = 0.;
     double correctThermo_part2_start, correctThermo_part2_end, correctThermo_part2_time = 0.;
     double correctThermo_start, correctThermo_end, correctThermo_time = 0.;
-    double correctThermoT_start, correctThermoT_end, correctThermoT_time = 0.;
+    double correctThermo_part1_1_time = 0.;
+    double correctThermo_part1_2_time = 0.;
+    double correctThermo_part1_3_time = 0.;
+    double correctThermo_part1_4_time = 0.;
+    double correctThermo_part1_5_time = 0.;
+    double correctThermo_part1_6_time = 0.;
+    double correctThermo_part1_7_time = 0.;
+    double correctThermo_part1_8_time = 0.;
 
     correctThermo_start = MPI_Wtime();
 
@@ -604,32 +551,43 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 
     forAll(T_, celli)
     {
+        double tick0 = MPI_Wtime();
         scalarList yTemp(mixture_.nSpecies());
         scalarList dTemp(mixture_.nSpecies());
         scalarList hrtTemp(mixture_.nSpecies());
-        
         forAll(Y_, i)
         {
             yTemp[i] = Y_[i][celli];
         }
-        correctThermoT_start = MPI_Wtime();
+        double tick1 = MPI_Wtime();
+        correctThermo_part1_1_time += tick1 - tick0;
 
         CanteraGas_->setState_PY(p_[celli], yTemp.begin());
+        double tick2 = MPI_Wtime();
+        correctThermo_part1_2_time += tick2 - tick1;
 
+        // cost
         CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
+        double tick3 = MPI_Wtime();
+        correctThermo_part1_3_time += tick3 - tick2;
 
         T_[celli] = CanteraGas_->temperature();
-
-        correctThermoT_end = MPI_Wtime();
-        correctThermoT_time += correctThermoT_end - correctThermoT_start;
-
+        double tick4 = MPI_Wtime();
+        correctThermo_part1_4_time += tick4 - tick3;
 
         // meanMolecularWeight() kg/kmol    RT() Joules/kmol
         psi_[celli] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+        double tick5 = MPI_Wtime();
+        correctThermo_part1_5_time += tick5 - tick4;
 
+        // cost
         mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
+        double tick6 = MPI_Wtime();
+        correctThermo_part1_6_time += tick6 - tick5;
 
         alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass()); // kg/(m*s)
+        double tick7 = MPI_Wtime();
+        correctThermo_part1_7_time += tick7 - tick6;
         // thermalConductivity() W/m/K
         // cp_mass()   J/kg/K
 
@@ -655,6 +613,8 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
                 hai_[i][celli] = hrtTemp[i]*RT/CanteraGas_->molecularWeight(i);
             }
         }
+        double tick8 = MPI_Wtime();
+        correctThermo_part1_8_time += tick8 - tick7;
     }
 
     correctThermo_part1_end = MPI_Wtime();
@@ -778,7 +738,14 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     Info << "correctThermo Total : " << correctThermo_time << endl;
     Info << "correctThermo part1 : " << correctThermo_part1_time << endl;
     Info << "correctThermo part2 : " << correctThermo_part2_time << endl;
-    Info << "correctThermo Temperature : " << correctThermoT_time << endl;
+    Info << "correctThermo part1 1 : " << correctThermo_part1_1_time << endl;
+    Info << "correctThermo part1 2 : " << correctThermo_part1_2_time << endl;
+    Info << "correctThermo part1 3 : " << correctThermo_part1_3_time << endl;
+    Info << "correctThermo part1 4 : " << correctThermo_part1_4_time << endl;
+    Info << "correctThermo part1 5 : " << correctThermo_part1_5_time << endl;
+    Info << "correctThermo part1 6 : " << correctThermo_part1_6_time << endl;
+    Info << "correctThermo part1 7 : " << correctThermo_part1_7_time << endl;
+    Info << "correctThermo part1 8 : " << correctThermo_part1_8_time << endl;
 }
 
 template<class ThermoType>
@@ -1038,10 +1005,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
     Info<<"=== end solve_CVODE === "<<endl;
     return updateReactionRates(incomingSolutions, List);
 }
-
-#ifdef USE_TENSORFLOW
-#include "tensorflowFunctions.H"
-#endif
 
 #ifdef USE_BLASDNN
 #include "blasdnnFunctions.H"

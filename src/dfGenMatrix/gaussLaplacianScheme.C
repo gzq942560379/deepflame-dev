@@ -137,7 +137,6 @@ gaussLaplacianSchemeFvmLaplacian
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    Info << "gaussLaplacianSchemeFvmLaplacian start" << endl;
     const fvMesh& mesh = vf.mesh();
     tmp<surfaceInterpolationScheme<scalar>> tinterpGammaScheme_(new linear<scalar>(mesh));
     tmp<fv::snGradScheme<Type>> tsnGradScheme_(new fv::orthogonalSnGrad<Type>(mesh));
@@ -242,7 +241,6 @@ gaussLaplacianSchemeFvmLaplacian
         }
     }
 
-    Info << "gaussLaplacianSchemeFvmLaplacian end" << endl;
     return tfvm;
 }  
 
@@ -274,12 +272,17 @@ gaussLaplacianSchemeFvcLaplacian
     const fvMesh& mesh = vf.mesh();
     tmp<surfaceInterpolationScheme<scalar>> tinterpGammaScheme_(new linear<scalar>(mesh));
     tmp<fv::snGradScheme<scalar>> tsnGradScheme_(new fv::orthogonalSnGrad<scalar>(mesh));
-    GeometricField<scalar, fvsPatchField, surfaceMesh> gammaInterpolate = 
-        tinterpGammaScheme_().interpolate(gamma)();
+    GeometricField<scalar, fvsPatchField, surfaceMesh> gammaInterpolate = tinterpGammaScheme_().interpolate(gamma)();
+
+    const tmp<GeometricField<Type, fvsPatchField, surfaceMesh>>& tssf = gammaInterpolate * tsnGradScheme_().snGrad(vf) * mesh.magSf();
 
     tmp<GeometricField<Type, fvPatchField, volMesh>> tLaplacian
     (
-        gaussConvectionSchemeFvcDiv(gammaInterpolate*tsnGradScheme_().snGrad(vf)*mesh.magSf())
+        new GeometricField<Type, fvPatchField, volMesh>
+        (
+            "div("+tssf->name()+')',
+            fvcSurfaceIntegrate(tssf)
+        )
     );
 
     return tLaplacian;

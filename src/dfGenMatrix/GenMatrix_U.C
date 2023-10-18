@@ -26,8 +26,7 @@ GenMatrix_U(
     volVectorField& U,
     const surfaceScalarField& phi,
     const volScalarField& p, 
-    compressible::turbulenceModel& turbulence,
-    labelList& face_scheduling
+    compressible::turbulenceModel& turbulence
 ){
     TICK0(GenMatrix_U);
 
@@ -180,6 +179,8 @@ GenMatrix_U(
     );
     Field<vector>& igGrad = gGrad;
     Field<tensor>& igGradU = gGradU;
+
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
 
     #pragma omp parallel for
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){

@@ -61,13 +61,14 @@ Description
 #include "CombustionModel.H"
 #include "CorrectPhi.H"
 
+#include "StructureMeshSchedule.H"
 #include <typeinfo>
 #include "env.H"
 #include "GenFvMatrix.H"
 
 // #define _CSR_
 // #define _ELL_
-// #define _DIV_
+#define _DIV_
 // #define _LDU_
 // #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
@@ -220,7 +221,7 @@ int main(int argc, char *argv[])
     double refine_start, refine_end, refine_time = 0.;
     double intializeFields_start, intializeFields_end,intializeFields_time = 0.;
     double renumber_start, renumber_end, renumber_time = 0.;
-    double structureMesh_start, structureMesh_end, structureMesh_time = 0.;
+    double ScheduleSetup_start, ScheduleSetup_end, ScheduleSetup_time = 0.;
 
     while (runTime.run()){
         refine_start = MPI_Wtime();
@@ -248,15 +249,15 @@ int main(int argc, char *argv[])
         break;
     }
 
-    structureMesh_start = MPI_Wtime();
-    #include "structureMesh.H"
-    structureMesh_end = MPI_Wtime();
-    structureMesh_time += structureMesh_end - structureMesh_start;
+    ScheduleSetup_start = MPI_Wtime();
+    #include "ScheduleSetup.H"
+    ScheduleSetup_end = MPI_Wtime();
+    ScheduleSetup_time += ScheduleSetup_end - ScheduleSetup_start;
 
     Info << "Refine time : " << refine_time << endl; 
     Info << "IntializeFields time : " << intializeFields_time << endl; 
     Info << "Renumber time : " << renumber_time << endl; 
-    Info << "structureMesh time : " << structureMesh_time << endl; 
+    Info << "ScheduleSetup time : " << ScheduleSetup_time << endl; 
     
     double init_end = MPI_Wtime();
 
@@ -385,7 +386,7 @@ int main(int argc, char *argv[])
                 Info<< "chemistry->correct end" << nl << endl;
             }
 
-            // Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
+            Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
 
             // --- Pressure corrector loop
 

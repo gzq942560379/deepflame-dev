@@ -33,8 +33,7 @@ GenMatrix_E(
     const volScalarField& alphaEff,
     const volScalarField& diffAlphaD,
     const volVectorField& hDiffCorrFlux,
-    const surfaceScalarField& linear_weights,
-    labelList& face_scheduling
+    const surfaceScalarField& linear_weights
 ){
     const fvMesh& mesh = he.mesh();
     assert(mesh.moving() == false);
@@ -53,21 +52,29 @@ GenMatrix_E(
     const scalar* const __restrict__ rhoOldTimePtr = rho.oldTime().primitiveField().begin();
     const scalar* const __restrict__ heOldTimePtr = he.oldTime().primitiveField().begin();
 
-    ITstream ITstream_surfaceInterpolationScheme_limitedLinear_1("surfaceInterpolationScheme_limitedLinear_1", tokenList{token(word("limitedLinear")), token(label(1))});
+    // ITstream ITstream_surfaceInterpolationScheme_limitedLinear_1("surfaceInterpolationScheme_limitedLinear_1", tokenList{token(word("limitedLinear")), token(label(1))});
+    // tmp<surfaceInterpolationScheme<scalar>> tsurfaceInterpolationScheme_limitedLinear_1  = surfaceInterpolationScheme<scalar>::New(mesh, phi, ITstream_surfaceInterpolationScheme_limitedLinear_1);
 
-    tmp<surfaceInterpolationScheme<scalar>> tsurfaceInterpolationScheme_limitedLinear_1  = surfaceInterpolationScheme<scalar>::New(mesh, phi, ITstream_surfaceInterpolationScheme_limitedLinear_1);
-
-    // TODO expancive
-    tmp<surfaceScalarField> tweights_he = tsurfaceInterpolationScheme_limitedLinear_1().weights(he);
-    const surfaceScalarField& weights_he = tweights_he();
-
-    // TODO expancive
-    tmp<surfaceScalarField> tweights_K = tsurfaceInterpolationScheme_limitedLinear_1().weights(K);
-    const surfaceScalarField& weights_K = tweights_K();
+    tmp<fv::convectionScheme<scalar>> cs_he = fv::convectionScheme<scalar>::New(mesh, phi, mesh.divScheme("div("+phi.name()+','+he.name()+')'));
+    fv::gaussConvectionScheme<scalar>& gcs_he = dynamic_cast<fv::gaussConvectionScheme<scalar>&>(cs_he.ref());
+    tmp<fv::convectionScheme<scalar>> cs_K = fv::convectionScheme<scalar>::New(mesh, phi, mesh.divScheme("div("+phi.name()+','+K.name()+')'));
+    fv::gaussConvectionScheme<scalar>& gcs_K = dynamic_cast<fv::gaussConvectionScheme<scalar>&>(cs_K.ref());
 
     tmp<surfaceInterpolationScheme<vector>> surfaceInterpolationScheme_vector_linear(new linear<vector>(mesh));
     tmp<surfaceInterpolationScheme<scalar>> surfaceInterpolationScheme_linear(new linear<scalar>(mesh));
     tmp<fv::snGradScheme<scalar>> snGradScheme_orthogonal(new fv::orthogonalSnGrad<scalar>(mesh));
+
+    // TODO expancive
+    // tmp<surfaceScalarField> tweights_he = surfaceInterpolationScheme_linear().weights(he);
+    // tmp<surfaceScalarField> tweights_he = tsurfaceInterpolationScheme_limitedLinear_1().weights(he);
+    tmp<surfaceScalarField> tweights_he = gcs_he.interpScheme().weights(he);
+    const surfaceScalarField& weights_he = tweights_he();    
+
+    // TODO expancive
+    // tmp<surfaceScalarField> tweights_K = surfaceInterpolationScheme_linear().weights(K);
+    // tmp<surfaceScalarField> tweights_K = tsurfaceInterpolationScheme_limitedLinear_1().weights(K);
+    tmp<surfaceScalarField> tweights_K = gcs_K.interpScheme().weights(K);
+    const surfaceScalarField& weights_K = tweights_K();
 
     tmp<surfaceScalarField> tweightshDiffCorrFlux= surfaceInterpolationScheme_vector_linear().weights(hDiffCorrFlux);
     tmp<surfaceScalarField> tlaplacianWeight = surfaceInterpolationScheme_linear().weights(alphaEff);
@@ -218,6 +225,7 @@ GenMatrix_E(
     //     fvcDiv2Ptr[l[f]] += hDiffCorrFluxf[f];
     //     fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
     // }
+    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
 
     #pragma omp parallel for
     for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){

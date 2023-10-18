@@ -22,14 +22,17 @@ std::vector<volVectorField> gradResult;
 Y_total_start = MPI_Wtime();
 Y_phiUc_start = MPI_Wtime();
 Y_build_start = MPI_Wtime();
+TICK0(Y_phiUc);
 forAll(Y, i)
 {
-    tmp<volVectorField> tfvcGradY = gaussGradSchemeGrad(Y[i]);
+    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * gaussGradSchemeGrad(Y[i]);
     const volVectorField& fvcGradY = tfvcGradY();
-    sumYDiffError += chemistry->rhoD(i)*fvcGradY;
+    sumYDiffError += fvcGradY;
     gradResult.push_back(fvcGradY);
 }
+TICK(Y_phiUc, 0, 1);
 const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
+TICK(Y_phiUc, 1, 2);
 Y_phiUc_end = MPI_Wtime();
 Y_build_end = MPI_Wtime();
 Y_total_end = MPI_Wtime();
@@ -101,7 +104,7 @@ forAll(Y, i)
     Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
 
     Y_build_grad_start = MPI_Wtime();
-    hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * gradResult[i] - Yi * sumYDiffError);
+    hDiffCorrFlux += chemistry->hai(i) * (gradResult[i] - Yi * sumYDiffError);
     diffAlphaD += laplacianTmp;
     Y_build_grad_end = MPI_Wtime();
     Y_field_multi_time += Y_build_grad_end - Y_build_grad_start;

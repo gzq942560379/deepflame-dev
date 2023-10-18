@@ -22,8 +22,9 @@ wmake src/dfUtils
 wmake src/dfRenumber
 wmake src/dfGenMatrix
 wmake src/dfMatrices
+wmake src/dfSchedule
 
-wmake applications/solvers/df0DFoam
+# wmake applications/solvers/df0DFoam
 wmake applications/solvers/dfLowMachFoam
 # wmake applications/solvers/dfHighSpeedFoam
 # wmake applications/solvers/dfSprayFoam

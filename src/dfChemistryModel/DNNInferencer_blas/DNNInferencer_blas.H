@@ -12,7 +12,7 @@
 class DNNInferencer_blas
 {
 private:
-    std::vector<int64_t> layers_{23,3200,1600,800,400,23};
+    std::vector<int64_t> layers_;
     std::vector<Layer<float>*> model0_;
     std::vector<Layer<float>*> model1_;
     std::vector<Layer<float>*> model2_;
@@ -25,8 +25,8 @@ private:
     std::vector<std::vector<float>> output_buffer_;
 public:
 
-    int64_t input_dim() const {return layers_[0]; }
-    int64_t output_dim() const {return layers_[5]; }
+    int64_t input_dim() const {return layers_.front(); }
+    int64_t output_dim() const {return layers_.back(); }
 
     int64_t batch_size() const {return batch_size_; }
 
