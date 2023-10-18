@@ -1,4 +1,5 @@
 Info << "refine\n" << endl;
+Info << "before refine cell number = " << U.size() << endl;
 // Store divrhoU from the previous mesh so that it can be mapped
 // and used in correctPhi to ensure the corrected phi has the
 // same divergence
@@ -41,5 +42,5 @@ if (mesh.changing())
     }
 }
 refineLevel --;
-Info << "cell number = " << U.size() << endl;
+Info << "after refine cell number = " << U.size() << endl;
 
