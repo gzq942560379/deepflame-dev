@@ -174,7 +174,7 @@ public IOdictionary
 
 #ifdef USE_BLASDNN
         // tensorflow
-        DNNInferencer_blas DNNInferencer_blas_;
+        DNNInferencer_blas<double> DNNInferencer_blas_;
         string BLASDNNModelPath_;
 #endif
 

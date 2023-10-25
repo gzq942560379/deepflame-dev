@@ -44,9 +44,9 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     }
 
     int input_dim = mixture_.nSpecies() + 2;
-    std::vector<float> NNInputs0(Cell0.size() * input_dim);
-    std::vector<float> NNInputs1(Cell1.size() * input_dim);
-    std::vector<float> NNInputs2(Cell2.size() * input_dim);
+    std::vector<double> NNInputs0(Cell0.size() * input_dim);
+    std::vector<double> NNInputs1(Cell1.size() * input_dim);
+    std::vector<double> NNInputs2(Cell2.size() * input_dim);
 
 #ifdef _OPENMP
     #pragma omp parallel

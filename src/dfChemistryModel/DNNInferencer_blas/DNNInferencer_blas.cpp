@@ -8,7 +8,8 @@
 #endif
 #include <yaml-cpp/yaml.h>
 
-DNNInferencer_blas::DNNInferencer_blas() {
+template<typename DataType>
+DNNInferencer_blas<DataType>::DNNInferencer_blas() {
     char* env_tmp = getenv("DNN_BATCH_SIZE");
     if(env_tmp == NULL){
         this->batch_size_ = 16384;
@@ -17,7 +18,8 @@ DNNInferencer_blas::DNNInferencer_blas() {
     }
 }                
 
-DNNInferencer_blas::~DNNInferencer_blas() {
+template<typename DataType>
+DNNInferencer_blas<DataType>::~DNNInferencer_blas() {
     for(int i = 0;i < model0_.size(); ++i){
         delete model0_[i];
     }
@@ -32,13 +34,13 @@ DNNInferencer_blas::~DNNInferencer_blas() {
     model2_.clear();
 }
 
-
-void DNNInferencer_blas::load_models(const std::string dir){
+template<typename DataType>
+void DNNInferencer_blas<DataType>::load_models(const std::string dir){
     // mpi 
     int flag_mpi_init;
     MPI_Initialized(&flag_mpi_init);
     if(!flag_mpi_init){
-        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        std::cerr << "DNNInferencer_blas<DataType>::load_models : MPI is not initialized" << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     int mpirank;
@@ -94,9 +96,9 @@ void DNNInferencer_blas::load_models(const std::string dir){
         int64_t in_features = modelNode0[i]["layer"]["in_features"].as<int64_t>();
         int64_t out_features = modelNode0[i]["layer"]["out_features"].as<int64_t>();
         if(layerType == "LinearGELU"){
-            model0_.push_back(new LinearGELU<float>(in_features, out_features));
+            model0_.push_back(new LinearGELU<DataType>(in_features, out_features));
         }else if(layerType == "Linear"){
-            model0_.push_back(new Linear<float>(in_features, out_features));
+            model0_.push_back(new Linear<DataType>(in_features, out_features));
         }else{
             assert(false);
         }
@@ -110,9 +112,9 @@ void DNNInferencer_blas::load_models(const std::string dir){
         int64_t in_features = modelNode1[i]["layer"]["in_features"].as<int64_t>();
         int64_t out_features = modelNode1[i]["layer"]["out_features"].as<int64_t>();
         if(layerType == "LinearGELU"){
-            model1_.push_back(new LinearGELU<float>(in_features, out_features));
+            model1_.push_back(new LinearGELU<DataType>(in_features, out_features));
         }else if(layerType == "Linear"){
-            model1_.push_back(new Linear<float>(in_features, out_features));
+            model1_.push_back(new Linear<DataType>(in_features, out_features));
         }else{
             assert(false);
         }
@@ -126,9 +128,9 @@ void DNNInferencer_blas::load_models(const std::string dir){
         int64_t in_features = modelNode2[i]["layer"]["in_features"].as<int64_t>();
         int64_t out_features = modelNode2[i]["layer"]["out_features"].as<int64_t>();
         if(layerType == "LinearGELU"){
-            model2_.push_back(new LinearGELU<float>(in_features, out_features));
+            model2_.push_back(new LinearGELU<DataType>(in_features, out_features));
         }else if(layerType == "Linear"){
-            model2_.push_back(new Linear<float>(in_features, out_features));
+            model2_.push_back(new Linear<DataType>(in_features, out_features));
         }else{
             assert(false);
         }
@@ -147,16 +149,18 @@ void DNNInferencer_blas::load_models(const std::string dir){
 
     buffer_alloced_ = true;
     FLOPs_per_sample_ = 0;
-    for(size_t i = 1; i < layers_.size(); ++i){
-        output_buffer_.emplace_back(std::vector<float>(batch_size_ * layers_[i]));
+    for(size_t i = 1; i < layers_.size() - 1; ++i){
+        output_buffer_.emplace_back(std::vector<DataType>(batch_size_ * layers_[i]));
         FLOPs_per_sample_ += 2.0 * layers_[i - 1] * layers_[i];
     }
 }
 
-void DNNInferencer_blas::Inference_multiDNNs(
-    const std::vector<float>& input0, std::vector<double>& output0, int64_t input_count0,
-    const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
-    const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2
+
+template<typename DataType>
+void DNNInferencer_blas<DataType>::Inference_multiDNNs(
+    const std::vector<DataType>& input0, std::vector<DataType>& output0, int64_t input_count0,
+    const std::vector<DataType>& input1, std::vector<DataType>& output1, int64_t input_count1,
+    const std::vector<DataType>& input2, std::vector<DataType>& output2, int64_t input_count2
 ){
     if(!buffer_alloced_){
         std::cerr << "DNNInferencer_blas::Inference : buffer is not alloced" << std::endl;
@@ -183,22 +187,23 @@ void DNNInferencer_blas::Inference_multiDNNs(
         for(int64_t sample_start = 0; sample_start < input_count0; sample_start += batch_size_){
             int64_t sample_end = std::min(input_count0, sample_start + batch_size_);
             int64_t sample_len = sample_end - sample_start;
-            std::vector<Tensor<float>> tensor_list;
-            tensor_list.emplace_back(Tensor<float>({sample_len, layers_[0]}, const_cast<float*>(input0.data()) + sample_start * input_dim()));
-            for(size_t i = 1; i < layers_.size(); ++i){
-                tensor_list.emplace_back(Tensor<float>({sample_len, layers_[i]}, output_buffer_[i - 1].data()));
+            std::vector<Tensor<DataType>> tensor_list;
+            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[0]}, const_cast<DataType*>(input0.data()) + sample_start * input_dim()));
+            for(size_t i = 1; i < layers_.size() - 1; ++i){
+                tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[i]}, output_buffer_[i - 1].data()));
             }
+            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[layers_.size() - 1]}, output0.data() + sample_start * output_dim()));
+
             for(size_t i = 0; i < model0_.size(); ++i){
                 model0_[i]->forward(tensor_list[i], tensor_list[i+1]);
             }
-            Tensor<float>& last_tensor = tensor_list.back();
+            Tensor<DataType>& last_tensor = tensor_list.back();
 
-            double* __restrict__ output0_ptr = output0.data() + sample_start * output_dim();
-            const float* const __restrict__ last_tensor_ptr = last_tensor.data();
-
-            for(int i = 0; i < last_tensor.element_num(); ++i){
-                output0_ptr[i] = last_tensor_ptr[i];
-            }
+            // DataType* __restrict__ output0_ptr = output0.data() + sample_start * output_dim();
+            // const DataType* const __restrict__ last_tensor_ptr = last_tensor.data();
+            // for(int i = 0; i < last_tensor.element_num(); ++i){
+            //     output0_ptr[i] = last_tensor_ptr[i];
+            // }
         }
     }
 
@@ -209,24 +214,23 @@ void DNNInferencer_blas::Inference_multiDNNs(
             int64_t sample_end = std::min(input_count1, sample_start + batch_size_);
             int64_t sample_len = sample_end - sample_start;
 
-            std::vector<Tensor<float>> tensor_list;
-            tensor_list.emplace_back(Tensor<float>({sample_len, layers_[0]}, const_cast<float*>(input1.data()) + sample_start * input_dim()));
-            for(size_t i = 1; i < layers_.size(); ++i){
-                tensor_list.emplace_back(Tensor<float>({sample_len, layers_[i]}, output_buffer_[i - 1].data()));
+            std::vector<Tensor<DataType>> tensor_list;
+            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[0]}, const_cast<DataType*>(input1.data()) + sample_start * input_dim()));
+            for(size_t i = 1; i < layers_.size() - 1; ++i){
+                tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[i]}, output_buffer_[i - 1].data()));
             }
+            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[layers_.size() - 1]}, output1.data() + sample_start * output_dim()));
 
             for(size_t i = 0; i < model1_.size(); ++i){
                 model1_[i]->forward(tensor_list[i], tensor_list[i+1]);
             }
 
-            Tensor<float>& last_tensor = tensor_list.back();
-
-            double* __restrict__ output1_ptr = output1.data() + sample_start * output_dim();
-            const float* const __restrict__ last_tensor_ptr = last_tensor.data();
-
-            for(int i = 0; i < last_tensor.element_num(); ++i){
-                output1_ptr[i] = last_tensor_ptr[i];
-            }
+            // Tensor<DataType>& last_tensor = tensor_list.back();
+            // DataType* __restrict__ output1_ptr = output1.data() + sample_start * output_dim();
+            // const DataType* const __restrict__ last_tensor_ptr = last_tensor.data();
+            // for(int i = 0; i < last_tensor.element_num(); ++i){
+            //     output1_ptr[i] = last_tensor_ptr[i];
+            // }
         }
     }
 
@@ -237,24 +241,23 @@ void DNNInferencer_blas::Inference_multiDNNs(
             int64_t sample_end = std::min(input_count2, sample_start + batch_size_);
             int64_t sample_len = sample_end - sample_start;
 
-            std::vector<Tensor<float>> tensor_list;
-            tensor_list.emplace_back(Tensor<float>({sample_len, layers_[0]}, const_cast<float*>(input2.data()) + sample_start * input_dim()));
-            for(size_t i = 1; i < layers_.size(); ++i){
-                tensor_list.emplace_back(Tensor<float>({sample_len, layers_[i]}, output_buffer_[i - 1].data()));
+            std::vector<Tensor<DataType>> tensor_list;
+            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[0]}, const_cast<DataType*>(input2.data()) + sample_start * input_dim()));
+            for(size_t i = 1; i < layers_.size() - 1; ++i){
+                tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[i]}, output_buffer_[i - 1].data()));
             }
+            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers_[layers_.size() - 1]}, output2.data() + sample_start * output_dim()));
 
             for(size_t i = 0; i < model2_.size(); ++i){
                 model2_[i]->forward(tensor_list[i], tensor_list[i+1]);
             }
 
-            Tensor<float>& last_tensor = tensor_list.back();
-
-            double* __restrict__ output2_ptr = output2.data() + sample_start * output_dim();
-            const float* const __restrict__ last_tensor_ptr = last_tensor.data();
-
-            for(int i = 0; i < last_tensor.element_num(); ++i){
-                output2_ptr[i] = last_tensor_ptr[i];
-            }
+            // Tensor<DataType>& last_tensor = tensor_list.back();
+            // DataType* __restrict__ output2_ptr = output2.data() + sample_start * output_dim();
+            // const DataType* const __restrict__ last_tensor_ptr = last_tensor.data();
+            // for(int i = 0; i < last_tensor.element_num(); ++i){
+            //     output2_ptr[i] = last_tensor_ptr[i];
+            // }
         }
     }
 
@@ -267,7 +270,13 @@ void DNNInferencer_blas::Inference_multiDNNs(
 #else
     int num_threads = 1;
 #endif
-    double theoretical_peak = 14./6.*2; // per node of sw  
+    double theoretical_peak = 14./6.; // per node of sw  
+    if(typeid(DataType) == typeid(double)){
+    }else if(typeid(DataType) == typeid(float)){
+        theoretical_peak *= 2.;
+    }else{
+        assert(false);
+    }
     double FLOPS = FLOPs / dnn_infer_time;
     double TFLOPS = FLOPS * 1e-12;
     double peak = TFLOPS * 100. / theoretical_peak;
@@ -289,8 +298,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
         std::cout << "Theoretical Peak : " << theoretical_peak << std::endl;
         std::cout << "Peak : " << peak << std::endl;
         std::cout << "-------------------------------------" << std::endl;
-    }
-
+    } 
 #ifdef DEF_PROFILING
     for(size_t i = 0; i < model0_.size(); ++i){
         model0_[i]->print_profiling_info();
@@ -305,4 +313,5 @@ void DNNInferencer_blas::Inference_multiDNNs(
 }
 
 
-
+template class DNNInferencer_blas<float>;
+template class DNNInferencer_blas<double>;
