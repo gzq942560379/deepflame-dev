@@ -940,6 +940,11 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
     const DeltaTType& deltaT
 )
 {
+    if(!chemistry_)
+    {
+        return great;
+    }
+
     Info<<"=== begin solve_CVODE === "<<endl;
     // CPU time analysis
     clockTime timer;
@@ -948,11 +953,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
     scalar t_balance(0);
     scalar t_solveBuffer(0);
     scalar t_unbalance(0);
-
-    if(!chemistry_)
-    {
-        return great;
-    }
 
     timer.timeIncrement();
     DynamicList<ChemistryProblem> allProblems = getProblems(deltaT);

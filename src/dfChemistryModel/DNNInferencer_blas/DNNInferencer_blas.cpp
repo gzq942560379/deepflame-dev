@@ -158,6 +158,23 @@ void DNNInferencer_blas::Inference_multiDNNs(
     const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
     const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2
 ){
+    if(!buffer_alloced_){
+        std::cerr << "DNNInferencer_blas::Inference : buffer is not alloced" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+
+#ifdef DEF_PROFILING
+    for(size_t i = 0; i < model0_.size(); ++i){
+        model0_[i]->profiling_reset();
+    }
+    for(size_t i = 0; i < model1_.size(); ++i){
+        model1_[i]->profiling_reset();
+    }
+    for(size_t i = 0; i < model2_.size(); ++i){
+        model2_[i]->profiling_reset();
+    }
+#endif
+
     double dnn_infer_start = MPI_Wtime();
 
     if(input_count0 > 0){
@@ -250,7 +267,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
 #else
     int num_threads = 1;
 #endif
-    double theoretical_peak = 14./6.; // per node of sw  
+    double theoretical_peak = 14./6.*2; // per node of sw  
     double FLOPS = FLOPs / dnn_infer_time;
     double TFLOPS = FLOPS * 1e-12;
     double peak = TFLOPS * 100. / theoretical_peak;
@@ -264,6 +281,7 @@ void DNNInferencer_blas::Inference_multiDNNs(
     if(mpirank == 0){
         std::cout << "Inference Performance ---------------" << std::endl;
         std::cout << "samples : " << (input_count0 + input_count1 + input_count2) << std::endl;
+        std::cout << "FLOPs_per_sample_ : " << FLOPs_per_sample_ << std::endl;
         std::cout << "batch size : " << batch_size_ << std::endl;
         std::cout << "Time : " << dnn_infer_time << std::endl;
         std::cout << "FLOPS : " << FLOPs << std::endl;
@@ -271,7 +289,19 @@ void DNNInferencer_blas::Inference_multiDNNs(
         std::cout << "Theoretical Peak : " << theoretical_peak << std::endl;
         std::cout << "Peak : " << peak << std::endl;
         std::cout << "-------------------------------------" << std::endl;
-    } 
+    }
+
+#ifdef DEF_PROFILING
+    for(size_t i = 0; i < model0_.size(); ++i){
+        model0_[i]->print_profiling_info();
+    }
+    for(size_t i = 0; i < model1_.size(); ++i){
+        model1_[i]->print_profiling_info();
+    }
+    for(size_t i = 0; i < model1_.size(); ++i){
+        model1_[i]->print_profiling_info();
+    }
+#endif
 }
 
 
