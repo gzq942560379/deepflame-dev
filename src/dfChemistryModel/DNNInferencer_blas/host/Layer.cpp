@@ -385,6 +385,18 @@ void bias_ldm_slave(Tensor<float>& input, const Tensor<float>& bias){
     CRTS_athread_join();
 }
 
+void bias_ldm_slave(Tensor<double>& input, const Tensor<double>& bias){
+    bias_d_param_t para;
+
+    para.row = input.dim(0);
+    para.col = input.dim(1);
+    para.input = input.data();
+    para.bias = const_cast<double*>(bias.data());
+
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(bias_d_ldm)), &para);
+    CRTS_athread_join();
+}
+
 void bias_gelu_ldm_lookup_slave(Tensor<float>& input, const Tensor<float>& bias){
     bias_gelu_s_param_t para;
 
@@ -394,6 +406,16 @@ void bias_gelu_ldm_lookup_slave(Tensor<float>& input, const Tensor<float>& bias)
     para.bias = const_cast<float*>(bias.data());
 
     CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(bias_gelu_s_ldm_lookup)), &para);
+    CRTS_athread_join();
+}
+
+void bias_gelu_ldm_lookup_slave(Tensor<double>& input, const Tensor<double>& bias){
+    bias_gelu_d_param_t para;
+    para.row = input.dim(0);
+    para.col = input.dim(1);
+    para.input = input.data();
+    para.bias = const_cast<double*>(bias.data());
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(bias_gelu_d_ldm_lookup)), &para);
     CRTS_athread_join();
 }
 
@@ -423,7 +445,8 @@ void Linear<DataType>::forward(const Tensor<DataType>& input, Tensor<DataType>& 
     double infer_gemm_end = MPI_Wtime();
     double infer_add_start = MPI_Wtime();
 #endif
-    bias_naive(output, bias_);
+    // bias_naive(output, bias_);
+    bias_ldm_slave(output, bias_);
 #ifdef DEF_PROFILING
     double infer_add_end = MPI_Wtime();
     double infer_end = MPI_Wtime();
@@ -460,13 +483,15 @@ void LinearGELU<DataType>::forward(const Tensor<DataType>& input, Tensor<DataTyp
     double infer_gemm_end = MPI_Wtime();
     double infer_add_start = MPI_Wtime();
 #endif
-    bias_naive(output, bias_);
+    // bias_naive(output, bias_);
 #ifdef DEF_PROFILING
     double infer_add_end = MPI_Wtime();
     double infer_gelu_start = MPI_Wtime();
 #endif
     // GELU
-    gelu_exp(output.element_num(), output.data());
+    // gelu_exp(output.element_num(), output.data());
+    bias_gelu_ldm_lookup_slave(output, bias_);
+
 #ifdef DEF_PROFILING
     double infer_gelu_end = MPI_Wtime();
     double infer_end = MPI_Wtime();
