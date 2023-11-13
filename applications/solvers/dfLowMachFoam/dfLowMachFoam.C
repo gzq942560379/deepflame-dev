@@ -113,6 +113,8 @@ Description
 #include "pointSet.H"
 #include <omp.h>
 
+#include "csrPattern.H"
+
 #ifdef FOAM_USE_ZOLTAN
     #include "zoltanRenumber.H"
 #endif
@@ -235,19 +237,27 @@ int main(int argc, char *argv[])
         }
         refine_end = MPI_Wtime();
         refine_time += refine_end - refine_start;
-
-        intializeFields_start = MPI_Wtime();
-        #include "intializeFields.H"
-        intializeFields_end = MPI_Wtime();
-        intializeFields_time += intializeFields_end - intializeFields_start;
-
-        renumber_start = MPI_Wtime();
-        #include "renumberMesh.H"
-        renumber_end = MPI_Wtime();
-        renumber_time += renumber_end - renumber_start;
-
         break;
     }
+
+    intializeFields_start = MPI_Wtime();
+    #include "intializeFields.H"
+    intializeFields_end = MPI_Wtime();
+    intializeFields_time += intializeFields_end - intializeFields_start;
+
+    csrPattern pattern_before_renumber(mesh);
+    pattern_before_renumber.coloring();
+    pattern_before_renumber.write_mtx("sparse_pattern_before_renumber");
+
+    renumber_start = MPI_Wtime();
+    #include "renumberMesh.H"
+    renumber_end = MPI_Wtime();
+    renumber_time += renumber_end - renumber_start;
+
+    renumber_start = MPI_Wtime();
+    #include "renumberMesh.H"
+    renumber_end = MPI_Wtime();
+    renumber_time += renumber_end - renumber_start;
 
     ScheduleSetup_start = MPI_Wtime();
     #include "ScheduleSetup.H"
