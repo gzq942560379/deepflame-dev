@@ -21,14 +21,9 @@ private:
     labelList cell_scheduling_;
     labelList face_scheduling_;
 
-    label blocksize_;
-    labelList color_;
-
 public:
 
-    StructureMeshSchedule(int blocksize){
-        blocksize_ = blocksize;
-    };
+    StructureMeshSchedule(label dummy){};
 
     virtual void Setup(const fvMesh& mesh);
 

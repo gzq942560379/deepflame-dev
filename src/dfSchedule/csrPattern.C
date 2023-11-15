@@ -139,6 +139,196 @@ csrPattern csrPattern::blocking(label block_size){
     return blocked_matrix;
 }
 
+csrPattern csrPattern::lower_part(){
+    csrPattern ret;
+    ret.n_ = n_;
+
+    // compute row_count
+    std::vector<label> row_count(n_, 0);
+    for(label r = 0; r < n_; ++r){
+        for(label index = rowptr_[r]; index < rowptr_[r + 1]; ++index){
+            label c = colidx_[index];
+            if(c < r){
+                row_count[r] += 1;
+            }
+        }
+    }
+
+    // rowptr nnz
+    ret.rowptr_.resize(n_ + 1);
+    ret.rowptr_[0] = 0;
+    for(label r = 0; r < n_; ++r){
+        ret.rowptr_[r + 1] = ret.rowptr_[r] + row_count[r];
+    }
+    ret.nnz_ = ret.rowptr_[n_];
+    ret.colidx_.resize(ret.nnz_);
+
+    std::vector<label> cur_index(n_);
+    for(label r = 0; r < n_; ++r){
+        cur_index[r] = ret.rowptr_[r];
+    }
+
+    // fill colidx
+    for(label r = 0; r < n_; ++r){
+        for(label index = rowptr_[r]; index < rowptr_[r + 1]; ++index){
+            label c = colidx_[index];
+            if(c < r){
+                ret.colidx_[cur_index[r]] = c;
+                cur_index[r] += 1;
+            }
+        }
+    }
+
+    // check
+    for(label r = 0; r < n_; ++r){
+        assert(cur_index[r] == ret.rowptr_[r + 1]);
+    }
+    return ret;
+}
+
+csrPattern csrPattern::indirect_conflict(){
+    csrPattern ret;
+
+    ret.n_ = n_;
+
+    // compute row_count
+    std::vector<label> row_count(n_, 0);
+    std::vector<label> mark(n_, -1);
+    for(label r = 0; r < n_; ++r){
+        for(label idx = rowptr_[r]; idx < rowptr_[r+1]; ++idx){
+            label c = colidx_[idx];
+            mark[c] = r;
+        }
+        
+        for(label rr = 0; rr < n_; ++rr){
+            if(rr == r) continue;
+            for(label oidx = rowptr_[rr]; oidx < rowptr_[rr+1]; ++oidx){
+                label cc = colidx_[oidx];
+                if(mark[cc] == r){
+                    row_count[r] += 1;
+                }
+            }
+        }
+    }
+
+    // rowptr nnz
+    ret.rowptr_.resize(n_ + 1);
+    ret.rowptr_[0] = 0;
+    for(label r = 0; r < n_; ++r){
+        ret.rowptr_[r + 1] = ret.rowptr_[r] + row_count[r];
+    }
+    ret.nnz_ = ret.rowptr_[n_];
+    ret.colidx_.resize(ret.nnz_);
+
+    std::vector<label> cur_index(n_);
+    for(label r = 0; r < n_; ++r){
+        cur_index[r] = ret.rowptr_[r];
+    }
+
+    // reset mark
+    for(label r = 0; r < n_; ++r){
+        mark[r] = -1;
+    }
+
+    // fill colidx
+    for(label r = 0; r < n_; ++r){
+        for(label idx = rowptr_[r]; idx < rowptr_[r+1]; ++idx){
+            label c = colidx_[idx];
+            mark[c] = r;
+        }
+        for(label rr = 0; rr < n_; ++rr){
+            if(rr == r) continue;
+            for(label oidx = rowptr_[rr]; oidx < rowptr_[rr+1]; ++oidx){
+                label cc = colidx_[oidx];
+                if(mark[cc] == r){
+                    ret.colidx_[cur_index[r]] = rr;
+                    cur_index[r] += 1;
+                }
+            }
+        }
+    }
+
+    // check
+    for(label r = 0; r < n_; ++r){
+        assert(cur_index[r] == ret.rowptr_[r + 1]);
+    }
+    return ret;
+}
+
+csrPattern operator+(const csrPattern& a, const csrPattern& b){
+    if(a.n_ != b.n_){
+        SeriousError << "In csrPattern friend operator+, the n_ of a and b have to be same !!!" << endl;
+        SeriousError << "a.n_ : " << a.n_ << endl;
+        SeriousError << "b.n_ : " << b.n_ << endl;
+        MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+    }
+
+    csrPattern ret;
+    ret.n_ = a.n_;
+
+    // compute row_count
+    std::vector<label> row_count(ret.n_, 0);
+    std::vector<label> mark(ret.n_, -1);
+    for(label r = 0; r < ret.n_; ++r){
+        for(label idx = a.rowptr_[r]; idx < a.rowptr_[r+1]; ++idx){
+            label c = a.colidx_[idx];
+            mark[c] = r;
+        }
+        for(label idx = b.rowptr_[r]; idx < b.rowptr_[r+1]; ++idx){
+            label c = b.colidx_[idx];
+            mark[c] = r;
+        }
+        for(label c = 0; c < ret.n_; ++c){
+            if(mark[c] == r){
+                row_count[r] += 1;
+            }
+        }
+    }
+
+    // rowptr nnz
+    ret.rowptr_.resize(ret.n_ + 1);
+    ret.rowptr_[0] = 0;
+    for(label r = 0; r < ret.n_; ++r){
+        ret.rowptr_[r + 1] = ret.rowptr_[r] + row_count[r];
+    }
+    ret.nnz_ = ret.rowptr_[ret.n_];
+    ret.colidx_.resize(ret.nnz_);
+
+    std::vector<label> cur_index(ret.n_);
+    for(label r = 0; r < ret.n_; ++r){
+        cur_index[r] = ret.rowptr_[r];
+    }
+
+    // reset mark
+    for(label r = 0; r < ret.n_; ++r){
+        mark[r] = -1;
+    }
+
+    // fill colidx
+    for(label r = 0; r < ret.n_; ++r){
+        for(label idx = a.rowptr_[r]; idx < a.rowptr_[r+1]; ++idx){
+            label c = a.colidx_[idx];
+            mark[c] = r;
+        }
+        for(label idx = b.rowptr_[r]; idx < b.rowptr_[r+1]; ++idx){
+            label c = b.colidx_[idx];
+            mark[c] = r;
+        }
+        for(label c = 0; c < ret.n_; ++c){
+            if(mark[c] == r){
+                ret.colidx_[cur_index[r]] = c;
+                cur_index[r] += 1;
+            }
+        }
+    }
+    
+    // check
+    for(label r = 0; r < ret.n_; ++r){
+        assert(cur_index[r] == ret.rowptr_[r + 1]);
+    }
+    return ret;
+}
+
 void csrPattern::write_mtx(const std::string& filename) const {
     int mpisize, mpirank;
     MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);

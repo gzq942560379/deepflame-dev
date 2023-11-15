@@ -45,6 +45,12 @@ public:
 
     csrPattern blocking(label block_size);
 
+    csrPattern lower_part();
+
+    csrPattern indirect_conflict();
+
+    friend csrPattern operator+(const csrPattern& a, const csrPattern& b);
+
     void write_mtx(const std::string& filename) const;
 };
 
