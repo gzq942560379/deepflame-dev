@@ -199,104 +199,104 @@ void Foam::ellMatrix::SymGaussSeidel_B8
     }
 }
 
-void Foam::ellMatrix::SymGaussSeidel_B8_colored
-(
-    scalarField& psi,
-    const scalarField& bPrime
-) const
-{
-    assert(psi.size() == row_);
-    assert(colored_);
+// void Foam::ellMatrix::SymGaussSeidel_B8_colored
+// (
+//     scalarField& psi,
+//     const scalarField& bPrime
+// ) const
+// {
+//     assert(psi.size() == row_);
+//     assert(colored_);
 
-    const scalar* const __restrict__ bPrimePtr = bPrime.begin();
+//     const scalar* const __restrict__ bPrimePtr = bPrime.begin();
 
-    scalar* __restrict__ psiPtr = psi.begin();
+//     scalar* __restrict__ psiPtr = psi.begin();
 
-    const scalar* const __restrict__ diagPtr = diag_value_.begin();
-    const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
-    const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
+//     const scalar* const __restrict__ diagPtr = diag_value_.begin();
+//     const label* const __restrict__ off_diag_colidx_Ptr = off_diag_colidx_.begin();
+//     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
 
-    #pragma omp parallel
-    {
-        scalarField tmp(row_block_size_);
-        scalar* __restrict__ tmpPtr = tmp.begin();
-        for(label color = 0; color < num_color_; ++color){
-            #pragma omp for
-            for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
-                label bi = nodes_of_color_[node_index];
-                label rbs = ELL_BLOCK_START(bi);
-                scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
-                const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
-                const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
-                tmpPtr[0] = bPrimePtr_offset[0];
-                tmpPtr[1] = bPrimePtr_offset[1];
-                tmpPtr[2] = bPrimePtr_offset[2];
-                tmpPtr[3] = bPrimePtr_offset[3];
-                tmpPtr[4] = bPrimePtr_offset[4];
-                tmpPtr[5] = bPrimePtr_offset[5];
-                tmpPtr[6] = bPrimePtr_offset[6];
-                tmpPtr[7] = bPrimePtr_offset[7];
-                label index_block_start = ELL_INDEX_BLOCK_START(rbs);
-                for(label ellcol = 0; ellcol < max_count_; ++ellcol){
-                    label index_ellcol_start = index_block_start + ELL_COL_OFFSET(ellcol);
-                    tmpPtr[0] -= off_diag_value_Ptr[index_ellcol_start + 0] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 0]];
-                    tmpPtr[1] -= off_diag_value_Ptr[index_ellcol_start + 1] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 1]];
-                    tmpPtr[2] -= off_diag_value_Ptr[index_ellcol_start + 2] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 2]];
-                    tmpPtr[3] -= off_diag_value_Ptr[index_ellcol_start + 3] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 3]];
-                    tmpPtr[4] -= off_diag_value_Ptr[index_ellcol_start + 4] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 4]];
-                    tmpPtr[5] -= off_diag_value_Ptr[index_ellcol_start + 5] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 5]];
-                    tmpPtr[6] -= off_diag_value_Ptr[index_ellcol_start + 6] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 6]];
-                    tmpPtr[7] -= off_diag_value_Ptr[index_ellcol_start + 7] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 7]];
-                }
-                psiPtr_offset[0] = tmpPtr[0] / diagPtr_offset[0];
-                psiPtr_offset[1] = tmpPtr[1] / diagPtr_offset[1];
-                psiPtr_offset[2] = tmpPtr[2] / diagPtr_offset[2];
-                psiPtr_offset[3] = tmpPtr[3] / diagPtr_offset[3];
-                psiPtr_offset[4] = tmpPtr[4] / diagPtr_offset[4];
-                psiPtr_offset[5] = tmpPtr[5] / diagPtr_offset[5];
-                psiPtr_offset[6] = tmpPtr[6] / diagPtr_offset[6];
-                psiPtr_offset[7] = tmpPtr[7] / diagPtr_offset[7];
-            }
-        }
-        for(label color = num_color_ - 1; color >= 0; --color){
-            #pragma omp for
-            for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
-                label bi = nodes_of_color_[node_index];
-                label rbs = ELL_BLOCK_START(bi);
-                scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
-                const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
-                const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
-                tmpPtr[0] = bPrimePtr_offset[0];
-                tmpPtr[1] = bPrimePtr_offset[1];
-                tmpPtr[2] = bPrimePtr_offset[2];
-                tmpPtr[3] = bPrimePtr_offset[3];
-                tmpPtr[4] = bPrimePtr_offset[4];
-                tmpPtr[5] = bPrimePtr_offset[5];
-                tmpPtr[6] = bPrimePtr_offset[6];
-                tmpPtr[7] = bPrimePtr_offset[7];
-                label index_block_start = ELL_INDEX_BLOCK_START(rbs);
-                for(label ellcol = 0; ellcol < max_count_; ++ellcol){
-                    label index_ellcol_start = index_block_start + ELL_COL_OFFSET(ellcol);
-                    tmpPtr[0] -= off_diag_value_Ptr[index_ellcol_start + 0] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 0]];
-                    tmpPtr[1] -= off_diag_value_Ptr[index_ellcol_start + 1] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 1]];
-                    tmpPtr[2] -= off_diag_value_Ptr[index_ellcol_start + 2] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 2]];
-                    tmpPtr[3] -= off_diag_value_Ptr[index_ellcol_start + 3] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 3]];
-                    tmpPtr[4] -= off_diag_value_Ptr[index_ellcol_start + 4] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 4]];
-                    tmpPtr[5] -= off_diag_value_Ptr[index_ellcol_start + 5] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 5]];
-                    tmpPtr[6] -= off_diag_value_Ptr[index_ellcol_start + 6] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 6]];
-                    tmpPtr[7] -= off_diag_value_Ptr[index_ellcol_start + 7] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 7]];
-                }
-                psiPtr_offset[0] = tmpPtr[0] / diagPtr_offset[0];
-                psiPtr_offset[1] = tmpPtr[1] / diagPtr_offset[1];
-                psiPtr_offset[2] = tmpPtr[2] / diagPtr_offset[2];
-                psiPtr_offset[3] = tmpPtr[3] / diagPtr_offset[3];
-                psiPtr_offset[4] = tmpPtr[4] / diagPtr_offset[4];
-                psiPtr_offset[5] = tmpPtr[5] / diagPtr_offset[5];
-                psiPtr_offset[6] = tmpPtr[6] / diagPtr_offset[6];
-                psiPtr_offset[7] = tmpPtr[7] / diagPtr_offset[7];
-            }
-        }
-    }
-}
+//     #pragma omp parallel
+//     {
+//         scalarField tmp(row_block_size_);
+//         scalar* __restrict__ tmpPtr = tmp.begin();
+//         for(label color = 0; color < num_color_; ++color){
+//             #pragma omp for
+//             for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
+//                 label bi = nodes_of_color_[node_index];
+//                 label rbs = ELL_BLOCK_START(bi);
+//                 scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
+//                 const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
+//                 const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
+//                 tmpPtr[0] = bPrimePtr_offset[0];
+//                 tmpPtr[1] = bPrimePtr_offset[1];
+//                 tmpPtr[2] = bPrimePtr_offset[2];
+//                 tmpPtr[3] = bPrimePtr_offset[3];
+//                 tmpPtr[4] = bPrimePtr_offset[4];
+//                 tmpPtr[5] = bPrimePtr_offset[5];
+//                 tmpPtr[6] = bPrimePtr_offset[6];
+//                 tmpPtr[7] = bPrimePtr_offset[7];
+//                 label index_block_start = ELL_INDEX_BLOCK_START(rbs);
+//                 for(label ellcol = 0; ellcol < max_count_; ++ellcol){
+//                     label index_ellcol_start = index_block_start + ELL_COL_OFFSET(ellcol);
+//                     tmpPtr[0] -= off_diag_value_Ptr[index_ellcol_start + 0] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 0]];
+//                     tmpPtr[1] -= off_diag_value_Ptr[index_ellcol_start + 1] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 1]];
+//                     tmpPtr[2] -= off_diag_value_Ptr[index_ellcol_start + 2] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 2]];
+//                     tmpPtr[3] -= off_diag_value_Ptr[index_ellcol_start + 3] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 3]];
+//                     tmpPtr[4] -= off_diag_value_Ptr[index_ellcol_start + 4] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 4]];
+//                     tmpPtr[5] -= off_diag_value_Ptr[index_ellcol_start + 5] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 5]];
+//                     tmpPtr[6] -= off_diag_value_Ptr[index_ellcol_start + 6] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 6]];
+//                     tmpPtr[7] -= off_diag_value_Ptr[index_ellcol_start + 7] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 7]];
+//                 }
+//                 psiPtr_offset[0] = tmpPtr[0] / diagPtr_offset[0];
+//                 psiPtr_offset[1] = tmpPtr[1] / diagPtr_offset[1];
+//                 psiPtr_offset[2] = tmpPtr[2] / diagPtr_offset[2];
+//                 psiPtr_offset[3] = tmpPtr[3] / diagPtr_offset[3];
+//                 psiPtr_offset[4] = tmpPtr[4] / diagPtr_offset[4];
+//                 psiPtr_offset[5] = tmpPtr[5] / diagPtr_offset[5];
+//                 psiPtr_offset[6] = tmpPtr[6] / diagPtr_offset[6];
+//                 psiPtr_offset[7] = tmpPtr[7] / diagPtr_offset[7];
+//             }
+//         }
+//         for(label color = num_color_ - 1; color >= 0; --color){
+//             #pragma omp for
+//             for(label node_index = color_ptr_[color]; node_index < color_ptr_[color+1]; ++node_index){
+//                 label bi = nodes_of_color_[node_index];
+//                 label rbs = ELL_BLOCK_START(bi);
+//                 scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
+//                 const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
+//                 const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
+//                 tmpPtr[0] = bPrimePtr_offset[0];
+//                 tmpPtr[1] = bPrimePtr_offset[1];
+//                 tmpPtr[2] = bPrimePtr_offset[2];
+//                 tmpPtr[3] = bPrimePtr_offset[3];
+//                 tmpPtr[4] = bPrimePtr_offset[4];
+//                 tmpPtr[5] = bPrimePtr_offset[5];
+//                 tmpPtr[6] = bPrimePtr_offset[6];
+//                 tmpPtr[7] = bPrimePtr_offset[7];
+//                 label index_block_start = ELL_INDEX_BLOCK_START(rbs);
+//                 for(label ellcol = 0; ellcol < max_count_; ++ellcol){
+//                     label index_ellcol_start = index_block_start + ELL_COL_OFFSET(ellcol);
+//                     tmpPtr[0] -= off_diag_value_Ptr[index_ellcol_start + 0] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 0]];
+//                     tmpPtr[1] -= off_diag_value_Ptr[index_ellcol_start + 1] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 1]];
+//                     tmpPtr[2] -= off_diag_value_Ptr[index_ellcol_start + 2] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 2]];
+//                     tmpPtr[3] -= off_diag_value_Ptr[index_ellcol_start + 3] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 3]];
+//                     tmpPtr[4] -= off_diag_value_Ptr[index_ellcol_start + 4] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 4]];
+//                     tmpPtr[5] -= off_diag_value_Ptr[index_ellcol_start + 5] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 5]];
+//                     tmpPtr[6] -= off_diag_value_Ptr[index_ellcol_start + 6] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 6]];
+//                     tmpPtr[7] -= off_diag_value_Ptr[index_ellcol_start + 7] * psiPtr[off_diag_colidx_Ptr[index_ellcol_start + 7]];
+//                 }
+//                 psiPtr_offset[0] = tmpPtr[0] / diagPtr_offset[0];
+//                 psiPtr_offset[1] = tmpPtr[1] / diagPtr_offset[1];
+//                 psiPtr_offset[2] = tmpPtr[2] / diagPtr_offset[2];
+//                 psiPtr_offset[3] = tmpPtr[3] / diagPtr_offset[3];
+//                 psiPtr_offset[4] = tmpPtr[4] / diagPtr_offset[4];
+//                 psiPtr_offset[5] = tmpPtr[5] / diagPtr_offset[5];
+//                 psiPtr_offset[6] = tmpPtr[6] / diagPtr_offset[6];
+//                 psiPtr_offset[7] = tmpPtr[7] / diagPtr_offset[7];
+//             }
+//         }
+//     }
+// }
 
 // ************************************************************************* //
