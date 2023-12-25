@@ -70,7 +70,13 @@ public:
         Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
         Info << "other time : " << other_time << ", " << other_time / solve_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;
+        Info << "normFactor profiling -----------------------------------------------------------------" << endl;
+        Info << "normFactor_sumA_time_ time : " << normFactor_sumA_time_ << ", " << normFactor_time / solve_time * 100 << "%" << endl;
+        Info << "normFactor_gAverage_time_ time : " << normFactor_gAverage_time_ << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
+        Info << "normFactor_gSum_time_ time : " << normFactor_gSum_time_ << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
+        Info << "----------------------------------------------------------------------------------------" << endl;
         preconPtr_->print_time();
+
     }
 };
 

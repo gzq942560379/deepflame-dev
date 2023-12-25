@@ -427,6 +427,11 @@ public:
             scalarField& tmpField
         ) const;
 
+        mutable double normFactor_sumA_time_ = 0.;
+        mutable double normFactor_gAverage_time_ = 0.;
+        mutable double normFactor_mag_time_ = 0.;
+        mutable double normFactor_gSum_time_ = 0.;
+
         virtual void print_time() const {}
 
     };

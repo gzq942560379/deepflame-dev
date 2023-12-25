@@ -72,7 +72,6 @@ EXE_LIBS = \
     $(if $(PYTHON_LIB_DIR),-lpython3,) \
     $(if $(USE_BLASDNN),$(DF_SRC)/dfChemistryModel/DNNInferencer_blas/build/libDNNInferencer_blas.so,) \
     -ldecompositionMethods \
-    -L$(FOAM_LIBBIN)/dummy -lscotchDecomp -lptscotchDecomp \
     -lsurfMesh \
     -lfileFormats \
     -ldynamicMesh \
@@ -81,7 +80,6 @@ EXE_LIBS = \
     -lfiniteVolume \
     -lgenericPatchFields \
     -lrenumberMethods \
-    -ldfRenumber
-    
-    
-    
+    -ldfRenumber \
+    -L$(FOAM_LIBBIN)/$(FOAM_MPI) -lPstream \
+    -L$(FOAM_LIBBIN)/dummy -lscotchDecomp -lptscotchDecomp

@@ -112,6 +112,7 @@ Description
 #include "faceSet.H"
 #include "pointSet.H"
 #include <omp.h>
+#include <typeinfo>
 
 #include "csrPattern.H"
 
@@ -135,6 +136,58 @@ Description
 #define TICK(prefix,start,end) ;
 #endif
 
+void benchmark(){
+    Info << "benchmark start" << endl;
+    bool b = false;
+    scalar s = 1;
+    label l = 1;
+    int i = 1;
+    syncClockTime clock;
+    char buffer_1K[1024];
+    char buffer_1M[1024 * 1024];
+    string str_buffer_1K(1024, 'a');
+    string str_buffer_1M(1024 * 1024, 'b');
+    point p(1.,2.,3.);
+    reduce(b, andOp<bool>());
+    Info << "reduce bool and : " << clock.timeIncrement() << endl;
+    reduce(b, orOp<bool>());
+    Info << "reduce bool or : " << clock.timeIncrement() << endl;
+    reduce(s, sumOp<scalar>());
+    Info << "reduce scalar sum : " << clock.timeIncrement() << endl;
+    reduce(s, maxOp<scalar>());
+    Info << "reduce scalar max : " << clock.timeIncrement() << endl;
+    reduce(s, minOp<scalar>());
+    Info << "reduce scalar min : " << clock.timeIncrement() << endl;
+    reduce(l, sumOp<label>());
+    Info << "reduce label sum : " << clock.timeIncrement() << endl;
+    reduce(l, maxOp<label>());
+    Info << "reduce label max : " << clock.timeIncrement() << endl;
+    reduce(l, minOp<label>());
+    Info << "reduce label min : " << clock.timeIncrement() << endl;
+    MPI_Bcast(&i, 1, MPI_INT, 0,  PstreamGlobals::MPI_COMM_FOAM);
+    Info << "MPI_Bcast int : " << clock.timeIncrement() << endl;
+    Pstream::scatter(i);
+    Info << "Pstream::scatter int : " << clock.timeIncrement() << endl;
+    MPI_Bcast(buffer_1K, 1024, MPI_CHAR, 0,  PstreamGlobals::MPI_COMM_FOAM);
+    Info << "MPI_Bcast char 1K : " << clock.timeIncrement() << endl;
+    Pstream::scatter(str_buffer_1K);
+    Info << "Pstream::scatter char 1K : " << clock.timeIncrement() << endl;
+    MPI_Bcast(buffer_1M, 1024 * 1024, MPI_CHAR, 0,  PstreamGlobals::MPI_COMM_FOAM);
+    Info << "MPI_Bcast char 1M : " << clock.timeIncrement() << endl;
+    Pstream::scatter(str_buffer_1M);
+    Info << "Pstream::scatter char 1M : " << clock.timeIncrement() << endl;
+    
+    reduce(p, sumOp<point>());
+    Info << "reduce point sum : " << clock.timeIncrement() << endl;
+    reduce(p, maxOp<point>());
+    Info << "reduce point max : " << clock.timeIncrement() << endl;
+    reduce(p, minOp<point>());
+    Info << "reduce point min : " << clock.timeIncrement() << endl;
+    Pstream::barrier();
+    Info << "Pstream::barrier : " << clock.timeIncrement() << endl;
+    Info << "benchmark end" << endl;
+}
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -143,143 +196,101 @@ int main(int argc, char *argv[])
     pybind11::scoped_interpreter guard{};//start python interpreter
 #endif
 
-    double postProcess_start = omp_get_wtime();
     #include "postProcess.H"
-    double postProcess_end = omp_get_wtime();
-    double postProcess_time = postProcess_end - postProcess_start;
-
     // #include "setRootCaseLists.H"
-    double listOptions_start = omp_get_wtime();
     #include "listOptions.H"
-    double listOptions_end = omp_get_wtime();
-    double listOptions_time = listOptions_end - listOptions_start;
 
     // MPI init here
-    double setRootCase2_start = omp_get_wtime();
     #include "setRootCase2.H"
-    double setRootCase2_end = omp_get_wtime();
-    double setRootCase2_time = setRootCase2_end - setRootCase2_start;
     
-    Info << "postProcess time : " << postProcess_time << endl;
-    Info << "listOptions time : " << listOptions_time << endl;
-    Info << "setRootCase2 time : " << setRootCase2_time << endl;
-
     env_show();
 
-    double init_start = MPI_Wtime();
+    benchmark();
 
-    double listOutput_start = MPI_Wtime();
+    Info << "typeid(unsigned).name() : " << typeid(unsigned).name() << endl;
+    Info << "sizeof(unsigned) : " << sizeof(unsigned) << endl;
+ 
+    syncClockTime initClock;
+
     #include "listOutput.H"
-    double listOutput_end = MPI_Wtime();
-    Info << "listOutput time : " << listOutput_end - listOutput_start << endl;
+    double listOutput_time = initClock.timeIncrement();
+    Info << "listOutput time : " << listOutput_time << endl;
 
-    double createTime_start = MPI_Wtime();
     #include "createTime.H"
-    double createTime_end = MPI_Wtime();
-    Info << "createTime time : " << createTime_end - createTime_start << endl;
+    double createTime_time = initClock.timeIncrement();
+    Info << "createTime time : " << createTime_time << endl;
 
     // #include "createMesh.H"
-    double createDynamicFvMesh_start = MPI_Wtime();
     #include "createDynamicFvMesh.H"
-    double createDynamicFvMesh_end = MPI_Wtime();
-    Info << "createDynamicFvMesh time : " << createDynamicFvMesh_end - createDynamicFvMesh_start << endl;
+    double createDynamicFvMesh_time = initClock.timeIncrement();
+    Info << "createDynamicFvMesh time : " << createDynamicFvMesh_time << endl;
 
-    double createDyMControls_start = MPI_Wtime();
     #include "createDyMControls.H"
-    double createDyMControls_end = MPI_Wtime();
-    Info << "createDyMControls time : " << createDyMControls_end - createDyMControls_start << endl;
+    double createDyMControls_time = initClock.timeIncrement();
+    Info << "createDyMControls time : " << createDyMControls_time << endl;
 
-    double initContinuityErrs_start = MPI_Wtime();
     #include "initContinuityErrs.H"
-    double initContinuityErrs_end = MPI_Wtime();
-    Info << "initContinuityErrs time : " << initContinuityErrs_end - initContinuityErrs_start << endl;
+    double initContinuityErrs_time = initClock.timeIncrement();
+    Info << "initContinuityErrs time : " << initContinuityErrs_time << endl;
 
-    double createFields_start = MPI_Wtime();
     #include "createFields.H"
-    double createFields_end = MPI_Wtime();
-    Info << "createFields time : " << createFields_end - createFields_start << endl;
+    double createFields_time = initClock.timeIncrement();
+    Info << "createFields time : " << createFields_time << endl;
 
-    double createRhoUfIfPresent_start = MPI_Wtime();
     #include "createRhoUfIfPresent.H"
-    double createRhoUfIfPresent_end = MPI_Wtime();
-    Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_end - createRhoUfIfPresent_start << endl;
+    double createRhoUfIfPresent_time = initClock.timeIncrement();
+    Info << "createRhoUfIfPresent time : " << createRhoUfIfPresent_time << endl;
 
     label timeIndex = 0;
 
-    double turbulenceValidate_start = MPI_Wtime();
     turbulence->validate();
-    double turbulenceValidate_end = MPI_Wtime();
-    Info << "turbulenceValidate time : " << turbulenceValidate_end - turbulenceValidate_start << endl;
+    double turbulenceValidate_time = initClock.timeIncrement();
+    Info << "turbulenceValidate time : " << turbulenceValidate_time << endl;
 
-    double setInitialDeltaT_start = MPI_Wtime();
     if (!LTS)
     {
         #include "compressibleCourantNo.H"
         #include "setInitialDeltaT.H"
     }
-    double setInitialDeltaT_end = MPI_Wtime();
-    Info << "setInitialDeltaT time : " << setInitialDeltaT_end - setInitialDeltaT_start << endl;
+    Pstream::barrier();
+    double setInitialDeltaT_time = initClock.timeIncrement();
+    Info << "setInitialDeltaT time : " << setInitialDeltaT_time << endl;
 
-    double refine_start, refine_end, refine_time = 0.;
-    double intializeFields_start, intializeFields_end,intializeFields_time = 0.;
-    double renumber_start, renumber_end, renumber_time = 0.;
-    double ScheduleSetup_start, ScheduleSetup_end, ScheduleSetup_time = 0.;
+    double refine_time = 0.;
 
     while (runTime.run()){
-        refine_start = MPI_Wtime();
         while (refineLevel)
         {
-            double refine_one_step_start = MPI_Wtime();
             runTime++;
             #include "Refine.H"
-            double refine_one_step_end = MPI_Wtime();
-            Info << "refine once time : " << refine_one_step_end - refine_one_step_start << endl; 
+            double refine_once_time = initClock.timeIncrement();
+            refine_time += refine_once_time;
+            Info << "refine once time : " << refine_once_time << endl; 
         }
-        refine_end = MPI_Wtime();
-        refine_time += refine_end - refine_start;
         break;
     }
-
-    intializeFields_start = MPI_Wtime();
-    #include "intializeFields.H"
-    intializeFields_end = MPI_Wtime();
-    intializeFields_time += intializeFields_end - intializeFields_start;
-
-    csrPattern pattern_before_renumber(mesh);
-    pattern_before_renumber.coloring();
-    pattern_before_renumber.write_mtx("sparse_pattern_before_renumber");
-
-    renumber_start = MPI_Wtime();
-    #include "renumberMesh.H"
-    renumber_end = MPI_Wtime();
-    renumber_time += renumber_end - renumber_start;
-
-    renumber_start = MPI_Wtime();
-    #include "renumberMesh.H"
-    renumber_end = MPI_Wtime();
-    renumber_time += renumber_end - renumber_start;
-
-    ScheduleSetup_start = MPI_Wtime();
-    #include "ScheduleSetup.H"
-    ScheduleSetup_end = MPI_Wtime();
-    ScheduleSetup_time += ScheduleSetup_end - ScheduleSetup_start;
-
     Info << "Refine time : " << refine_time << endl; 
+
+    #include "intializeFields.H"
+    double intializeFields_time = initClock.timeIncrement();
     Info << "IntializeFields time : " << intializeFields_time << endl; 
+
+    #include "renumberMesh.H"
+    double renumber_time = initClock.timeIncrement();
     Info << "Renumber time : " << renumber_time << endl; 
+
+    #include "ScheduleSetup.H"
+    double ScheduleSetup_time = initClock.timeIncrement();
     Info << "ScheduleSetup time : " << ScheduleSetup_time << endl; 
     
-    double init_end = MPI_Wtime();
+    double init_time = initClock.elapsedTime();
+    Info << "Total Init time : " << init_time << endl;
 
-    double init_time = init_end - init_start;
-
-    Info << "Init time : " << init_time << endl;
-
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+    // // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     std::vector<double> step_timer;
 
-    double compute_start = MPI_Wtime();
+    syncClockTime computeClock;
 
     Info<< "\nStarting time loop\n" << endl;
 
@@ -297,8 +308,6 @@ int main(int argc, char *argv[])
         double time_monitor_p=0.;
         double time_turbulenceCorrect=0.;
         double start, end;
-
-        double step_start = MPI_Wtime();
 
         timeIndex ++;
         
@@ -396,7 +405,7 @@ int main(int argc, char *argv[])
                 Info<< "chemistry->correct end" << nl << endl;
             }
 
-            Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
+            // Info << "min/max(T) = " << min(T).value() << ", " << max(T).value() << endl;
 
             // --- Pressure corrector loop
 
@@ -439,8 +448,7 @@ int main(int argc, char *argv[])
 
         Info << "output time index " << runTime.timeIndex() << endl;
 
-        double step_end = MPI_Wtime();
-        double step_time = step_end - step_start;
+        double step_time = computeClock.timeIncrement();
         step_timer.push_back(step_time);
 
         Info<< "========Time Spent in diffenet parts========"<< endl;
@@ -465,11 +473,9 @@ int main(int argc, char *argv[])
         Info<< "============================================"<<nl<< endl;
     }
 
-    double compute_end = MPI_Wtime();
-    double compute_time = compute_end - compute_start - step_timer[0] - step_timer[1];
+    double compute_time = computeClock.elapsedTime() - step_timer[0] - step_timer[1];
 
-
-    Info << "Init time : " << init_time << endl;
+    Info << "Total Init time : " << init_time << endl;
     Info << "First time : " << step_timer[0] << endl;
     Info << "Second time : " << step_timer[1] << endl;
     Info << "Compute step : " << step_timer.size() - 2 << endl;

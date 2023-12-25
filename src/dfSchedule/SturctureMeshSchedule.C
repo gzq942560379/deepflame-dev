@@ -68,28 +68,29 @@ void StructureMeshSchedule::Setup(const fvMesh& mesh){
 
     // physics solver co-design
     // renumber && coloring 
-    csrPattern meshPattern(mesh);
-    meshPattern.coloring();
-    meshPattern.write_mtx("sparse_pattern");
+    
+    // csrPattern meshPattern(mesh);
+    // meshPattern.coloring();
+    // meshPattern.write_mtx("sparse_pattern");
 
-    csrPattern block32 = meshPattern.blocking(32);
-    block32.write_mtx("sparse_pattern_block_32");
+    // csrPattern block32 = meshPattern.blocking(32);
+    // block32.write_mtx("sparse_pattern_block_32");
 
-    csrPattern yzdim_graph = meshPattern.blocking(x_dim_);
-    yzdim_graph.write_mtx("sparse_pattern_block_xdim_" + std::to_string(x_dim_));
+    // csrPattern yzdim_graph = meshPattern.blocking(x_dim_);
+    // yzdim_graph.write_mtx("sparse_pattern_block_xdim_" + std::to_string(x_dim_));
 
-    csrPattern yzdim_lower_part_graph = yzdim_graph.lower_part();
-    yzdim_lower_part_graph.write_mtx("sparse_pattern_block_xdim_lower_part");
+    // csrPattern yzdim_lower_part_graph = yzdim_graph.lower_part();
+    // yzdim_lower_part_graph.write_mtx("sparse_pattern_block_xdim_lower_part");
 
-    csrPattern yzdim_indirect_graph = yzdim_lower_part_graph.indirect_conflict();
-    yzdim_indirect_graph.write_mtx("sparse_pattern_block_xdim_indirect_graph");
+    // csrPattern yzdim_indirect_graph = yzdim_lower_part_graph.indirect_conflict();
+    // yzdim_indirect_graph.write_mtx("sparse_pattern_block_xdim_indirect_graph");
 
-    csrPattern yzdim_symv_conflict_graph = yzdim_graph + yzdim_indirect_graph;
-    yzdim_symv_conflict_graph.write_mtx("sparse_pattern_block_xdim_symv_conflict_graph");
-    yzdim_symv_conflict_graph.coloring();
+    // csrPattern yzdim_symv_conflict_graph = yzdim_graph + yzdim_indirect_graph;
+    // yzdim_symv_conflict_graph.write_mtx("sparse_pattern_block_xdim_symv_conflict_graph");
+    // yzdim_symv_conflict_graph.coloring();
 
-    csrPattern zdim_graph = meshPattern.blocking(x_dim_ * y_dim_);
-    zdim_graph.write_mtx("sparse_pattern_block_xydim_" + std::to_string(x_dim_ * y_dim_));
+    // csrPattern zdim_graph = meshPattern.blocking(x_dim_ * y_dim_);
+    // zdim_graph.write_mtx("sparse_pattern_block_xydim_" + std::to_string(x_dim_ * y_dim_));
 }
 
 StructureMeshSchedule structureMeshSchedule(0);

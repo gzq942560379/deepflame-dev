@@ -50,6 +50,8 @@ Foam::solverPerformance Foam::DIVPCG::solve
     const direction cmpt
 ) const
 {
+    Pstream::barrier();
+    
     double spmv_start, spmv_end;
     double normFactor_start, normFactor_end;
     double gSumMag_start, gSumMag_end;
