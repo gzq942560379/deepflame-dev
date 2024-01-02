@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(DNNInferencer_blas)
 
-add_library(${PROJECT_NAME} SHARED DNNInferencer_blas.cpp Layer.cpp)
+add_library(${PROJECT_NAME} SHARED DNNInferencer_blas.cpp Layer.cpp kernel_double.cpp kernel_float.cpp kernel_half.cpp)
 
 # Link the TensorFlow library
 target_link_libraries(${PROJECT_NAME} fjlapackexsve)
