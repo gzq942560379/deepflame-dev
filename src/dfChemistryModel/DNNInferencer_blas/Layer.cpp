@@ -333,8 +333,9 @@ void LinearGELU<DataType>::forward(const Tensor<DataType>& input, Tensor<DataTyp
     // GELU
     // gelu_navie(output.element_num(), output.data());
     // gelu_exp(output.element_num(), output.data());
-    gelu_exp_fusion(output.element_num(), output.data());
-    // gelu_exp_simd(output.element_num(), output.data());
+    // gelu_lookup(output.element_num(), output.data());
+    // gelu_fastexp_fusion(output.element_num(), output.data());
+    gelu_fastexp_simd(output.element_num(), output.data());
     // bias_gelu_exp_fusion(output, bias_);
     // bias_gelu_lookup_fusion(output, bias_);
     

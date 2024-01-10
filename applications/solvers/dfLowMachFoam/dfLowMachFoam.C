@@ -68,7 +68,7 @@ Description
 
 // #define _CSR_
 // #define _ELL_
-#define _DIV_
+// #define _DIV_
 // #define _LDU_
 // #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
@@ -283,6 +283,11 @@ int main(int argc, char *argv[])
     double ScheduleSetup_time = initClock.timeIncrement();
     Info << "ScheduleSetup time : " << ScheduleSetup_time << endl; 
     
+
+#ifdef _DIV_
+    divMatrix div(mesh);
+#endif
+
     double init_time = initClock.elapsedTime();
     Info << "Total Init time : " << init_time << endl;
 

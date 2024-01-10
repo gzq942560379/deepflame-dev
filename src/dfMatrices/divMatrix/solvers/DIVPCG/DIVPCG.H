@@ -49,7 +49,7 @@ public:
 
 
     // profiling
-    mutable double solve_time = 0.;
+    mutable double PCG_time = 0.;
     mutable double spmv_time = 0.;
     mutable double normFactor_time = 0.;
     mutable double gSumMag_time = 0.;
@@ -59,21 +59,21 @@ public:
     mutable double precondition_construct_time = 0.;
 
     void print_time() const {
-        double other_time = solve_time - spmv_time - normFactor_time - gSumMag_time - gSumProd_time - localUpdate_time - precondition_time;
+        double other_time = PCG_time - spmv_time - normFactor_time - gSumMag_time - gSumProd_time - localUpdate_time - precondition_time;
         Info << "DIVPCG solve profiling -----------------------------------------------------------------" << endl;
-        Info << "solve time : " << solve_time << endl;
-        Info << "spmv time : " << spmv_time << ", " << spmv_time / solve_time * 100 << "%" << endl;
-        Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / solve_time * 100 << "%" << endl;
-        Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
-        Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
-        Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / solve_time * 100 << "%" << endl;
-        Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
-        Info << "other time : " << other_time << ", " << other_time / solve_time * 100 << "%" << endl;
+        Info << "PCG time : " << PCG_time << endl;
+        Info << "spmv time : " << spmv_time << ", " << spmv_time / PCG_time * 100 << "%" << endl;
+        Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / PCG_time * 100 << "%" << endl;
+        Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / PCG_time * 100 << "%" << endl;
+        Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / PCG_time * 100 << "%" << endl;
+        Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / PCG_time * 100 << "%" << endl;
+        Info << "precondition time : " << precondition_time << ", " << precondition_time / PCG_time * 100 << "%" << endl;
+        Info << "other time : " << other_time << ", " << other_time / PCG_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;
         Info << "normFactor profiling -----------------------------------------------------------------" << endl;
-        Info << "normFactor_sumA_time_ time : " << normFactor_sumA_time_ << ", " << normFactor_time / solve_time * 100 << "%" << endl;
-        Info << "normFactor_gAverage_time_ time : " << normFactor_gAverage_time_ << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
-        Info << "normFactor_gSum_time_ time : " << normFactor_gSum_time_ << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
+        Info << "normFactor_sumA_time_ time : " << normFactor_sumA_time_ << ", " << normFactor_time / PCG_time * 100 << "%" << endl;
+        Info << "normFactor_gAverage_time_ time : " << normFactor_gAverage_time_ << ", " << gSumMag_time / PCG_time * 100 << "%" << endl;
+        Info << "normFactor_gSum_time_ time : " << normFactor_gSum_time_ << ", " << gSumProd_time / PCG_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;
         preconPtr_->print_time();
 

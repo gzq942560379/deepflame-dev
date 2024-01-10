@@ -18,6 +18,16 @@ SolverPerformance<Type> divMatrix::solve(
     const FieldField<Field, Type>& boundaryCoeffs,
     const dictionary& solverControls
 ){
+    double addBoundarySource_time = 0.;
+    double addBoundaryDiag_time = 0.;
+    double initMatrixInterfaces_time = 0.;
+    double updateMatrixInterfaces_time = 0.;
+    double solver_construct_time = 0.;
+    double solve_time = 0.;
+    double psi_correctBoundaryConditions_time = 0.;
+
+    syncClockTime clock;
+
     SolverPerformance<Type> solverPerfVec
     (
         "divMatrix::solve",
@@ -29,6 +39,8 @@ SolverPerformance<Type> divMatrix::solve(
     Field<Type> sourceCpy(source);
 
     addBoundarySource(sourceCpy, psi, boundaryCoeffs);
+
+    addBoundarySource_time += clock.timeIncrement();
 
     typename Type::labelType validComponents
     (
@@ -42,6 +54,8 @@ SolverPerformance<Type> divMatrix::solve(
         // copy field and source
         scalarField psiCmpt(psi.primitiveField().component(cmpt));
         addBoundaryDiag(diag(), internalCoeffs, cmpt);
+
+        addBoundaryDiag_time += clock.timeIncrement();
 
         scalarField sourceCmpt(sourceCpy.component(cmpt));
 
@@ -70,6 +84,8 @@ SolverPerformance<Type> divMatrix::solve(
             cmpt
         );
 
+        initMatrixInterfaces_time += clock.timeIncrement();
+
         updateMatrixInterfaces
         (
             bouCoeffsCmpt,
@@ -79,10 +95,11 @@ SolverPerformance<Type> divMatrix::solve(
             cmpt
         );
 
+        updateMatrixInterfaces_time += clock.timeIncrement();
+
         solverPerformance solverPerf;
 
-        // Solver call
-        solverPerf = divMatrix::solver::New
+        Foam::autoPtr<Foam::divMatrix::solver> solver = divMatrix::solver::New
         (
             psi.name() + pTraits<Type>::componentNames[cmpt],
             *this,
@@ -90,7 +107,18 @@ SolverPerformance<Type> divMatrix::solve(
             intCoeffsCmpt,
             interfaces,
             solverControls
-        )->solve(psiCmpt, sourceCmpt, cmpt);
+        );
+
+        solver_construct_time += clock.timeIncrement();
+
+        // Solver call
+        solverPerf = solver->solve(psiCmpt, sourceCmpt, cmpt);
+
+        solve_time += clock.timeIncrement();
+
+#ifdef _PROFILING_
+        solver->print_time();
+#endif    
 
         if (SolverPerformance<Type>::debug)
         {
@@ -105,8 +133,25 @@ SolverPerformance<Type> divMatrix::solve(
     }
 
     psi.correctBoundaryConditions();
+        
+    psi_correctBoundaryConditions_time += clock.timeIncrement();
 
     Residuals<Type>::append(psi.mesh(), solverPerfVec);
+
+    double total_solve_time = clock.elapsedTime();
+
+#ifdef _PROFILING_
+    Info << "divMatrix solve<Type> profiling ----------------------------" << solve_time << endl;
+    Info << "Total solve time : " << total_solve_time << endl;
+    Info << "addBoundaryDiag_time : " << addBoundaryDiag_time << ", " << addBoundaryDiag_time / total_solve_time * 100 << "%" << endl;
+    Info << "addBoundarySource_time : " << addBoundarySource_time << ", " << addBoundarySource_time / total_solve_time * 100 << "%" << endl;
+    Info << "initMatrixInterfaces_time : " << initMatrixInterfaces_time << ", " << initMatrixInterfaces_time / total_solve_time * 100 << "%" << endl;
+    Info << "updateMatrixInterfaces_time : " << updateMatrixInterfaces_time << ", " << updateMatrixInterfaces_time / total_solve_time * 100 << "%" << endl;
+    Info << "solver_construct_time : " << solver_construct_time << ", " << solver_construct_time / total_solve_time * 100 << "%" << endl;
+    Info << "solve_time : " << solve_time << ", " << solve_time / total_solve_time * 100 << "%" << endl;
+    Info << "psi_correctBoundaryConditions_time : " << psi_correctBoundaryConditions_time << ", " << psi_correctBoundaryConditions_time / total_solve_time * 100 << "%" << endl;
+    Info << "-------------------------------------------------------------" << solve_time << endl;
+#endif    
 
     return solverPerfVec;
 }
@@ -121,12 +166,25 @@ solverPerformance divMatrix::solve
     const dictionary& solverControls
 )
 {
+    double addBoundaryDiag_time = 0.;
+    double addBoundarySource_time = 0.;
+    double solver_construct_time = 0.;
+    double solve_time = 0.;
+    double psi_correctBoundaryConditions_time = 0.;
+    double total_solve_time = 0.;
+
+    syncClockTime clock;
+
     scalarField saveDiag(diag());
     addBoundaryDiag(diag(), internalCoeffs, 0);
     const_cast<scalarField&>(ldu().diag()) = diag();
 
+    addBoundaryDiag_time += clock.timeIncrement();
+
     scalarField sourceCpy(source);
     addBoundarySource(sourceCpy, psi, boundaryCoeffs, false);
+
+    addBoundarySource_time += clock.timeIncrement();
 
     Foam::autoPtr<Foam::divMatrix::solver> solver = divMatrix::solver::New
     (
@@ -137,9 +195,12 @@ solverPerformance divMatrix::solve
         psi.boundaryField().scalarInterfaces(),
         solverControls
     );
+    solver_construct_time += clock.timeIncrement();
     
     // Solver call
     solverPerformance solverPerf = solver->solve(psi.primitiveFieldRef(), sourceCpy);
+
+    solve_time += clock.timeIncrement();
 
     if (solverPerformance::debug)
     {
@@ -153,7 +214,18 @@ solverPerformance divMatrix::solve
 
     Residuals<scalar>::append(psi.mesh(), solverPerf);
 
+    psi_correctBoundaryConditions_time += clock.timeIncrement();
+
+    total_solve_time += clock.elapsedTime();
 #ifdef _PROFILING_
+    Info << "divMatrix solve<scalar> profiling ----------------------------" << solve_time << endl;
+    Info << "Total solve time : " << total_solve_time << endl;
+    Info << "addBoundaryDiag_time : " << addBoundaryDiag_time << ", " << addBoundaryDiag_time / total_solve_time * 100 << "%" << endl;
+    Info << "addBoundarySource_time : " << addBoundarySource_time << ", " << addBoundarySource_time / total_solve_time * 100 << "%" << endl;
+    Info << "solver_construct_time : " << solver_construct_time << ", " << solver_construct_time / total_solve_time * 100 << "%" << endl;
+    Info << "solve_time : " << solve_time << ", " << solve_time / total_solve_time * 100 << "%" << endl;
+    Info << "psi_correctBoundaryConditions_time : " << psi_correctBoundaryConditions_time << ", " << psi_correctBoundaryConditions_time / total_solve_time * 100 << "%" << endl;
+    Info << "-------------------------------------------------------------" << solve_time << endl;
     solver->print_time();
 #endif    
 

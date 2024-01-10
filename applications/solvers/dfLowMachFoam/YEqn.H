@@ -146,8 +146,6 @@ forAll(Y, i)
         YiEqn.relax();
         Y_build_end = MPI_Wtime();
         Y_build_time += Y_build_end - Y_build_start;
-        Y_total_end = MPI_Wtime();
-        Y_total_time += Y_total_end - Y_total_start;
 
 #ifdef OPT_GenMatrix_Y_check
         Y_build_old_start = MPI_Wtime();
@@ -169,23 +167,23 @@ forAll(Y, i)
         check_fvmatrix_equal(YiEqn, YiEqn_answer);
 
 #endif
-// #ifdef _CSR_
-//             Y_convert_start = MPI_Wtime();
-//             csr.init_value_from_lduMatrix(YiEqn);
-//             Y_convert_end = MPI_Wtime();
-//             Y_convert_time += Y_convert_end - Y_convert_start;
-// #endif
-        Y_total_start = MPI_Wtime();
+#ifdef _DIV_
+        Y_convert_start = MPI_Wtime();
+        // divMatrix div(YiEqn);
+        div.copy_value_from_fvMatrix(YiEqn);
+        Y_convert_end = MPI_Wtime();
+        Y_convert_time += Y_convert_end - Y_convert_start;
+#endif
         Y_solve_start = MPI_Wtime();
-// #ifdef _CSR_
-//             auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
-//             auto& source = YiEqn.source();
-//             auto& internalCoeffs = YiEqn.internalCoeffs();
-//             auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
-//             csr.solve(psi, source, internalCoeffs, boundaryCoeffs, "Yi");
-// #else
+#ifdef _DIV_
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(YiEqn.psi());
+        auto& source = YiEqn.source();
+        auto& internalCoeffs = YiEqn.internalCoeffs();
+        auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs, "Yi");
+#else
         YiEqn.solve("Yi");
-// #endif
+#endif
 
         Y_solve_end = MPI_Wtime();
         Y_solve_time += Y_solve_end - Y_solve_start;

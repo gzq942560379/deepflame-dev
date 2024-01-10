@@ -88,8 +88,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
     double localUpdate_start, localUpdate_end;
     double precondition_start, precondition_end;
 
-    Info << "Foam::DIVPBiCGStab::solve start -------------------------------------" << endl;
-    double solve_start = MPI_Wtime();
+    double PBiCGStab_start = MPI_Wtime();
 
     // --- Setup class containing solver performance data
     solverPerformance solverPerf
@@ -313,17 +312,8 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
         );
     }
 
-    double solve_end = MPI_Wtime();
-    solve_time += solve_end - solve_start;
-
-    Info << "spmv time : " << spmv_time << ", " << spmv_time / solve_time * 100 << "%" << endl;
-    Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / solve_time * 100 << "%" << endl;
-    Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / solve_time * 100 << "%" << endl;
-    Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / solve_time * 100 << "%" << endl;
-    Info << "gSumSqr time : " << gSumSqr_time << ", " << gSumSqr_time / solve_time * 100 << "%" << endl;
-    Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / solve_time * 100 << "%" << endl;
-    Info << "precondition time : " << precondition_time << ", " << precondition_time / solve_time * 100 << "%" << endl;
-    Info << "Foam::DIVPBiCGStab::solve end --------------------------------------------" << endl;
+    double PBiCGStab_end = MPI_Wtime();
+    PBiCGStab_time += PBiCGStab_end - PBiCGStab_start;
     return solverPerf;
 }
 

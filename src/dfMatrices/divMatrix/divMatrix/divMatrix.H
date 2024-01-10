@@ -1,5 +1,5 @@
 #pragma once
-#include <fvMesh.H>
+#include <lduMesh.H>
 #include <vector>
 #include <string>
 #include "autoPtr.H"
@@ -24,10 +24,10 @@
 #define DIV_BLOCK_INDEX(row) ((row) >> (row_block_bit_))
 #define DIV_BLOCK_ROW(row) ((row) & DIV_BLOCK_MASK)
 #define DIV_BLOCK_START(bi) (bi << row_block_bit_)
-// #define DIV_BLOCK_END(rbs) (std::min((rbs) + (row_block_size_), (row_)))
-#define DIV_BLOCK_END(rbs) ((rbs) + (row_block_size_))
-// #define DIV_BLOCK_LEN(rbs,rbe) ((rbe - rbs))
-#define DIV_BLOCK_LEN(rbs,rbe) (row_block_size_)
+#define DIV_BLOCK_END(rbs) (std::min((rbs) + (row_block_size_), (row_)))
+// #define DIV_BLOCK_END(rbs) ((rbs) + (row_block_size_))
+#define DIV_BLOCK_LEN(rbs,rbe) ((rbe - rbs))
+// #define DIV_BLOCK_LEN(rbs,rbe) (row_block_size_)
 #define DIV_BLOCK_TAIL DIV_BLOCK_ROW(row_)
 #define DIV_BLOCK_COUNT (((row_) + (row_block_size_) - 1) >> (row_block_bit_))
 
@@ -40,11 +40,9 @@ namespace Foam{
 // diagonal vecorization matrix
 class divMatrix{
 private:
-    // const fvMesh& mesh_;
-    const lduMatrix& lduMatrix_;
+    const lduMatrix* lduMatrix_ = nullptr;
 
     //- Coefficients (not including interfaces)
-
     label row_;
     scalarField diag_value_;
 
@@ -63,12 +61,12 @@ private:
 
     scalarField off_diag_value_;
 
-    // // map from face to lower in off_diag_value_
-    // // lower (nei,own)
-    // labelList face2lower_;
-    // // map from face to upper in off_diag_value_
-    // // lower (own,nei)
-    // labelList face2upper_;
+    // map from face to lower in off_diag_value_
+    // lower (nei,own)
+    labelList face2lower_;
+    // map from face to upper in off_diag_value_
+    // lower (own,nei)
+    labelList face2upper_;
 
     bool diagonal_;
     bool symmetric_;
@@ -79,13 +77,22 @@ public:
     // Declare name of the class and its debug switch
     ClassName("divMatrix");
 
-    // Constructors
-    // divMatrix(const fvMesh& mesh);
-
     divMatrix(const lduMatrix& lduMatrix);
 
+    // divMatrix(const fvMesh& mesh);
+    divMatrix(const lduMesh& mesh);
+
+    void copy_value_from_fvMatrix(const lduMatrix& lduMatrix);
+
     // Copy constructor
-    divMatrix(const divMatrix& other) = delete;
+    divMatrix(const divMatrix& other)
+        :row_(other.row_),row_block_bit_(other.row_block_bit_),row_block_size_(other.row_block_size_),
+        diag_value_(other.diag_value_),block_count_(other.block_count_),block_tail_(other.block_tail_),
+        distance_count_(other.distance_count_),distance_list_(other.distance_list_),max_distance_(other.max_distance_),
+        min_distance_(other.min_distance_),head_block_count_(other.head_block_count_), tail_block_count_(other.tail_block_count_),
+        off_diag_value_(other.off_diag_value_), face2lower_(other.face2lower_), face2upper_(other.face2upper_),
+        diagonal_(other.diagonal_), symmetric_(other.symmetric_), asymmetric_(other.asymmetric_)
+        {};
 
     // Copy constructor
     // void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
@@ -93,12 +100,12 @@ public:
     //- Destructor
     ~divMatrix(){};
 
-    const lduMatrix& ldu() const {return lduMatrix_;}
+    const lduMatrix& ldu() const {return *lduMatrix_;}
 
     //- Return the LDU mesh from which the addressing is obtained
-    const lduMesh& mesh() const {return lduMatrix_.mesh();}
+    const lduMesh& mesh() const {return lduMatrix_->mesh();}
     //- Return the LDU addressing
-    const lduAddressing& lduAddr() const {return lduMatrix_.lduAddr();}
+    const lduAddressing& lduAddr() const {return lduMatrix_->lduAddr();}
 
     //- Return the patch evaluation schedule
     const lduSchedule& patchSchedule() const {return lduAddr().patchSchedule();}
@@ -110,7 +117,7 @@ public:
     bool asymmetric() const {return asymmetric_;}
 
     label row() const {return row_;}
-    label nnz() const {return lduMatrix_.lower().size() + lduMatrix_.upper().size() + row_;}
+    label nnz() const {return lduMatrix_->lower().size() + lduMatrix_->upper().size() + row_;}
     const scalarField& diag() const {return diag_value_;}
     scalarField& diag() {return diag_value_;}
     

@@ -6,7 +6,7 @@ double fast_exp<double>(double x){
     const double LOG2E = 1.442695040;
     const uint64_t SHIFT = static_cast<uint64_t>(1) << 52;
     x *= LOG2E;
-    double xi = floor(x);
+    double xi = std::floor(x);
     double xf = x - xi;
     const double coef[2] = {-0.05288671, 0.99232129};
     double k = coef[1] * xf + coef[0] + 1.;
@@ -37,12 +37,12 @@ double tanh_exp<double>(double x){
     const double sign = x < zero ? neg_one : one;
     double abs_x = std::abs(x);
     abs_x = abs_x < max ? abs_x : max;
-    double abs_ret = one - two / (fast_exp<double>(two * abs_x) + one);
+    double abs_ret = one - two / (std::exp(two * abs_x) + one);
     return sign * abs_ret;
 }
 
 template<>
-void gelu_exp_fusion<double>(int64_t len, double* data){
+void gelu_fastexp_fusion<double>(int64_t len, double* data){
     const double const_sqrt_2_div_pi = static_cast<double>(0.7978845608028654);
     const double const_2 = static_cast<double>(0.044715);
     const double const_half = static_cast<double>(0.5);
@@ -68,7 +68,7 @@ void gelu_exp_fusion<double>(int64_t len, double* data){
         abs_tanh_x = abs_tanh_x < const_max ? abs_tanh_x : const_max;
         double exp_x = const_two * abs_tanh_x;
         exp_x *= const_log2e;
-        double exp_xi = floor(exp_x);
+        double exp_xi = std::floor(exp_x);
         uint64_t exp_xi_int = exp_xi;
         double exp_xf = exp_x - exp_xi;
         double exp_k = exp_coef[1] * exp_xf + exp_coef[0] + const_one;
@@ -79,32 +79,6 @@ void gelu_exp_fusion<double>(int64_t len, double* data){
         uint64_t tanh_ret_int = *(uint64_t*)&abs_ret | tanh_x_sign;
         double tanh_ret = *(double*)&tanh_ret_int;
         data[i] = const_half * x * (const_one + tanh_ret);
-    }
-}
-
-template<>
-void gelu_navie<double>(int64_t len, double* data){
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        double x = data[i];
-        data[i] = 0.5 * x * (1. + tanh(sqrt(2. / M_PI) * (x + 0.044715 * pow(x, 3.))));
-    }
-}
-
-template<>
-void gelu_exp<double>(int64_t len, double* data){
-    const double const_1 = 0.7978845608028654;
-    const double const_2 = 0.044715;
-    const double one = 1.;
-    const double half = 0.5;
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        double x = data[i];
-        data[i] = half * x * (one + tanh_exp(const_1 * (x + const_2 * x * x * x)));
     }
 }
 
@@ -125,29 +99,6 @@ void gelu_lookup<double>(int64_t len, double* data){
             double c1 = fast_gelu_poly_table_double[index][1];
             double c0 = fast_gelu_poly_table_double[index][2];
             data[i] = ((c2 * x) + c1) * x + c0;
-        }
-    }
-}
-
-template<>
-void bias_gelu_exp_fusion<double>(Tensor<double>& input, const Tensor<double>& bias){
-    int64_t row = input.dim(0);
-    int64_t col = input.dim(1);
-    int64_t ld = col;
-    const double const_1 = sqrt(2. / M_PI);
-    const double const_2 = 0.044715;
-    const double one = 1.;
-    const double half = 0.5;
-    double* input_data = input.data();
-    const double* bias_data = bias.data();
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t r = 0; r < row; ++r){
-        double* input_data_row = &input_data[r * ld];
-        for(int64_t c = 0; c < col; ++c){
-            double x = input_data_row[c] + bias_data[c];
-            input_data_row[c] = half * x * (one + tanh_exp(const_1 * (x + const_2 * x * x * x)));
         }
     }
 }

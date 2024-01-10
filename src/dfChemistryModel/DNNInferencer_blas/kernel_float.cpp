@@ -6,18 +6,10 @@ float fast_exp<float>(float x){
     const float LOG2E = 1.442695040;
     const uint32_t SHIFT = static_cast<uint32_t>(1) << 23;
     x *= LOG2E;
-    float xi = floor(x);
+    float xi = std::floor(x);
     float xf = x - xi;
-
-    const float coef[2] = {
-        -0.05288671,
-        0.99232129
-    };
-
-    float k = \
-        + coef[1] * xf \
-        + coef[0] + 1.;
-
+    const float coef[2] = {-0.05288671,0.99232129};
+    float k = coef[1] * xf + coef[0] + 1.;
     uint32_t e = reinterpret_cast<const uint32_t &>(k);
     e += SHIFT * static_cast<uint32_t>(xi);
     return reinterpret_cast<float &>(e);
@@ -38,12 +30,12 @@ float tanh_exp<float>(float x){
     const float sign = x < zero ? neg_one : one;
     float abs_x = std::abs(x);
     abs_x = abs_x < max ? abs_x : max;
-    float abs_ret = one - two / (fast_exp<float>(two * abs_x) + one);
+    float abs_ret = one - two / (std::exp(two * abs_x) + one);
     return sign * abs_ret;
 }
 
 template<>
-void gelu_exp_fusion<float>(int64_t len, float* data){
+void gelu_fastexp_fusion<float>(int64_t len, float* data){
     const float const_sqrt_2_div_pi = static_cast<float>(0.7978845608028654);
     const float const_2 = static_cast<float>(0.044715);
     const float const_half = static_cast<float>(0.5);
@@ -69,7 +61,7 @@ void gelu_exp_fusion<float>(int64_t len, float* data){
         abs_tanh_x = abs_tanh_x < const_max ? abs_tanh_x : const_max;
         float exp_x = const_two * abs_tanh_x;
         exp_x *= const_log2e;
-        float exp_xi = floor(exp_x);
+        float exp_xi = std::floor(exp_x);
         uint32_t exp_xi_int = exp_xi;
         float exp_xf = exp_x - exp_xi;
         float exp_k = exp_coef[1] * exp_xf + exp_coef[0] + const_one;
@@ -80,33 +72,6 @@ void gelu_exp_fusion<float>(int64_t len, float* data){
         uint32_t tanh_ret_int = *(uint32_t*)&abs_ret | tanh_x_sign;
         float tanh_ret = *(float*)&tanh_ret_int;
         data[i] = const_half * x * (const_one + tanh_ret);
-    }
-}
-
-template<>
-void gelu_navie<float>(int64_t len, float* data){
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        float x = data[i];
-        data[i] = 0.5f * x * (1.f + tanhf(sqrtf(2.f / M_PI) * (x + 0.044715f * powf(x, 3.f))));
-    }
-}
-
-template<>
-void gelu_exp<float>(int64_t len, float* data){
-    // const float const_1 = sqrtf(2.f / M_PI);
-    const float const_1 = 0.7978845608028654f;
-    const float const_2 = 0.044715f;
-    const float one = 1.f;
-    const float half = 0.5;
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        float x = data[i];
-        data[i] = half * x * (one + tanh_exp(const_1 * (x + const_2 * x * x * x)));
     }
 }
 
@@ -127,29 +92,6 @@ void gelu_lookup<float>(int64_t len, float* data){
             float c1 = fast_gelu_poly_table_float[index][1];
             float c0 = fast_gelu_poly_table_float[index][2];
             data[i] = ((c2 * x) + c1) * x + c0;
-        }
-    }
-}
-
-template<>
-void bias_gelu_exp_fusion<float>(Tensor<float>& input, const Tensor<float>& bias){
-    int64_t row = input.dim(0);
-    int64_t col = input.dim(1);
-    int64_t ld = col;
-    float* input_data = input.data();
-    const float* bias_data = bias.data();
-    const float const_1 = sqrtf(2.f / M_PI);
-    const float const_2 = 0.044715f;
-    const float one = 1.f;
-    const float half = 0.5;
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t r = 0; r < row; ++r){
-        float* input_data_row = &input_data[r * ld];
-        for(int64_t c = 0; c < col; ++c){
-            float x = input_data_row[c] + bias_data[c];
-            input_data_row[c] = half * x * (one + tanh_exp(const_1 * (x + const_2 * x * x * x)));
         }
     }
 }

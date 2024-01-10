@@ -189,14 +189,13 @@ void Foam::DIVGAMGSolver::agglomerateMatrix
                 }
             }
         }
-
         // Set the coarse level matrix
         divMatrixLevels_.set
         (
             fineLevelIndex,
-            new divMatrix(coarseMatrix)
+            new divMatrix(agglomeration_.divMatrixLevel(fineLevelIndex + 1))
         );
-
+        divMatrixLevels_[fineLevelIndex].copy_value_from_fvMatrix(coarseMatrix);
     }
 }
 

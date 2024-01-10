@@ -10,7 +10,7 @@ __fp16 fast_exp<__fp16>(__fp16 x){
     const __fp16 LOG2E = 1.442695040;
     const uint16_t SHIFT = static_cast<uint16_t>(1) << 10;
     x *= LOG2E;
-    __fp16 xi = floor(x);
+    __fp16 xi = std::floor(x);
     __fp16 xf = x - xi;
     const __fp16 coef[2] = {-0.05288671, 0.99232129};
     __fp16 k = coef[1] * xf + coef[0] + 1.;
@@ -26,22 +26,15 @@ __fp16 tanh_exp<__fp16>(__fp16 x){
     const __fp16 neg_one = static_cast<__fp16>(-1.);
     const __fp16 one = static_cast<__fp16>(1.);
     const __fp16 two = static_cast<__fp16>(2.);
-
     const __fp16 sign = x < zero ? neg_one : one;
-    const __fp16 abs_x = std::abs(x);
-
-    __fp16 abs_ret;
-
-    if(abs_x < max){
-        abs_ret = one - two / (fast_exp<__fp16>(two * abs_x) + one);
-    }else{
-        abs_ret = one;
-    }
+    __fp16 abs_x = std::abs(x);
+    abs_x = abs_x < max ? abs_x : max;
+    __fp16 abs_ret = one - two / (std::exp(two * abs_x) + one);
     return sign * abs_ret;
 }
 
 template<>
-void gelu_exp_fusion<__fp16>(int64_t len, __fp16* data){
+void gelu_fastexp_fusion<__fp16>(int64_t len, __fp16* data){
     const __fp16 const_sqrt_2_div_pi = static_cast<__fp16>(0.7978845608028654);
     const __fp16 const_2 = static_cast<__fp16>(0.044715);
     const __fp16 const_half = static_cast<__fp16>(0.5);
@@ -67,7 +60,7 @@ void gelu_exp_fusion<__fp16>(int64_t len, __fp16* data){
         abs_tanh_x = abs_tanh_x < const_max ? abs_tanh_x : const_max;
         __fp16 exp_x = const_two * abs_tanh_x;
         exp_x *= const_log2e;
-        __fp16 exp_xi = floor(exp_x);
+        __fp16 exp_xi = std::floor(exp_x);
         uint16_t exp_xi_int = exp_xi;
         __fp16 exp_xf = exp_x - exp_xi;
         __fp16 exp_k = exp_coef[1] * exp_xf + exp_coef[0] + const_one;
@@ -81,9 +74,9 @@ void gelu_exp_fusion<__fp16>(int64_t len, __fp16* data){
     }
 }
 
-#ifdef __ARM_FEATURE_SVE
+// #ifdef __ARM_FEATURE_SVE
 template<>
-void gelu_exp_simd<__fp16>(int64_t len, __fp16* data){
+void gelu_fastexp_simd<__fp16>(int64_t len, __fp16* data){
     const __fp16 const_sqrt_2_div_pi = 0.7978845608028654;
     const __fp16 const_2 = 0.044715;
     const __fp16 const_half = 0.5;
@@ -169,23 +162,7 @@ void gelu_exp_simd<__fp16>(int64_t len, __fp16* data){
         svst1(p_1, &data[i + svcnth()], vgelu_ret_1);
     }
 }
-#endif
-
-template<>
-void gelu_exp<__fp16>(int64_t len, __fp16* data){
-    const __fp16 const_1 = static_cast<__fp16>(0.7978845608028654);
-    const __fp16 const_2 = static_cast<__fp16>(0.044715);
-    const __fp16 one = static_cast<__fp16>(1.);
-    const __fp16 half = static_cast<__fp16>(0.5);
-
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        __fp16 x = data[i];
-        data[i] = half * x * (one + tanh_exp<__fp16>(const_1 * (x + const_2 * x * x * x)));
-    }
-}
+// #endif
 
 template<>
 void gelu_lookup<__fp16>(int64_t len, __fp16* data){

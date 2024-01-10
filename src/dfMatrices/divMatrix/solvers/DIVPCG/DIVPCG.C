@@ -50,8 +50,6 @@ Foam::solverPerformance Foam::DIVPCG::solve
     const direction cmpt
 ) const
 {
-    Pstream::barrier();
-    
     double spmv_start, spmv_end;
     double normFactor_start, normFactor_end;
     double gSumMag_start, gSumMag_end;
@@ -60,7 +58,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
     double precondition_start, precondition_end;
     double precondition_construct_start, precondition_construct_end;
 
-    double solve_start = MPI_Wtime();
+    double PCG_start = MPI_Wtime();
 
     // --- Setup class containing solver performance data
     solverPerformance solverPerf
@@ -199,9 +197,8 @@ Foam::solverPerformance Foam::DIVPCG::solve
         );
 
     }
-
-    double solve_end = MPI_Wtime();
-    solve_time += solve_end - solve_start;
+    double PCG_end = MPI_Wtime();
+    PCG_time += PCG_end - PCG_start;
 
     return solverPerf;
 }

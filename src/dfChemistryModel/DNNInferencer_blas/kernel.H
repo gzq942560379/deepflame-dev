@@ -5,11 +5,14 @@
 #include <iostream>
 #include "Tensor.H"
 
-template<typename T>
-static T tanh_exp(T x);
+// template<typename T> // Todo
+// static T fast_floor(T x);
 
 template<typename T>
-static T fast_exp(T x);
+T tanh_exp(T x);
+
+template<typename T>
+T fast_exp(T x);
 
 template<typename T>
 void gelu_navie(int64_t len, T* data);
@@ -18,11 +21,11 @@ template<typename T>
 void gelu_exp(int64_t len, T* data);
 
 template<typename T>
-void gelu_exp_fusion(int64_t len, T* data);
+void gelu_fastexp_fusion(int64_t len, T* data);
 
 #ifdef __ARM_FEATURE_SVE
 template<typename T>
-void gelu_exp_simd(int64_t len, T* data);
+void gelu_fastexp_simd(int64_t len, T* data);
 #endif
 
 template<typename T>
@@ -52,6 +55,32 @@ void gemm(char transa, char transb, int m, int n, int k, T alpha, const T *a, in
 // implement ----------------------------------------------------------------------------
 
 template<typename T>
+void gelu_navie(int64_t len, T* data){
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
+    for(int64_t i = 0; i < len; ++i){
+        float x = data[i];
+        data[i] = 0.5 * x * (1. + std::tanh(std::sqrt(2. / M_PI) * (x + 0.044715 * std::pow(x, 3.))));
+    }
+}
+
+template<typename T>
+void gelu_exp(int64_t len, T* data){
+    const T const_1 = 0.7978845608028654;
+    const T const_2 = 0.044715;
+    const T one = 1.;
+    const T half = 0.5;
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
+    for(int64_t i = 0; i < len; ++i){
+        T x = data[i];
+        data[i] = half * x * (one + tanh_exp<T>(const_1 * (x + const_2 * x * x * x)));
+    }
+}
+
+template<typename T>
 void bias_naive(Tensor<T>& input, const Tensor<T>& bias){
     int64_t row = input.dim(0);
     int64_t col = input.dim(1);
@@ -68,10 +97,33 @@ void bias_naive(Tensor<T>& input, const Tensor<T>& bias){
     }
 }
 
+template<typename T>
+void bias_gelu_exp_fusion(Tensor<T>& input, const Tensor<T>& bias){
+    int64_t row = input.dim(0);
+    int64_t col = input.dim(1);
+    int64_t ld = col;
+    const T const_1 = 0.7978845608028654;
+    const T const_2 = 0.044715;
+    const T one = 1.;
+    const T half = 0.5;
+    T* input_data = input.data();
+    const T* bias_data = bias.data();
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
+    for(int64_t r = 0; r < row; ++r){
+        T* input_data_row = &input_data[r * ld];
+        for(int64_t c = 0; c < col; ++c){
+            T x = input_data_row[c] + bias_data[c];
+            input_data_row[c] = half * x * (one + tanh_exp(const_1 * (x + const_2 * x * x * x)));
+        }
+    }
+}
+
 #ifdef __ARM_FEATURE_SVE
 template<typename T>
-void gelu_exp_simd(int64_t len, T* data){
-    return gelu_exp_fusion(len, data);
+void gelu_fastexp_simd(int64_t len, T* data){
+    return gelu_fastexp_fusion(len, data);
 }
 #endif
 
