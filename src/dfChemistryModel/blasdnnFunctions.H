@@ -82,7 +82,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         #pragma omp for
         for(size_t celli = 0; celli<Cell0.size(); ++celli){
             size_t cellI = Cell0[celli];
-
             scalar Ti = T_[cellI];
             scalar pi = p_[cellI];
             size_t offset = celli * input_dim;
@@ -274,11 +273,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
     double update_time = update_end - update_start;
 
+    Info << "solve_DNN_blas profiling --------------------------------------------------" << endl;
     Info << "solve_DNN_blas time : " << solve_DNN_blas_time << endl;
     Info << "prepare dnn input time : " << prepare_dnn_input_time << endl;
     Info << "dnn inference time : " << dnn_infer_time << endl;
     Info << "update time : " << update_time << endl;
     Info << "other time : " << solve_DNN_blas_time - prepare_dnn_input_time - dnn_infer_time - update_time << endl;
+    Info << "---------------------------------------------------------------------------" << endl;
 
     return deltaTMin;
 }

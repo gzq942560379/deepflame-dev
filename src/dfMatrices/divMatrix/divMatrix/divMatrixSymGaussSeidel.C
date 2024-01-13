@@ -37,7 +37,6 @@ void Foam::divMatrix::SymGaussSeidel
     const scalarField& bPrime
 ) const
 {
-
     SymGaussSeidel_naive(psi, bPrime);
 }
 

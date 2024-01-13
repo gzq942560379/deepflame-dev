@@ -28,6 +28,9 @@ divMatrix::divMatrix(const lduMatrix& ldu):lduMatrix_(&ldu),row_block_bit_(row_b
     assert(block_tail_ == 0);
     // fill diag value
     diag_value_.resize(row_);
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
     for(label i = 0; i < row_; ++i){
         diag_value_[i] = lduDiag[i];
     }
@@ -53,7 +56,7 @@ divMatrix::divMatrix(const lduMatrix& ldu):lduMatrix_(&ldu),row_block_bit_(row_b
     }
     distance_list_.resize(distance_count_);
     label distance_index = 0;
-    for(label i = 0 ; i < distance_map.size(); ++i){
+    for(size_t i = 0 ; i < distance_map.size(); ++i){
         if(distance_map[i] > 0){
             distance_list_[distance_index] = i - row_ + 1;
             distance_map[i] = distance_index;
@@ -64,7 +67,7 @@ divMatrix::divMatrix(const lduMatrix& ldu):lduMatrix_(&ldu),row_block_bit_(row_b
     }
     max_distance_ = 0;
     min_distance_ = 0;
-    for(label i = 0; i < distance_list_.size(); ++i){
+    for(size_t i = 0; i < distance_list_.size(); ++i){
         max_distance_ = std::max(max_distance_, distance_list_[i]);
         min_distance_ = std::min(min_distance_, distance_list_[i]);
     }
@@ -129,7 +132,7 @@ divMatrix::divMatrix(const lduMesh& mesh):row_block_bit_(row_block_bit), row_blo
 
     distance_list_.resize(distance_count_);
     label distance_index = 0;
-    for(label i = 0 ; i < distance_map.size(); ++i){
+    for(size_t i = 0 ; i < distance_map.size(); ++i){
         if(distance_map[i] > 0){
             distance_list_[distance_index] = i - row_ + 1;
             distance_map[i] = distance_index;
@@ -141,7 +144,7 @@ divMatrix::divMatrix(const lduMesh& mesh):row_block_bit_(row_block_bit), row_blo
 
     max_distance_ = 0;
     min_distance_ = 0;
-    for(label i = 0; i < distance_list_.size(); ++i){
+    for(size_t i = 0; i < distance_list_.size(); ++i){
         max_distance_ = std::max(max_distance_, distance_list_[i]);
         min_distance_ = std::min(min_distance_, distance_list_[i]);
     }
@@ -197,6 +200,9 @@ void divMatrix::copy_value_from_fvMatrix(const lduMatrix& lduMatrix){
 
     label face_count = lduLower.size();
 
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
     for(label i = 0; i < row_; ++i){
         diag_value_[i] = lduDiag[i];
     }
@@ -228,10 +234,6 @@ void divMatrix::check() const {
         label rbs = DIV_BLOCK_START(bi);
         label rbe = DIV_BLOCK_END(rbs);
         label rbl = DIV_BLOCK_LEN(rbs,rbe);
-        const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
-        // for(label br = 0; br < rbl; ++br){
-        //     ApsiPtr_offset[br] = diagPtr_offset[br] * psiPtr[rbs + br];
-        // }
         label index_block_start = DIV_INDEX_BLOCK_START(rbs);
         for(label divcol = 0; divcol < distance_count_; ++divcol){
             label index_divcol_start = index_block_start + DIV_COL_OFFSET(divcol);

@@ -79,11 +79,11 @@ Foam::DIVGAMGSolver::DIVGAMGSolver
     directSolveCoarsest_(false),
     agglomeration_(DIVGAMGAgglomeration::New(matrix_.ldu(), controlDict_)),
     matrixLevels_(agglomeration_.size()),
-    divMatrixLevels_(agglomeration_.size()),
     primitiveInterfaceLevels_(agglomeration_.size()),
     interfaceLevels_(agglomeration_.size()),
     interfaceLevelsBouCoeffs_(agglomeration_.size()),
-    interfaceLevelsIntCoeffs_(agglomeration_.size())
+    interfaceLevelsIntCoeffs_(agglomeration_.size()),
+    divMatrixLevels_(agglomeration_.size())
 {
     readControls();
 

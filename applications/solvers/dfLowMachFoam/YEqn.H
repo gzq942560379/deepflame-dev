@@ -19,6 +19,7 @@ diffAlphaD = Zero;
 sumYDiffError = Zero;
 std::vector<volVectorField> gradResult; 
 
+start = MPI_Wtime();
 Y_total_start = MPI_Wtime();
 Y_phiUc_start = MPI_Wtime();
 Y_build_start = MPI_Wtime();
@@ -39,6 +40,8 @@ Y_total_end = MPI_Wtime();
 Y_build_time += Y_build_end - Y_build_start;
 Y_phiUc_time += Y_phiUc_end - Y_phiUc_start;
 Y_total_time += Y_total_end - Y_total_start;
+end = MPI_Wtime();
+time_monitor_Y += end - start;
 
 start = MPI_Wtime();
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
@@ -97,8 +100,8 @@ forAll(Y, i)
     Y_build_grad_time += Y_build_grad_end - Y_build_grad_start;
 
     Y_build_laplacian_start = MPI_Wtime();
-    // tmp<volScalarField> laplacianTmp = fvc::laplacian(alpha_mul_hai, Yi);
-    tmp<volScalarField> laplacianTmp = gaussLaplacianSchemeFvcLaplacian(alpha_mul_hai, Yi);
+    tmp<volScalarField> laplacianTmp = fvc::laplacian(alpha_mul_hai, Yi);
+    // tmp<volScalarField> laplacianTmp = gaussLaplacianSchemeFvcLaplacian(alpha_mul_hai, Yi);
 
     Y_build_laplacian_end = MPI_Wtime();
     Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;

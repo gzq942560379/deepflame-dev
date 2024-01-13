@@ -114,26 +114,30 @@ public:
 
     // profiling
     mutable double PBiCGStab_time = 0.;
-    mutable double spmv_time = 0.;
-    mutable double normFactor_time = 0.;
-    mutable double gSumMag_time = 0.;
-    mutable double gSumProd_time = 0.;
-    mutable double gSumSqr_time = 0.;
-    mutable double localUpdate_time = 0.;
-    mutable double precondition_time = 0.;
+    mutable double PBiCGStab_spmv_time = 0.;
+    mutable double PBiCGStab_normFactor_time = 0.;
+    mutable double PBiCGStab_gSumMag_time = 0.;
+    mutable double PBiCGStab_gSumProd_time = 0.;
+    mutable double PBiCGStab_gSumSqr_time = 0.;
+    mutable double PBiCGStab_localUpdate_time = 0.;
+    mutable double PBiCGStab_precondition_time = 0.;
+    mutable double PBiCGStab_misc_time = 0.;
 
     void print_time() const {
-        double other_time = PBiCGStab_time - spmv_time - normFactor_time - gSumMag_time - gSumProd_time - gSumSqr_time - localUpdate_time - precondition_time;
-        Info << "DIVPCG solve profiling -----------------------------------------------------------------" << endl;
+        double PBiCGStab_other_time = PBiCGStab_time - PBiCGStab_spmv_time - PBiCGStab_normFactor_time - PBiCGStab_gSumMag_time \
+            - PBiCGStab_gSumProd_time - PBiCGStab_gSumSqr_time - PBiCGStab_localUpdate_time - PBiCGStab_precondition_time \
+            - PBiCGStab_misc_time;
+        Info << "DIVPBiCGStab solve profiling ------------------------------------------------------------" << endl;
         Info << "PBiCGStab time : " << PBiCGStab_time << endl;
-        Info << "spmv time : " << spmv_time << ", " << spmv_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "normFactor time : " << normFactor_time << ", " << normFactor_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "gSumMag time : " << gSumMag_time << ", " << gSumMag_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "gSumProd time : " << gSumProd_time << ", " << gSumProd_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "gSumSqr time : " << gSumSqr_time << ", " << gSumSqr_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "localUpdate time : " << localUpdate_time << ", " << localUpdate_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "precondition time : " << precondition_time << ", " << precondition_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "other time : " << other_time << ", " << other_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab spmv time : " << PBiCGStab_spmv_time << ", " << PBiCGStab_spmv_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab normFactor time : " << PBiCGStab_normFactor_time << ", " << PBiCGStab_normFactor_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab gSumMag time : " << PBiCGStab_gSumMag_time << ", " << PBiCGStab_gSumMag_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab gSumProd time : " << PBiCGStab_gSumProd_time << ", " << PBiCGStab_gSumProd_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab gSumSqr time : " << PBiCGStab_gSumSqr_time << ", " << PBiCGStab_gSumSqr_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab localUpdate time : " << PBiCGStab_localUpdate_time << ", " << PBiCGStab_localUpdate_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab precondition time : " << PBiCGStab_precondition_time << ", " << PBiCGStab_precondition_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab misc time : " << PBiCGStab_misc_time << ", " << PBiCGStab_misc_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab other time : " << PBiCGStab_other_time << ", " << PBiCGStab_other_time / PBiCGStab_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;
         preconPtr_->print_time();
     }

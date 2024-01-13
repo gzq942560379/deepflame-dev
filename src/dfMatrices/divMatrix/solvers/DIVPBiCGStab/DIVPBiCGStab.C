@@ -25,6 +25,7 @@ License
 
 #include "DIVPBiCGStab.H"
 #include <mpi.h>
+#include <clockTime.H>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -80,15 +81,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
     const direction cmpt
 ) const
 {
-    double spmv_start, spmv_end;
-    double normFactor_start, normFactor_end;
-    double gSumMag_start, gSumMag_end;
-    double gSumProd_start, gSumProd_end;
-    double gSumSqr_start, gSumSqr_end;
-    double localUpdate_start, localUpdate_end;
-    double precondition_start, precondition_end;
-
-    double PBiCGStab_start = MPI_Wtime();
+    clockTime clock;
 
     // --- Setup class containing solver performance data
     solverPerformance solverPerf
@@ -108,32 +101,23 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
     scalar* __restrict__ yAPtr = yA.begin();
 
     // --- Calculate A.psi
-    spmv_start = MPI_Wtime();
     matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-    spmv_end = MPI_Wtime();
-    spmv_time += spmv_end - spmv_start;
+    
+    PBiCGStab_spmv_time += clock.timeIncrement();
 
     // --- Calculate initial residual field
-    localUpdate_start = MPI_Wtime();
     scalarField rA(source - yA);
-    localUpdate_end = MPI_Wtime();
-    localUpdate_time += localUpdate_end - localUpdate_start;
+    PBiCGStab_localUpdate_time += clock.timeIncrement();
 
     scalar* __restrict__ rAPtr = rA.begin();
 
     // --- Calculate normalisation factor
-    normFactor_start = MPI_Wtime();
     const scalar normFactor = this->normFactor(psi, source, yA, pA);
-    normFactor_end = MPI_Wtime();
-    normFactor_time += normFactor_end - normFactor_start;
+    PBiCGStab_normFactor_time += clock.timeIncrement();
 
     // --- Calculate normalised residual norm
-    gSumMag_start = MPI_Wtime();
-    solverPerf.initialResidual() =
-        gSumMag(rA, matrix().mesh().comm())
-       /normFactor;
-    gSumMag_end = MPI_Wtime();
-    gSumMag_time += gSumMag_end - gSumMag_start;
+    solverPerf.initialResidual() = gSumMag(rA, matrix().mesh().comm()) / normFactor;
+    PBiCGStab_gSumMag_time += clock.timeIncrement();
 
     solverPerf.finalResidual() = solverPerf.initialResidual();
 
@@ -144,6 +128,8 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
      || !solverPerf.checkConvergence(tolerance_, relTol_)
     )
     {
+        PBiCGStab_misc_time += clock.timeIncrement();
+
         scalarField AyA(nCells);
         scalar* __restrict__ AyAPtr = AyA.begin();
 
@@ -170,11 +156,11 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
             // --- Store previous rA0rA
             const scalar rA0rAold = rA0rA;
 
-            gSumProd_start = MPI_Wtime();
-            rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
-            gSumProd_end = MPI_Wtime();
-            gSumProd_time += gSumProd_end - gSumProd_start;
+            PBiCGStab_misc_time += clock.timeIncrement();
 
+            rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
+
+            PBiCGStab_gSumProd_time += clock.timeIncrement();
 
             // --- Test for singularity
             if (solverPerf.checkSingularity(mag(rA0rA)))
@@ -185,13 +171,14 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
             // --- Update pA
             if (solverPerf.nIterations() == 0)
             {
-                localUpdate_start = MPI_Wtime();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
                 for (label cell=0; cell<nCells; cell++)
                 {
                     pAPtr[cell] = rAPtr[cell];
                 }
-                localUpdate_end = MPI_Wtime();
-                localUpdate_time += localUpdate_end - localUpdate_start;
+                PBiCGStab_localUpdate_time += clock.timeIncrement();
             }
             else
             {
@@ -201,107 +188,91 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
                     break;
                 }
 
-                localUpdate_start = MPI_Wtime();
+                PBiCGStab_misc_time += clock.timeIncrement();
+
                 const scalar beta = (rA0rA/rA0rAold)*(alpha/omega);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
                 for (label cell=0; cell<nCells; cell++)
                 {
-                    pAPtr[cell] =
-                        rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
+                    pAPtr[cell] = rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
                 }
-                localUpdate_end = MPI_Wtime();
-                localUpdate_time += localUpdate_end - localUpdate_start;
+
+                PBiCGStab_localUpdate_time += clock.timeIncrement();
             }
 
             // --- Precondition pA
-            precondition_start = MPI_Wtime();
             preconPtr_->precondition(yA, pA, cmpt);
-            precondition_end = MPI_Wtime();
-            precondition_time += precondition_end - precondition_start;
+            PBiCGStab_precondition_time += clock.timeIncrement();
             
             // --- Calculate AyA
-            spmv_start = MPI_Wtime();   
             matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
-            spmv_end = MPI_Wtime();
-            spmv_time += spmv_end - spmv_start;
+            PBiCGStab_spmv_time += clock.timeIncrement();
 
-            gSumProd_start = MPI_Wtime();
             const scalar rA0AyA = gSumProd(rA0, AyA, matrix().mesh().comm());
-            gSumProd_end = MPI_Wtime();
-            gSumProd_time += gSumProd_end - gSumProd_start;
+            PBiCGStab_gSumProd_time += clock.timeIncrement();
 
             // --- Calculate sA
-            localUpdate_start = MPI_Wtime();
             alpha = rA0rA/rA0AyA;
             // --- Calculate sA
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label cell=0; cell<nCells; cell++)
             {
                 sAPtr[cell] = rAPtr[cell] - alpha*AyAPtr[cell];
             }
-            localUpdate_end = MPI_Wtime();
-            localUpdate_time += localUpdate_end - localUpdate_start;
+            PBiCGStab_localUpdate_time += clock.timeIncrement();
 
             // --- Test sA for convergence
-            gSumMag_start = MPI_Wtime();
-            solverPerf.finalResidual() =
-                gSumMag(sA, matrix().mesh().comm())/normFactor;
-            gSumMag_end = MPI_Wtime();
-            gSumMag_time += gSumMag_end - gSumMag_start;
+            solverPerf.finalResidual() = gSumMag(sA, matrix().mesh().comm()) / normFactor;
+            PBiCGStab_gSumMag_time += clock.timeIncrement();
 
             if (solverPerf.checkConvergence(tolerance_, relTol_))
             {
-                localUpdate_start = MPI_Wtime();
+                PBiCGStab_misc_time += clock.timeIncrement();
                 for (label cell=0; cell<nCells; cell++)
                 {
                     psiPtr[cell] += alpha*yAPtr[cell];
                 }
                 solverPerf.nIterations()++;
-                localUpdate_end = MPI_Wtime();
-                localUpdate_time += localUpdate_end - localUpdate_start;
-
+                PBiCGStab_localUpdate_time += clock.timeIncrement();
                 break;
             }
 
             // --- Precondition sA
-            precondition_start = MPI_Wtime();
             preconPtr_->precondition(zA, sA, cmpt);
-            precondition_end = MPI_Wtime();
-            precondition_time += precondition_end - precondition_start;
+            PBiCGStab_precondition_time += clock.timeIncrement();
 
             // --- Calculate tA
-            spmv_start = MPI_Wtime();   
             matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
-            spmv_end = MPI_Wtime();
-            spmv_time += spmv_end - spmv_start;
+            PBiCGStab_spmv_time += clock.timeIncrement();
 
-            gSumSqr_start = MPI_Wtime();
             const scalar tAtA = gSumSqr(tA, matrix().mesh().comm());
-            gSumSqr_end = MPI_Wtime();
-            gSumSqr_time += gSumSqr_end - gSumSqr_start;
+            
+            PBiCGStab_gSumSqr_time += clock.timeIncrement();
 
             // --- Calculate omega from tA and sA
             //     (cheaper than using zA with preconditioned tA)
-            gSumProd_start = MPI_Wtime();
             omega = gSumProd(tA, sA, matrix().mesh().comm())/tAtA;
-            gSumProd_end = MPI_Wtime();
-            gSumProd_time += gSumProd_end - gSumProd_start;
+            
+            PBiCGStab_gSumProd_time += clock.timeIncrement();
 
             // --- Update solution and residual
-            localUpdate_start = MPI_Wtime();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label cell=0; cell<nCells; cell++)
             {
                 psiPtr[cell] += alpha*yAPtr[cell] + omega*zAPtr[cell];
                 rAPtr[cell] = sAPtr[cell] - omega*tAPtr[cell];
             }
-            localUpdate_end = MPI_Wtime();
-            localUpdate_time += localUpdate_end - localUpdate_start;
+            PBiCGStab_localUpdate_time += clock.timeIncrement();
 
-            gSumMag_start = MPI_Wtime();
-            solverPerf.finalResidual() =
-                gSumMag(rA, matrix().mesh().comm())
-               /normFactor;
-            gSumMag_end = MPI_Wtime();
-            gSumMag_time += gSumMag_end - gSumMag_start;
-
+            solverPerf.finalResidual() = gSumMag(rA, matrix().mesh().comm()) / normFactor;
+            
+            PBiCGStab_gSumMag_time += clock.timeIncrement();
         } while
         (
             (
@@ -312,8 +283,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
         );
     }
 
-    double PBiCGStab_end = MPI_Wtime();
-    PBiCGStab_time += PBiCGStab_end - PBiCGStab_start;
+    PBiCGStab_time += clock.elapsedTime();
     return solverPerf;
 }
 

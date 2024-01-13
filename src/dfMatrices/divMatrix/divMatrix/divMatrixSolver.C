@@ -183,24 +183,16 @@ Foam::scalar Foam::divMatrix::solver::normFactor
 ) const
 {
     // --- Calculate A dot reference value of psi
-    clockTime clock;
     matrix_.sumA(tmpField, interfaceBouCoeffs_, interfaces_);
 
-    normFactor_sumA_time_ += clock.timeIncrement();
 
     tmpField *= gAverage(psi, matrix_.mesh().comm());
 
-    normFactor_sumA_time_ += clock.timeIncrement();
-
     tmp<scalarField> tmp = mag(Apsi - tmpField) + mag(source - tmpField);
 
-    normFactor_mag_time_ += clock.timeIncrement();
 
-    scalar ret = gSum(tmp(), matrix_.mesh().comm()) + solverPerformance::small_;
 
-    normFactor_gSum_time_ += clock.timeIncrement();
-
-    return ret;
+    return gSum(tmp(), matrix_.mesh().comm()) + solverPerformance::small_;
     // At convergence this simpler method is equivalent to the above
     // return 2*gSumMag(source) + solverPerformance::small_;
 }

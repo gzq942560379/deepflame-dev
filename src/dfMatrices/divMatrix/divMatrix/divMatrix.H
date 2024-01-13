@@ -41,13 +41,13 @@ namespace Foam{
 class divMatrix{
 private:
     const lduMatrix* lduMatrix_ = nullptr;
+    const label row_block_bit_; // row_block_size_ = 2^row_block_bit_
+    const label row_block_size_;
 
     //- Coefficients (not including interfaces)
     label row_;
     scalarField diag_value_;
 
-    const label row_block_bit_; // row_block_size_ = 2^row_block_bit_
-    const label row_block_size_;
     label block_count_; // node count 只算能整除的部分
     label block_tail_; // 
 
@@ -85,13 +85,13 @@ public:
     void copy_value_from_fvMatrix(const lduMatrix& lduMatrix);
 
     // Copy constructor
-    divMatrix(const divMatrix& other)
-        :row_(other.row_),row_block_bit_(other.row_block_bit_),row_block_size_(other.row_block_size_),
+    divMatrix(const divMatrix& other):
+        row_block_bit_(other.row_block_bit_),row_block_size_(other.row_block_size_),row_(other.row_),
         diag_value_(other.diag_value_),block_count_(other.block_count_),block_tail_(other.block_tail_),
-        distance_count_(other.distance_count_),distance_list_(other.distance_list_),max_distance_(other.max_distance_),
-        min_distance_(other.min_distance_),head_block_count_(other.head_block_count_), tail_block_count_(other.tail_block_count_),
-        off_diag_value_(other.off_diag_value_), face2lower_(other.face2lower_), face2upper_(other.face2upper_),
-        diagonal_(other.diagonal_), symmetric_(other.symmetric_), asymmetric_(other.asymmetric_)
+        distance_count_(other.distance_count_),distance_list_(other.distance_list_),
+        max_distance_(other.max_distance_),min_distance_(other.min_distance_),head_block_count_(other.head_block_count_),
+        tail_block_count_(other.tail_block_count_),off_diag_value_(other.off_diag_value_), face2lower_(other.face2lower_),
+        face2upper_(other.face2upper_),diagonal_(other.diagonal_), symmetric_(other.symmetric_), asymmetric_(other.asymmetric_)
         {};
 
     // Copy constructor
@@ -434,13 +434,7 @@ public:
             scalarField& tmpField
         ) const;
 
-        mutable double normFactor_sumA_time_ = 0.;
-        mutable double normFactor_gAverage_time_ = 0.;
-        mutable double normFactor_mag_time_ = 0.;
-        mutable double normFactor_gSum_time_ = 0.;
-
         virtual void print_time() const {}
-
     };
 
     //- Abstract base-class for divMatrix smoothers

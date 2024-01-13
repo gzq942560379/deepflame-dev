@@ -358,25 +358,34 @@ public:
 
     // Member Functions
 
-        //- Solve
-        virtual solverPerformance solve
-        (
-            scalarField& psi,
-            const scalarField& source,
-            const direction cmpt=0
-        ) const;
+    //- Solve
+    virtual solverPerformance solve
+    (
+        scalarField& psi,
+        const scalarField& source,
+        const direction cmpt=0
+    ) const;
+    
+    // profiling
+    mutable double Vcycle_total_time = 0.;
+    mutable double Vcycle_spmv_time = 0.;
+    mutable double Vcycle_smooth_time = 0.;
+    mutable double Vcycle_scale_time = 0.;
+    mutable double Vcycle_interpolate_time = 0.;
+    mutable double Vcycle_restrictField_time = 0.;
+    mutable double Vcycle_prolongField_time = 0.;
+    mutable double Vcycle_solveCoarsest_time = 0.;
+    mutable double Vcycle_misc_time = 0.;
 
-        // profiling
-        mutable double Vcycle_time = 0.;
-        mutable double spmv_time = 0.;
-        mutable double smooth_time = 0.;
-        mutable double scale_time = 0.;
-        mutable double scale_spmv_time = 0.;
-        mutable double interpolate_spmv_time = 0.;
-        mutable double interpolate_time = 0.;
-        mutable double restrictField_time = 0.;
-        mutable double prolongField_time = 0.;
-        mutable double solveCoarsest_time = 0.;
+    mutable double scale_total_time = 0.;
+    mutable double scale_spmv_time = 0.;
+    mutable double scale_norm_time = 0.;
+    mutable double scale_vector2D_reduce_time = 0.;
+    mutable double scale_sf_time = 0.;
+    mutable double scale_field_time = 0.;
+
+    virtual void print_time() const {}
+
 };
 
 

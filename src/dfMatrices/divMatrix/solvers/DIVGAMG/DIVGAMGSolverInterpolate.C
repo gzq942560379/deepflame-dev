@@ -74,10 +74,7 @@ void Foam::DIVGAMGSolver::interpolate
     //     cmpt
     // );
 
-    double start = MPI_Wtime();
     m.Amul(Apsi, psi, interfaceBouCoeffs, interfaces, cmpt);
-    double end = MPI_Wtime();
-    interpolate_spmv_time += end - start;
 
     const label nCells = m.diag().size();
     for (label celli=0; celli<nCells; celli++)
