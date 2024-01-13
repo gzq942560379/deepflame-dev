@@ -246,8 +246,6 @@ Foam::solverPerformance Foam::DIVPCG::solve
             }
             PCG_localUpdate_time += clock.timeIncrement();
 
-            // solverPerf.finalResidual() = gSumMag(rA, matrix().mesh().comm()) / normFactor;
-
             gRASumMag = 0.;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:gRASumMag)

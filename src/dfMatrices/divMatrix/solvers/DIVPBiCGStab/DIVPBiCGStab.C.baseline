@@ -92,11 +92,6 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
     const label nCells = psi.size();
 
-    label gNCells = nCells;
-    reduce(gNCells, sumOp<label>());
-
-    const scalar* __restrict__ sourcePtr = source.begin();
-
     scalar* __restrict__ psiPtr = psi.begin();
 
     scalarField pA(nCells);
@@ -105,83 +100,23 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
     scalarField yA(nCells);
     scalar* __restrict__ yAPtr = yA.begin();
 
-    scalarField rA(nCells);
-    scalar* __restrict__ rAPtr = rA.begin();
-
-    scalarField tmp(nCells);
-    scalar* __restrict__ tmpPtr = tmp.begin();
-
     // --- Calculate A.psi
     matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
     
     PBiCGStab_spmv_time += clock.timeIncrement();
 
     // --- Calculate initial residual field
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        rAPtr[c] = sourcePtr[c] - yAPtr[c];
-    }
-
+    scalarField rA(source - yA);
     PBiCGStab_localUpdate_time += clock.timeIncrement();
 
+    scalar* __restrict__ rAPtr = rA.begin();
+
     // --- Calculate normalisation factor
-    matrix_.sumA(pA, interfaceBouCoeffs_, interfaces_);
-
-    scalar gPsiSum = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gPsiSum)
-#endif
-    for(label c = 0; c < nCells; ++c){
-        gPsiSum += psi[c];
-    }
-
-    reduce(gPsiSum, sumOp<scalar>());
-
-    scalar gPsiAvg = gPsiSum / gNCells;
-
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        pAPtr[c] *= gPsiAvg;
-    }
-    
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        tmpPtr[c] = std::abs(yAPtr[c] - pAPtr[c]) + std::abs(sourcePtr[c] - pAPtr[c]);
-    }
-
-    scalar gTmpSum = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gTmpSum)
-#endif
-    for(label c = 0; c < nCells; ++c){
-        gTmpSum += tmpPtr[c];
-    }
-
-    reduce(gTmpSum, sumOp<scalar>());
-    
-    scalar normFactor = gTmpSum + solverPerformance::small_;
-
+    const scalar normFactor = this->normFactor(psi, source, yA, pA);
     PBiCGStab_normFactor_time += clock.timeIncrement();
 
     // --- Calculate normalised residual norm
-    scalar gRASumMag = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gRASumMag)
-#endif
-    for(label c = 0; c < nCells; ++c){
-        gRASumMag += std::abs(rAPtr[c]);
-    }
-
-    reduce(gRASumMag, sumOp<scalar>());
-    
-    solverPerf.initialResidual() = gRASumMag / normFactor;
-
+    solverPerf.initialResidual() = gSumMag(rA, matrix().mesh().comm()) / normFactor;
     PBiCGStab_gSumMag_time += clock.timeIncrement();
 
     solverPerf.finalResidual() = solverPerf.initialResidual();
@@ -209,7 +144,6 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
         // --- Store initial residual
         const scalarField rA0(rA);
-        const scalar* __restrict__ rA0Ptr = rA0.begin();
 
         // --- Initial values not used
         scalar rA0rA = 0;
@@ -224,18 +158,15 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
             PBiCGStab_misc_time += clock.timeIncrement();
 
-            rA0rA = 0.;
-
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:rA0rA)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                rA0rA += rA0Ptr[c] * rAPtr[c];
-            }
-
-            reduce(rA0rA, sumOp<scalar>());
+            rA0rA = gSumProd(rA0, rA, matrix().mesh().comm());
 
             PBiCGStab_gSumProd_time += clock.timeIncrement();
+
+            // --- Test for singularity
+            if (solverPerf.checkSingularity(mag(rA0rA)))
+            {
+                break;
+            }
 
             // --- Update pA
             if (solverPerf.nIterations() == 0)
@@ -251,13 +182,21 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
             }
             else
             {
+                // --- Test for singularity
+                if (solverPerf.checkSingularity(mag(omega)))
+                {
+                    break;
+                }
+
+                PBiCGStab_misc_time += clock.timeIncrement();
+
                 const scalar beta = (rA0rA/rA0rAold)*(alpha/omega);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
                 for (label cell=0; cell<nCells; cell++)
                 {
-                    pAPtr[cell] = rAPtr[cell] + beta * (pAPtr[cell] - omega * AyAPtr[cell]);
+                    pAPtr[cell] = rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
                 }
 
                 PBiCGStab_localUpdate_time += clock.timeIncrement();
@@ -271,17 +210,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
             matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
             PBiCGStab_spmv_time += clock.timeIncrement();
 
-            scalar rA0AyA = 0.;
-
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:rA0AyA)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                rA0AyA += rA0Ptr[c] * AyAPtr[c];
-            }
-
-            reduce(rA0AyA, sumOp<scalar>());
-
+            const scalar rA0AyA = gSumProd(rA0, AyA, matrix().mesh().comm());
             PBiCGStab_gSumProd_time += clock.timeIncrement();
 
             // --- Calculate sA
@@ -297,29 +226,15 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
             PBiCGStab_localUpdate_time += clock.timeIncrement();
 
             // --- Test sA for convergence
-            scalar gSASumMag = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gSASumMag)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                gSASumMag += std::abs(sAPtr[c]);
-            }
-
-            reduce(gSASumMag, sumOp<scalar>());
-
-            solverPerf.finalResidual() = gSASumMag / normFactor;
-
+            solverPerf.finalResidual() = gSumMag(sA, matrix().mesh().comm()) / normFactor;
             PBiCGStab_gSumMag_time += clock.timeIncrement();
 
             if (solverPerf.checkConvergence(tolerance_, relTol_))
             {
                 PBiCGStab_misc_time += clock.timeIncrement();
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
                 for (label cell=0; cell<nCells; cell++)
                 {
-                    psiPtr[cell] += alpha * yAPtr[cell];
+                    psiPtr[cell] += alpha*yAPtr[cell];
                 }
                 solverPerf.nIterations()++;
                 PBiCGStab_localUpdate_time += clock.timeIncrement();
@@ -334,32 +249,13 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
             matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
             PBiCGStab_spmv_time += clock.timeIncrement();
 
-            scalar tAtA = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:tAtA)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                tAtA += tAPtr[c] * tAPtr[c];
-            }
-            reduce(tAtA, sumOp<scalar>());
+            const scalar tAtA = gSumSqr(tA, matrix().mesh().comm());
             
             PBiCGStab_gSumSqr_time += clock.timeIncrement();
 
             // --- Calculate omega from tA and sA
             //     (cheaper than using zA with preconditioned tA)
-            // omega = gSumProd(tA, sA, matrix().mesh().comm()) / tAtA;
-
-            omega = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:omega)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                omega += tAPtr[c] * sAPtr[c];
-            }
-
-            reduce(omega, sumOp<scalar>());
-
-            omega /= tAtA;
+            omega = gSumProd(tA, sA, matrix().mesh().comm())/tAtA;
             
             PBiCGStab_gSumProd_time += clock.timeIncrement();
 
@@ -369,24 +265,13 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 #endif
             for (label cell=0; cell<nCells; cell++)
             {
-                psiPtr[cell] += alpha * yAPtr[cell] + omega * zAPtr[cell];
-                rAPtr[cell] = sAPtr[cell] - omega * tAPtr[cell];
+                psiPtr[cell] += alpha*yAPtr[cell] + omega*zAPtr[cell];
+                rAPtr[cell] = sAPtr[cell] - omega*tAPtr[cell];
             }
-
             PBiCGStab_localUpdate_time += clock.timeIncrement();
 
-            gRASumMag = 0.;
-            #ifdef _OPENMP
-            #pragma omp parallel for reduction(+:gRASumMag)
-            #endif
-                for(label c = 0; c < nCells; ++c){
-                    gRASumMag += std::abs(rAPtr[c]);
-                }
-
-            reduce(gRASumMag, sumOp<scalar>());
+            solverPerf.finalResidual() = gSumMag(rA, matrix().mesh().comm()) / normFactor;
             
-            solverPerf.finalResidual() = gRASumMag / normFactor;
-
             PBiCGStab_gSumMag_time += clock.timeIncrement();
         } while
         (
