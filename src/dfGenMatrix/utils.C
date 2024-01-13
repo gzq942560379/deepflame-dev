@@ -32,6 +32,14 @@ void check_field_equal(const Field<scalar>& a, const Field<scalar>& b){
     return;
 }
 
+void check_field_boundary_equal(const volScalarField& a, const volScalarField& b){
+    check_field_error(a, b, "field");
+    forAll(a.boundaryField(), patchi)
+    {
+        check_field_error(a.boundaryField()[patchi], b.boundaryField()[patchi], "boundaryField_" + std::to_string(patchi));
+    }
+}
+
 
 void check_fvmatrix_equal(const fvScalarMatrix& a,const fvScalarMatrix& b){
     if(a.source().begin() == b.source().begin()){

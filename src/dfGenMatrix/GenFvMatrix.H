@@ -14,6 +14,7 @@
 // #include <algorithm>
 // #include "PstreamGlobals.H"
 #include "StructureMeshSchedule.H"
+#include "processorFvPatchField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -279,14 +280,39 @@ GenMatrix_p(
     const volScalarField& phi
 );
 
+// thermo
+
+// construct new variables
+// thermo_rho
+// thermo_
+
+// correctThermo
+void correctThermo
+(
+    const PtrList<volScalarField>& Y,
+    volScalarField& T,
+    volScalarField& ha,
+    volScalarField& rho,
+    volScalarField& psi,
+    volScalarField& alpha,
+    volScalarField& mu,
+    volScalarField& p,
+    dfChemistryModel<basicThermo>* chemistry
+);
 
 void check_fvmatrix_equal(const fvScalarMatrix& a,const fvScalarMatrix& b);
 void check_fvmatrix_equal(const fvVectorMatrix& a,const fvVectorMatrix& b);
 
 void check_field_equal(const Field<scalar>& a, const Field<scalar>& b);
+void check_field_boundary_equal(const volScalarField& a, const volScalarField& b);
 void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name);
 
 } // End namespace Foam
 
+void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volScalarField>& Y);
+extern int nSpecies;
+extern Foam::label nCells;
+extern int nBoundarySurfaces;
+extern int nBoundaryPatches;
 
 // ************************************************************************* //
