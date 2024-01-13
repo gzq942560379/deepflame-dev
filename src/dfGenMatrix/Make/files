@@ -11,4 +11,6 @@ GenMatrix_E.C
 GenMatrix_p.C
 utils.C
 
+dfThermo.C
+
 LIB = $(DF_LIBBIN)/libdfGenMatrix

@@ -1,6 +1,6 @@
 -include $(GENERAL_RULES)/mplibType
 
-EXE_INC = \
+EXE_INC = -std=c++17\
 	-g \
     $(PFLAGS) $(PINC) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
