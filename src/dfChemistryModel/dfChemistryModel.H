@@ -319,6 +319,8 @@ public:
         PtrList<volScalarField>& Y() {return Y_;}
 
         const volScalarField& rhoD(const label i) const {return rhoD_[i];}
+        
+        volScalarField& rhoD(const label i) {return rhoD_[i];}
 
         const volScalarField& hai(const label i) {return hai_[i];}
 

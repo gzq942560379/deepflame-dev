@@ -68,16 +68,18 @@ Description
 
 // #define _CSR_
 // #define _ELL_
-#define _DIV_
-// #define _LDU_
+// #define _DIV_
+#define _LDU_
 // #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
-// #define OPT_GenMatrix_U
+#define OPT_GenMatrix_U
 // #define OPT_GenMatrix_p
-// #define OPT_GenMatrix_U_check
+#define OPT_thermo
+#define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
 // #define OPT_GenMatrix_p_check
+// #define OPT_thermo_check
 
 #ifdef _CSR_
 #include "csrMatrix.H"
@@ -374,10 +376,34 @@ int main(int argc, char *argv[])
 
                 Info<< "chemistry->correctThermo start" << nl << endl;
                 start = MPI_Wtime();
+                #ifdef OPT_thermo
+                volScalarField& mu = const_cast<volScalarField&>(thermo.mu()());
+                volScalarField& alpha = const_cast<volScalarField&>(thermo.alpha());
+                volScalarField& psi = const_cast<volScalarField&>(thermo.psi());
+                correctThermo(Y, T, thermo.he(), rho, psi, alpha, mu, p, chemistry);
+                #else
                 chemistry->correctThermo();
+                #endif
                 end = MPI_Wtime();
                 Info<< "chemistry->correctThermo end" << nl << endl;
                 time_monitor_corrThermo += end - start;
+
+                // when define OPT_thermo_check, do not define OPT_thermo
+                #ifdef OPT_thermo_check
+                volScalarField T_test = thermo.T();
+                volScalarField rho_test = thermo.rho();
+                volScalarField mu_test = thermo.mu();
+                volScalarField alpha_test = thermo.alpha();
+                volScalarField psi_test = thermo.psi();
+
+                correctThermo(Y, T_test, thermo.he(), rho_test, psi_test, alpha_test, mu_test, p, chemistry);
+                // check result
+                check_field_boundary_equal(T, T_test);
+                check_field_boundary_equal(psi, psi_test);
+                check_field_boundary_equal(thermo.rho(), rho_test);
+                check_field_boundary_equal(thermo.mu()(), mu_test);
+                check_field_boundary_equal(thermo.alpha(), alpha_test);
+                #endif
             }
             else
             {

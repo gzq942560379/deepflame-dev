@@ -59,20 +59,20 @@ Foam::CanteraMixture::CanteraMixture
         )
     ),
     CanteraMechanismFile_(CanteraTorchProperties_.lookup("CanteraMechanismFile")),
-    // CanteraSolution_(Cantera::newSolution(CanteraMechanismFile_, "")),
-    // CanteraGas_(CanteraSolution_->thermo()),
+    CanteraSolution_(Cantera::newSolution(CanteraMechanismFile_, "")),
+    CanteraGas_(CanteraSolution_->thermo()),
     transportModelName_(CanteraTorchProperties_.lookup("transportModel")),
-    // CanteraTransport_(newTransportMgr(transportModelName_, CanteraGas_.get())),
-    // Y_(nSpecies()),
+    CanteraTransport_(newTransportMgr(transportModelName_, CanteraGas_.get())),
+    Y_(nSpecies()),
     Tref_(mesh.objectRegistry::lookupObject<volScalarField>("T")),
-    pref_(mesh.objectRegistry::lookupObject<volScalarField>("p"))
-    // yTemp_(nSpecies()),
-    // HaTemp_(nSpecies()),
-    // CpTemp_(nSpecies()),
-    // CvTemp_(nSpecies()),
-    // muTemp_(nSpecies())
+    pref_(mesh.objectRegistry::lookupObject<volScalarField>("p")),
+    yTemp_(nSpecies()),
+    HaTemp_(nSpecies()),
+    CpTemp_(nSpecies()),
+    CvTemp_(nSpecies()),
+    muTemp_(nSpecies())
 {
-    buildCanteraSolution();
+    // buildCanteraSolution();
 
     Y_.resize(nSpecies());
     yTemp_.resize(nSpecies());
@@ -196,8 +196,13 @@ void Foam::CanteraMixture::buildCanteraSolution(){
     std::string CanteraMechanism;
 
     int mpisize, mpirank;
-    MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
-    MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+
+    if(flag_mpi_init){
+        MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+        MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    }
 
     if(mpirank == 0){
         std::ifstream fin(CanteraMechanismFile_);
