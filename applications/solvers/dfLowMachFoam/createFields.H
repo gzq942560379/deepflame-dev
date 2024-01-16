@@ -202,6 +202,34 @@ volVectorField hDiffCorrFlux
     dimensionedVector(dimensionSet(1,0,-3,0,0,0,0), Zero)
 );
 
+surfaceScalarField phiUc
+(
+    IOobject
+    (
+        "phiUc",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimensionSet(1,0,-1,0,0,0,0), 0)
+);
+
+surfaceScalarField upwindWeights
+(
+    IOobject
+    (
+        "upwindWeights",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimensionSet(0,0,0,0,0,0,0), 0)
+);
+
 double createFildes_tick_19 = MPI_Wtime();
 Info << "createFildes_time_19 : " << createFildes_tick_19 - createFildes_tick_18 << endl;
 
