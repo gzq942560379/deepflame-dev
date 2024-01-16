@@ -292,7 +292,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 #endif
             for (label cell=0; cell<nCells; cell++)
             {
-                sAPtr[cell] = rAPtr[cell] - alpha*AyAPtr[cell];
+                sAPtr[cell] = rAPtr[cell] - alpha * AyAPtr[cell];
             }
             PBiCGStab_localUpdate_time += clock.timeIncrement();
 
