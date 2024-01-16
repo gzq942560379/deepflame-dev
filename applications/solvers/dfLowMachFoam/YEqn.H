@@ -17,7 +17,35 @@ double Y_field_multi_time = 0.0;
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
 sumYDiffError = Zero;
+
 std::vector<volVectorField> gradResult; 
+forAll(Y, i){
+    gradResult.push_back(U);
+}
+
+#ifdef OPT_GenMatrix_Y_check
+gradResult.clear();
+// test
+std::vector<volVectorField> gradResultRef; 
+forAll(Y, i){
+    tmp<volVectorField> tfvcGradY = fvc::grad(Y[i]);
+    volVectorField& fvcGradY = const_cast<volVectorField&>(tfvcGradY());
+    gradResult.push_back(fvcGradY);
+    gradResultRef.push_back(fvcGradY);
+}
+volVectorField sumYDiffErrorRef = sumYDiffError;
+#endif
+
+// preProcess_Y(Y, phiUc, sumYDiffError, gradResultRef, chemistry, upwindWeights, thermo.alpha(), phi);
+preProcess_Y(Y, phiUc, sumYDiffError, chemistry, upwindWeights, thermo.alpha(), phi);
+
+#ifdef OPT_GenMatrix_Y_check
+forAll(Y, i){
+    check_field_boundary_equal(gradResult[i], gradResultRef[i]);
+}
+gradResult.clear();
+Info << "gradResult pass " << endl;
+
 
 Y_total_start = MPI_Wtime();
 Y_phiUc_start = MPI_Wtime();
@@ -27,11 +55,16 @@ forAll(Y, i)
 {
     tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * gaussGradSchemeGrad(Y[i]);
     const volVectorField& fvcGradY = tfvcGradY();
-    sumYDiffError += fvcGradY;
+    sumYDiffErrorRef += fvcGradY;
     gradResult.push_back(fvcGradY);
 }
+check_field_boundary_equal(sumYDiffError, sumYDiffErrorRef);
+Info << "sumYDiffError pass " << endl;
+
 TICK(Y_phiUc, 0, 1);
-const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
+const surfaceScalarField phiUcRef = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
+check_field_boundary_equal(phiUc, phiUcRef);
+Info << "phiUc pass " << endl;
 TICK(Y_phiUc, 1, 2);
 Y_phiUc_end = MPI_Wtime();
 Y_build_end = MPI_Wtime();
@@ -39,6 +72,7 @@ Y_total_end = MPI_Wtime();
 Y_build_time += Y_build_end - Y_build_start;
 Y_phiUc_time += Y_phiUc_end - Y_phiUc_start;
 Y_total_time += Y_total_end - Y_total_start;
+#endif
 
 start = MPI_Wtime();
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
@@ -64,17 +98,6 @@ start = MPI_Wtime();
 Y_total_start = MPI_Wtime();
 Y_init_start = MPI_Wtime();
 
-tmp<fv::convectionScheme<scalar>> mvConvection
-(
-    fv::convectionScheme<scalar>::New
-    (
-        mesh,
-        fields,
-        phi,
-        mesh.divScheme("div(phi,Yi_h)")
-    )
-);
-
 volScalarField Yt(0.0*Y[0]);
 
 Y_init_end = MPI_Wtime();
@@ -85,38 +108,23 @@ forAll(Y, i)
     
     volScalarField& Yi = Y[i];
 
-    Y_build_grad_start = MPI_Wtime();
-    auto alpha_mul_hai = thermo.alpha() * chemistry->hai(i);
-    Y_build_grad_end = MPI_Wtime();
-    Y_field_multi_time += Y_build_grad_end - Y_build_grad_start;
-
-    // hDiffCorrFlux += chemistry->hai(i) * (chemistry->rhoD(i) * fvc::grad(Yi) - Yi * sumYDiffError);
-    Y_build_grad_start = MPI_Wtime();
-    // auto gradTmp = gaussGradSchemeGrad(Yi);
-    Y_build_grad_end = MPI_Wtime();
-    Y_build_grad_time += Y_build_grad_end - Y_build_grad_start;
-
-    Y_build_laplacian_start = MPI_Wtime();
-    // tmp<volScalarField> laplacianTmp = fvc::laplacian(alpha_mul_hai, Yi);
-    tmp<volScalarField> laplacianTmp = gaussLaplacianSchemeFvcLaplacian(alpha_mul_hai, Yi);
-
-    Y_build_laplacian_end = MPI_Wtime();
-    Y_build_laplacian_time += Y_build_laplacian_end - Y_build_laplacian_start;
-
-    Y_build_grad_start = MPI_Wtime();
-    hDiffCorrFlux += chemistry->hai(i) * (gradResult[i] - Yi * sumYDiffError);
-    diffAlphaD += laplacianTmp;
-    Y_build_grad_end = MPI_Wtime();
-    Y_field_multi_time += Y_build_grad_end - Y_build_grad_start;
-
-    Y_build_end = MPI_Wtime();
-    Y_build_time += Y_build_end - Y_build_start;
     if (i != inertIndex)
     {
 
         Y_build_start = MPI_Wtime();
         Y_build_opt_start = MPI_Wtime();
 #ifndef OPT_GenMatrix_Y
+        tmp<fv::convectionScheme<scalar>> mvConvection
+        (
+            fv::convectionScheme<scalar>::New
+            (
+                mesh,
+                fields,
+                phi,
+                mesh.divScheme("div(phi,Yi_h)")
+            )
+        );
+
         Y_build_old_start = MPI_Wtime();
         tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
         fvScalarMatrix YiEqn
@@ -135,7 +143,7 @@ forAll(Y, i)
         Y_build_old_time += Y_build_old_end - Y_build_old_start;
 #else
         Y_build_new_start = MPI_Wtime();
-        tmp<fvScalarMatrix> tYiEqn = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), mvConvection.ref());
+        tmp<fvScalarMatrix> tYiEqn = GenMatrix_Y(rho, Yi, phi, phiUc, chemistry->rhoD(i), turbulence->mut(), splitting, Sct, combustion(), upwindWeights);
         fvScalarMatrix& YiEqn = tYiEqn.ref();
         Y_build_new_end = MPI_Wtime();
         Y_build_new_time += Y_build_new_end - Y_build_new_start;
@@ -150,6 +158,16 @@ forAll(Y, i)
         Y_total_time += Y_total_end - Y_total_start;
 
 #ifdef OPT_GenMatrix_Y_check
+        tmp<fv::convectionScheme<scalar>> mvConvection
+        (
+            fv::convectionScheme<scalar>::New
+            (
+                mesh,
+                fields,
+                phi,
+                mesh.divScheme("div(phi,Yi_h)")
+            )
+        );
         Y_build_old_start = MPI_Wtime();
         tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
         fvScalarMatrix YiEqn_answer
