@@ -191,6 +191,34 @@ volVectorField hDiffCorrFlux
     dimensionedVector(dimensionSet(1,0,-3,0,0,0,0), Zero)
 );
 
+surfaceScalarField phiUc
+(
+    IOobject
+    (
+        "phiUc",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimensionSet(1,0,-1,0,0,0,0), 0)
+);
+
+surfaceScalarField upwindWeights
+(
+    IOobject
+    (
+        "upwindWeights",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh,
+    dimensionedScalar(dimensionSet(0,0,0,0,0,0,0), 0)
+);
+
 Info << "createFields time 19 : " << createFieldsClock.timeIncrement() << endl;
 
 volVectorField sumYDiffError
@@ -227,6 +255,6 @@ const surfaceScalarField linear_weights = mesh.surfaceInterpolation::weights(); 
     const Switch log_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("log", false);
     const Switch torch_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("torch", false);
 #endif
-// init_const_coeff_ptr(fileName(CanteraTorchProperties.lookup("CanteraMechanismFile")).expand(), Y);
+// 
 
 Info << "createFildes_time_22 : " << createFieldsClock.timeIncrement() << endl;

@@ -15,7 +15,9 @@ size_t nasa_coeffs_size, viscosity_coeffs_size, conductivity_coeffs_size, binary
     viscosity_constant1_size, viscosity_constant2_size;
 
 int nSpecies = 0, nBoundarySurfaces = 0, nBoundaryPatches = 0;
-Foam::label nCells = 0;
+Foam::label nCells = 0, nFaces = 0, nProcessBoundarySurfaces = 0;
+Foam::label *surfacePerPatch;
+int *neighbProcNo;
 
 std::string get_filename(std::string mechanism_file){
     size_t start = mechanism_file.find_last_of('/') + 1;
@@ -31,10 +33,28 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
 
     nSpecies = Y.size();
     nCells = Y[0].size();
+    const Foam::fvMesh& mesh = Y[0].mesh();
+    const Foam::labelUList& neighbour = mesh.neighbour();
+    nFaces = neighbour.size();
+
     forAll(Y[0].boundaryField(), patchi) {
         const Foam::fvPatchScalarField& patchYi = Y[0].boundaryField()[patchi];
         nBoundaryPatches ++;
         nBoundarySurfaces += patchYi.size();
+        if (patchYi.type() == "processor" || patchYi.type() == "processorCyclic") 
+            nProcessBoundarySurfaces += 2 * patchYi.size();
+        else 
+            nProcessBoundarySurfaces += patchYi.size();
+    }
+    neighbProcNo = new int[nBoundaryPatches];
+    surfacePerPatch = new Foam::label[nBoundaryPatches];
+    std::fill(neighbProcNo, neighbProcNo + nBoundaryPatches, -1);
+    forAll(Y[0].boundaryField(), patchi) {
+        const Foam::fvPatchScalarField& patchYi = Y[0].boundaryField()[patchi];
+        surfacePerPatch[patchi] = patchYi.size();
+        if (patchYi.type() == "processor" || patchYi.type() == "processorCyclic") {
+            neighbProcNo[patchi] = dynamic_cast<const Foam::processorFvPatchField<Foam::scalar>&>(patchYi).neighbProcNo();
+        } 
     }
 
     nasa_coeffs_size = 15 * nSpecies;
@@ -517,9 +537,9 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
-        for (int j = 0; j < nSpecies; ++j) {
-            boundary_rhoD[i * nSpecies + j] = boundary_alpha[i];
+    for (int i = 0; i < nSpecies; ++i) {
+        for (int j = 0; j < nBoundarySurfaces; ++j) {
+            boundary_rhoD[i * nBoundarySurfaces + j] = boundary_alpha[j];
         }
     }
 

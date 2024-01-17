@@ -255,7 +255,18 @@ GenMatrix_Y(
     const Switch splitting,
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
-    fv::convectionScheme<scalar>& mvConvection
+    const surfaceScalarField& upwindWeights
+);
+
+void preProcess_Y(
+    PtrList<volScalarField>& Y,
+    surfaceScalarField& phiUc,
+    volVectorField& sumYDiffError,
+    // std::vector<volVectorField>& gradResult,
+    dfChemistryModel<basicThermo>* chemistry,
+    surfaceScalarField& upwindWeights,
+    const volScalarField& alpha,
+    const surfaceScalarField& phi
 );
 
 tmp<fvScalarMatrix>
@@ -305,6 +316,8 @@ void check_fvmatrix_equal(const fvVectorMatrix& a,const fvVectorMatrix& b);
 
 void check_field_equal(const Field<scalar>& a, const Field<scalar>& b);
 void check_field_boundary_equal(const volScalarField& a, const volScalarField& b);
+void check_field_boundary_equal(const volVectorField& a, const volVectorField& b);
+void check_field_boundary_equal(const surfaceScalarField& a, const surfaceScalarField& b);
 void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name);
 
 } // End namespace Foam
@@ -312,7 +325,25 @@ void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const wor
 void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volScalarField>& Y);
 extern int nSpecies;
 extern Foam::label nCells;
+extern Foam::label nFaces;
 extern int nBoundarySurfaces;
 extern int nBoundaryPatches;
+extern Foam::label nProcessBoundarySurfaces;
+extern Foam::label *surfacePerPatch;
+extern int *neighbProcNo;
+
+enum boundaryConditions{
+    zeroGradient,
+    fixedValue,
+    coupled,
+    empty,
+    gradientEnergy,
+    calculated,
+    cyclic,
+    processor,
+    extrapolated,
+    fixedEnergy,
+    processorCyclic
+};
 
 // ************************************************************************* //

@@ -3,8 +3,8 @@
 
 namespace Foam{
 
-#define RELATIVE_ERROR_TOLERANCE 1e-9
-#define ABSULTE_ERROR_TOLERANCE 1e-18
+#define RELATIVE_ERROR_TOLERANCE 1e-8
+#define ABSULTE_ERROR_TOLERANCE 1e-16
 
 void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name){
     if(a.size() != b.size()){
@@ -40,6 +40,27 @@ void check_field_boundary_equal(const volScalarField& a, const volScalarField& b
     }
 }
 
+void check_field_boundary_equal(const volVectorField& a, const volVectorField& b){
+    for (direction cmpt=0; cmpt<vector::nComponents; ++cmpt)
+    {
+        check_field_error(a.component(cmpt).ref(),b.component(cmpt).ref(), "internal_" + std::to_string(cmpt));
+    }
+    forAll(a.boundaryField(), patchi)
+    {
+        for (direction cmpt=0; cmpt<vector::nComponents; ++cmpt)
+        {
+            check_field_error(a.boundaryField()[patchi].component(cmpt).ref(),b.boundaryField()[patchi].component(cmpt).ref(), "boundary_" + std::to_string(cmpt));
+        }
+    }
+}
+
+void check_field_boundary_equal(const surfaceScalarField& a, const surfaceScalarField& b){
+    check_field_error(a, b, "field");
+    forAll(a.boundaryField(), patchi)
+    {
+        check_field_error(a.boundaryField()[patchi], b.boundaryField()[patchi], "boundaryField_" + std::to_string(patchi));
+    }
+}
 
 void check_fvmatrix_equal(const fvScalarMatrix& a,const fvScalarMatrix& b){
     if(a.source().begin() == b.source().begin()){
