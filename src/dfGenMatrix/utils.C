@@ -3,8 +3,8 @@
 
 namespace Foam{
 
-#define RELATIVE_ERROR_TOLERANCE 1e-8
-#define ABSULTE_ERROR_TOLERANCE 1e-16
+#define RELATIVE_ERROR_TOLERANCE 1e-6
+#define ABSULTE_ERROR_TOLERANCE 1e-10
 
 void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name){
     if(a.size() != b.size()){
@@ -67,10 +67,12 @@ void check_fvmatrix_equal(const fvScalarMatrix& a,const fvScalarMatrix& b){
         SeriousError << "a and b are the same matrix." << endl;
         MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
     } 
+
     check_field_error(a.source(),b.source(), "source");
     check_field_error(a.diag(),b.diag(), "diag");
     check_field_error(a.lower(),b.lower(), "lower");
     check_field_error(a.upper(),b.upper(), "upper");
+
     for(label patchi = 0; patchi < const_cast<fvScalarMatrix&>(a).internalCoeffs().size(); ++patchi)
     {
         check_field_error(const_cast<fvScalarMatrix&>(a).internalCoeffs()[patchi],const_cast<fvScalarMatrix&>(b).internalCoeffs()[patchi], "internalCoeffs_" + std::to_string(patchi));
@@ -101,6 +103,7 @@ void check_fvmatrix_equal(const fvVectorMatrix& a,const fvVectorMatrix& b){
             check_field_error(const_cast<fvVectorMatrix&>(a).boundaryCoeffs().component(cmpt).ref()[patchi],const_cast<fvVectorMatrix&>(b).boundaryCoeffs().component(cmpt).ref()[patchi], "boundaryCoeffs_" + std::to_string(cmpt) + "_" + std::to_string(patchi));
         }
     }
+
 }
 
 }

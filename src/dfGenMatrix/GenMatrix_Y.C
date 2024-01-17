@@ -54,6 +54,9 @@ void preProcess_Y(
     const double *phiPtr = &phi[0];
     double *boundary_phiUc = new double[nProcessBoundarySurfaces]();
     double *upwindWeightsPtr = &upwindWeights[0];
+    double *rhoD = new double[nCells * nSpecies];
+    double *boundary_rhoD = new double[nProcessBoundarySurfaces * nSpecies];
+
     int offset;
     for (int i = 0; i < nSpecies; ++i) {
         YiPtr[i] = &Y[i][0];
@@ -108,11 +111,25 @@ void preProcess_Y(
     for (int i = 0; i < nBoundaryPatches; ++i) {
         if (Y[0].boundaryField()[i].type() == "processor") {
             patchType[i] = boundaryConditions::processor;
-        } else if (Y[i].boundaryField()[i].type() == "zeroGradient") {
+        } else if (Y[0].boundaryField()[i].type() == "zeroGradient") {
             patchType[i] = boundaryConditions::zeroGradient;
         } else {
             Info << "boundary condition not supported" << endl;
             std::exit(-1);
+        }
+    }
+
+    for (int i = 0; i < nSpecies; ++i) {
+        memcpy(rhoD + i * nCells, &chemistry->rhoD(i)[0], nCells * sizeof(double));
+        offset = 0;
+        forAll(Y[i].boundaryField(), patchi) {
+            fvPatchScalarField& patchRhoD = const_cast<fvPatchScalarField&>(chemistry->rhoD(i).boundaryField()[patchi]);
+            int patchsize = patchRhoD.size();
+            memcpy(boundary_rhoD + i * nProcessBoundarySurfaces + offset, &patchRhoD[0], patchsize * sizeof(double));
+            if (patchType[patchi] == boundaryConditions::processor)
+                offset += 2 * surfacePerPatch[patchi];
+            else
+                offset += surfacePerPatch[patchi];
         }
     }
 
@@ -242,9 +259,9 @@ void preProcess_Y(
     // calculate sumYDiffError
     for (int i = 0; i < nSpecies; ++i) {
         for (label j = 0; j < nCells; ++j) {
-            sumYDiffErrorPtr[3 * j + 0] += gradY[i * nCells * 3 + j * 3 + 0] * alphaPtr[j];
-            sumYDiffErrorPtr[3 * j + 1] += gradY[i * nCells * 3 + j * 3 + 1] * alphaPtr[j];
-            sumYDiffErrorPtr[3 * j + 2] += gradY[i * nCells * 3 + j * 3 + 2] * alphaPtr[j];
+            sumYDiffErrorPtr[3 * j + 0] += gradY[i * nCells * 3 + j * 3 + 0] * rhoD[i * nCells + j];
+            sumYDiffErrorPtr[3 * j + 1] += gradY[i * nCells * 3 + j * 3 + 1] * rhoD[i * nCells + j];
+            sumYDiffErrorPtr[3 * j + 2] += gradY[i * nCells * 3 + j * 3 + 2] * rhoD[i * nCells + j];
         }
         for (label j = 0; j < nProcessBoundarySurfaces; ++j) {
             boundary_sumYDiffErrorPtr[3 * j + 0] += boundary_gradY[i * nProcessBoundarySurfaces * 3 + j * 3 + 0] * boundary_alpha[j];
@@ -329,6 +346,8 @@ void preProcess_Y(
     delete[] boundary_alpha;
     delete[] boundary_phiUc;
     delete[] patchType;
+    delete[] rhoD;
+    delete[] boundary_rhoD;
 }
 
 tmp<fvScalarMatrix>

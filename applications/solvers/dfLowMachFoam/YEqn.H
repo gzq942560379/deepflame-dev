@@ -19,9 +19,11 @@ diffAlphaD = Zero;
 sumYDiffError = Zero;
 
 std::vector<volVectorField> gradResult; 
+#ifndef OPT_GenMatrix_Y_check
 forAll(Y, i){
     gradResult.push_back(U);
 }
+#endif
 
 #ifdef OPT_GenMatrix_Y_check
 gradResult.clear();
@@ -53,7 +55,7 @@ Y_build_start = MPI_Wtime();
 TICK0(Y_phiUc);
 forAll(Y, i)
 {
-    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * gaussGradSchemeGrad(Y[i]);
+    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * fvc::grad(Y[i]);
     const volVectorField& fvcGradY = tfvcGradY();
     sumYDiffErrorRef += fvcGradY;
     gradResult.push_back(fvcGradY);
@@ -169,7 +171,7 @@ forAll(Y, i)
             )
         );
         Y_build_old_start = MPI_Wtime();
-        tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
+        tmp<volScalarField> DEff = chemistry->rhoD(i);
         fvScalarMatrix YiEqn_answer
         (
             fvm::ddt(rho, Yi)

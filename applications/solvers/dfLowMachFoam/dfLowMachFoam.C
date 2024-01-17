@@ -73,10 +73,10 @@ Description
 #define _LDU_
 #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
-#define OPT_GenMatrix_U
+// #define OPT_GenMatrix_U
 // #define OPT_GenMatrix_p
 #define OPT_thermo
-#define OPT_GenMatrix_U_check
+// #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
 // #define OPT_GenMatrix_p_check
@@ -251,6 +251,8 @@ int main(int argc, char *argv[])
 
         break;
     }
+
+    init_const_coeff_ptr(fileName(CanteraTorchProperties.lookup("CanteraMechanismFile")).expand(), Y);
 
     ScheduleSetup_start = MPI_Wtime();
     #include "ScheduleSetup.H"
