@@ -69,14 +69,14 @@ Description
 
 // #define _CSR_
 // #define _ELL_
-// #define _DIV_
-#define _LDU_
+#define _DIV_
+// #define _LDU_
 #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
-#define OPT_GenMatrix_U
+// #define OPT_GenMatrix_U
 // #define OPT_GenMatrix_p
 #define OPT_thermo
-#define OPT_GenMatrix_U_check
+// #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
 // #define OPT_GenMatrix_p_check
@@ -282,6 +282,8 @@ int main(int argc, char *argv[])
     double renumber_time = initClock.timeIncrement();
     Info << "Renumber time : " << renumber_time << endl; 
 
+    init_const_coeff_ptr(fileName(CanteraTorchProperties.lookup("CanteraMechanismFile")).expand(), Y);
+
     #include "ScheduleSetup.H"
     double ScheduleSetup_time = initClock.timeIncrement();
     Info << "ScheduleSetup time : " << ScheduleSetup_time << endl; 
@@ -460,15 +462,15 @@ int main(int argc, char *argv[])
                 }
             }
 
-            if (pimple.turbCorr())
-            {
-                Info<< "turbulence->correct start" << nl << endl;
-                start = MPI_Wtime();
-                turbulence->correct();
-                end = MPI_Wtime();
-                time_turbulenceCorrect += end - start;
-                Info<< "turbulence->correct end" << nl << endl;
-            }
+            // if (pimple.turbCorr())
+            // {
+            //     Info<< "turbulence->correct start" << nl << endl;
+            //     start = MPI_Wtime();
+            //     turbulence->correct();
+            //     end = MPI_Wtime();
+            //     time_turbulenceCorrect += end - start;
+            //     Info<< "turbulence->correct end" << nl << endl;
+            // }
 
         }
         start = MPI_Wtime();

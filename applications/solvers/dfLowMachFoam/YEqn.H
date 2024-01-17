@@ -12,15 +12,20 @@ double Y_build_new_start, Y_build_new_end, Y_build_new_time = 0.;
 double Y_phiUc_start, Y_phiUc_end, Y_phiUc_time = 0.; 
 double Y_field_multi_time = 0.0;
 
-
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
 sumYDiffError = Zero;
 
+start = MPI_Wtime();
+Y_total_start = MPI_Wtime();
+Y_build_start = MPI_Wtime();
+
 std::vector<volVectorField> gradResult; 
+#ifndef OPT_GenMatrix_Y_check
 forAll(Y, i){
     gradResult.push_back(U);
 }
+#endif
 
 #ifdef OPT_GenMatrix_Y_check
 gradResult.clear();
@@ -44,15 +49,10 @@ forAll(Y, i){
 }
 gradResult.clear();
 Info << "gradResult pass " << endl;
-
-
-Y_total_start = MPI_Wtime();
 Y_phiUc_start = MPI_Wtime();
-Y_build_start = MPI_Wtime();
-TICK0(Y_phiUc);
 forAll(Y, i)
 {
-    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * gaussGradSchemeGrad(Y[i]);
+    tmp<volVectorField> tfvcGradY = chemistry->rhoD(i) * fvc::grad(Y[i]);
     const volVectorField& fvcGradY = tfvcGradY();
     sumYDiffErrorRef += fvcGradY;
     gradResult.push_back(fvcGradY);
@@ -66,12 +66,15 @@ check_field_boundary_equal(phiUc, phiUcRef);
 Info << "phiUc pass " << endl;
 TICK(Y_phiUc, 1, 2);
 Y_phiUc_end = MPI_Wtime();
+Y_phiUc_time += Y_phiUc_end - Y_phiUc_start;
+#endif
+
 Y_build_end = MPI_Wtime();
 Y_total_end = MPI_Wtime();
 Y_build_time += Y_build_end - Y_build_start;
-Y_phiUc_time += Y_phiUc_end - Y_phiUc_start;
 Y_total_time += Y_total_end - Y_total_start;
-#endif
+end = MPI_Wtime();
+time_monitor_Y += end - start;
 
 start = MPI_Wtime();
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
@@ -149,8 +152,6 @@ forAll(Y, i)
         YiEqn.relax();
         Y_build_end = MPI_Wtime();
         Y_build_time += Y_build_end - Y_build_start;
-        Y_total_end = MPI_Wtime();
-        Y_total_time += Y_total_end - Y_total_start;
 
 #ifdef OPT_GenMatrix_Y_check
         tmp<fv::convectionScheme<scalar>> mvConvection
@@ -164,7 +165,7 @@ forAll(Y, i)
             )
         );
         Y_build_old_start = MPI_Wtime();
-        tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
+        tmp<volScalarField> DEff = chemistry->rhoD(i);
         fvScalarMatrix YiEqn_answer
         (
             fvm::ddt(rho, Yi)
@@ -181,23 +182,22 @@ forAll(Y, i)
         Y_build_old_time += Y_build_old_end - Y_build_old_start;
         check_fvmatrix_equal(YiEqn, YiEqn_answer);
 #endif
-// #ifdef _CSR_
-//             Y_convert_start = MPI_Wtime();
-//             csr.init_value_from_lduMatrix(YiEqn);
-//             Y_convert_end = MPI_Wtime();
-//             Y_convert_time += Y_convert_end - Y_convert_start;
-// #endif
-        Y_total_start = MPI_Wtime();
+#ifdef _DIV_
+            Y_convert_start = MPI_Wtime();
+            div.copy_value_from_fvMatrix(YiEqn);
+            Y_convert_end = MPI_Wtime();
+            Y_convert_time += Y_convert_end - Y_convert_start;
+#endif
         Y_solve_start = MPI_Wtime();
-// #ifdef _CSR_
-//             auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
-//             auto& source = YiEqn.source();
-//             auto& internalCoeffs = YiEqn.internalCoeffs();
-//             auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
-//             csr.solve(psi, source, internalCoeffs, boundaryCoeffs, "Yi");
-// #else
+#ifdef _DIV_
+            auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
+            auto& source = YiEqn.source();
+            auto& internalCoeffs = YiEqn.internalCoeffs();
+            auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+            div.solve(psi, source, internalCoeffs, boundaryCoeffs, "Yi");
+#else
         YiEqn.solve("Yi");
-// #endif
+#endif
 
         Y_solve_end = MPI_Wtime();
         Y_solve_time += Y_solve_end - Y_solve_start;

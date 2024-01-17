@@ -36,6 +36,7 @@ void preProcess_Y(
 
     Info << "nProcessBoundarySurfaces = " << nProcessBoundarySurfaces << endl;
     Info << "nBoundarySurfaces = " << nBoundarySurfaces << endl;
+    Info << "nBoundaryPatches = " << nBoundaryPatches << endl;
     // allocate memory
     double *boundary_Y = new double[nSpecies * nProcessBoundarySurfaces];
     double *boundary_sf = new double[nProcessBoundarySurfaces * 3];
@@ -54,6 +55,9 @@ void preProcess_Y(
     const double *phiPtr = &phi[0];
     double *boundary_phiUc = new double[nProcessBoundarySurfaces]();
     double *upwindWeightsPtr = &upwindWeights[0];
+    double *rhoD = new double[nCells * nSpecies];
+    double *boundary_rhoD = new double[nProcessBoundarySurfaces * nSpecies];
+
     int offset;
     for (int i = 0; i < nSpecies; ++i) {
         YiPtr[i] = &Y[i][0];
@@ -105,10 +109,13 @@ void preProcess_Y(
         }
     }
     int *patchType = new int[nBoundaryPatches];
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (int i = 0; i < nBoundaryPatches; ++i) {
         if (Y[0].boundaryField()[i].type() == "processor") {
             patchType[i] = boundaryConditions::processor;
-        } else if (Y[i].boundaryField()[i].type() == "zeroGradient") {
+        } else if (Y[0].boundaryField()[i].type() == "zeroGradient") {
             patchType[i] = boundaryConditions::zeroGradient;
         } else {
             Info << "boundary condition not supported" << endl;
@@ -117,63 +124,84 @@ void preProcess_Y(
     }
 
     for (int i = 0; i < nSpecies; ++i) {
+        memcpy(rhoD + i * nCells, &chemistry->rhoD(i)[0], nCells * sizeof(double));
+        offset = 0;
+        forAll(Y[i].boundaryField(), patchi) {
+            fvPatchScalarField& patchRhoD = const_cast<fvPatchScalarField&>(chemistry->rhoD(i).boundaryField()[patchi]);
+            int patchsize = patchRhoD.size();
+            memcpy(boundary_rhoD + i * nProcessBoundarySurfaces + offset, &patchRhoD[0], patchsize * sizeof(double));
+            if (patchType[patchi] == boundaryConditions::processor)
+                offset += 2 * surfacePerPatch[patchi];
+            else
+                offset += surfacePerPatch[patchi];
+        }
+    }
+
+    for (int i = 0; i < nSpecies; ++i) {
         // fvc::grad(Y[i]) inner
         double *Yi = YiPtr[i];
+        double *gradY_Species = &gradY[i * nCells * 3];
+        
         for (label j = 0; j < nFaces; ++j) {
-            double ssf = (weightsPtr[j] * (Yi[own[j]] - Yi[nei[j]]) + Yi[nei[j]]);
+            label owner = own[j];
+            label neighbor = nei[j];
+            double ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
             double grad_x = meshSfPtr[3 * j + 0] * ssf;
             double grad_y = meshSfPtr[3 * j + 1] * ssf;
             double grad_z = meshSfPtr[3 * j + 2] * ssf;
-            gradY[i * nCells * 3 + own[j] * 3 + 0] += grad_x;
-            gradY[i * nCells * 3 + own[j] * 3 + 1] += grad_y;
-            gradY[i * nCells * 3 + own[j] * 3 + 2] += grad_z;
-            gradY[i * nCells * 3 + nei[j] * 3 + 0] -= grad_x;
-            gradY[i * nCells * 3 + nei[j] * 3 + 1] -= grad_y;
-            gradY[i * nCells * 3 + nei[j] * 3 + 2] -= grad_z;
+            gradY_Species[owner * 3 + 0] += grad_x;
+            gradY_Species[owner * 3 + 1] += grad_y;
+            gradY_Species[owner * 3 + 2] += grad_z;
+            gradY_Species[neighbor * 3 + 0] -= grad_x;
+            gradY_Species[neighbor * 3 + 1] -= grad_y;
+            gradY_Species[neighbor * 3 + 2] -= grad_z;
         }
         
         // fvc::grad(Y[i]) boundary
-        offset = 0;
-        for (int j = 0; j < nBoundaryPatches; ++j) {
-            if (patchType[j] == boundaryConditions::zeroGradient) {
-                for (int k = 0; k < surfacePerPatch[j]; ++k) {
-                    int startIndex = offset + k;
-                    double bouvf = boundary_Y[i * nProcessBoundarySurfaces + startIndex];
-                    double bouSfx = boundary_sf[startIndex * 3 + 0];
-                    double bouSfy = boundary_sf[startIndex * 3 + 1];
-                    double bouSfz = boundary_sf[startIndex * 3 + 2];
-                    double grad_x = bouSfx * bouvf;
-                    double grad_y = bouSfy * bouvf;
-                    double grad_z = bouSfz * bouvf;
 
-                    gradY[i * nCells * 3 + boundary_face_cell[startIndex] * 3 + 0] += grad_x;
-                    gradY[i * nCells * 3 + boundary_face_cell[startIndex] * 3 + 1] += grad_y;
-                    gradY[i * nCells * 3 + boundary_face_cell[startIndex] * 3 + 2] += grad_z;
+        {
+            offset = 0;
+            for (int j = 0; j < nBoundaryPatches; ++j) {
+                if (patchType[j] == boundaryConditions::zeroGradient) {
+                    for (int k = 0; k < surfacePerPatch[j]; ++k) {
+                        int startIndex = offset + k;
+                        double bouvf = boundary_Y[i * nProcessBoundarySurfaces + startIndex];
+                        double bouSfx = boundary_sf[startIndex * 3 + 0];
+                        double bouSfy = boundary_sf[startIndex * 3 + 1];
+                        double bouSfz = boundary_sf[startIndex * 3 + 2];
+                        double grad_x = bouSfx * bouvf;
+                        double grad_y = bouSfy * bouvf;
+                        double grad_z = bouSfz * bouvf;
+
+                        gradY[i * nCells * 3 + boundary_face_cell[startIndex] * 3 + 0] += grad_x;
+                        gradY[i * nCells * 3 + boundary_face_cell[startIndex] * 3 + 1] += grad_y;
+                        gradY[i * nCells * 3 + boundary_face_cell[startIndex] * 3 + 2] += grad_z;
+                    }
+                    offset += surfacePerPatch[j];
+
+                } else if (patchType[j] == boundaryConditions::processor) {
+                    for (int k = 0; k < surfacePerPatch[j]; ++k) {
+                        int neighbor_start_index = offset + k;
+                        int internal_start_index = offset + surfacePerPatch[j] + k;
+                        double bouWeight = boundary_weights[neighbor_start_index];
+
+                        double bouSfx = boundary_sf[neighbor_start_index * 3 + 0];
+                        double bouSfy = boundary_sf[neighbor_start_index * 3 + 1];
+                        double bouSfz = boundary_sf[neighbor_start_index * 3 + 2];
+
+                        double bouvf = (1 - bouWeight) * boundary_Y[i * nProcessBoundarySurfaces + neighbor_start_index] + 
+                                bouWeight * boundary_Y[i * nProcessBoundarySurfaces + internal_start_index];
+                        
+                        double grad_x = bouSfx * bouvf;
+                        double grad_y = bouSfy * bouvf;
+                        double grad_z = bouSfz * bouvf;
+
+                        gradY[i * nCells * 3 + boundary_face_cell[neighbor_start_index] * 3 + 0] += grad_x;
+                        gradY[i * nCells * 3 + boundary_face_cell[neighbor_start_index] * 3 + 1] += grad_y;
+                        gradY[i * nCells * 3 + boundary_face_cell[neighbor_start_index] * 3 + 2] += grad_z;
+                    }
+                    offset += 2 * surfacePerPatch[j];
                 }
-                offset += surfacePerPatch[j];
-
-            } else if (patchType[j] == boundaryConditions::processor) {
-                for (int k = 0; k < surfacePerPatch[j]; ++k) {
-                    int neighbor_start_index = offset + k;
-                    int internal_start_index = offset + surfacePerPatch[j] + k;
-                    double bouWeight = boundary_weights[neighbor_start_index];
-
-                    double bouSfx = boundary_sf[neighbor_start_index * 3 + 0];
-                    double bouSfy = boundary_sf[neighbor_start_index * 3 + 1];
-                    double bouSfz = boundary_sf[neighbor_start_index * 3 + 2];
-
-                    double bouvf = (1 - bouWeight) * boundary_Y[i * nProcessBoundarySurfaces + neighbor_start_index] + 
-                            bouWeight * boundary_Y[i * nProcessBoundarySurfaces + internal_start_index];
-                    
-                    double grad_x = bouSfx * bouvf;
-                    double grad_y = bouSfy * bouvf;
-                    double grad_z = bouSfz * bouvf;
-
-                    gradY[i * nCells * 3 + boundary_face_cell[neighbor_start_index] * 3 + 0] += grad_x;
-                    gradY[i * nCells * 3 + boundary_face_cell[neighbor_start_index] * 3 + 1] += grad_y;
-                    gradY[i * nCells * 3 + boundary_face_cell[neighbor_start_index] * 3 + 2] += grad_z;
-                }
-                offset += 2 * surfacePerPatch[j];
             }
         }
 
@@ -183,45 +211,49 @@ void preProcess_Y(
             gradY[i * nCells * 3 + j * 3 + 2] /= meshVPtr[j];
         }
 
-        offset = 0;
-        for (int j = 0; j < nBoundaryPatches; ++j) {
-            if (patchType[j] == boundaryConditions::zeroGradient) {
-                for (int k = 0; k < surfacePerPatch[j]; ++k) {
-                    int start_index = offset + k;
-                    int cellIndex = boundary_face_cell[start_index];
+        {
+            offset = 0;
+            for (int j = 0; j < nBoundaryPatches; ++j) {
+                if (patchType[j] == boundaryConditions::zeroGradient) {
+                    for (int k = 0; k < surfacePerPatch[j]; ++k) {
+                        int start_index = offset + k;
+                        int cellIndex = boundary_face_cell[start_index];
 
-                    double grad_x = gradY[i * nCells * 3 + cellIndex * 3 + 0];
-                    double grad_y = gradY[i * nCells * 3 + cellIndex * 3 + 1];
-                    double grad_z = gradY[i * nCells * 3 + cellIndex * 3 + 2];
+                        double grad_x = gradY[i * nCells * 3 + cellIndex * 3 + 0];
+                        double grad_y = gradY[i * nCells * 3 + cellIndex * 3 + 1];
+                        double grad_z = gradY[i * nCells * 3 + cellIndex * 3 + 2];
 
-                    double n_x = boundary_sf[start_index * 3 + 0] / boundary_mag_sf[start_index];
-                    double n_y = boundary_sf[start_index * 3 + 1] / boundary_mag_sf[start_index];
-                    double n_z = boundary_sf[start_index * 3 + 2] / boundary_mag_sf[start_index];
+                        double n_x = boundary_sf[start_index * 3 + 0] / boundary_mag_sf[start_index];
+                        double n_y = boundary_sf[start_index * 3 + 1] / boundary_mag_sf[start_index];
+                        double n_z = boundary_sf[start_index * 3 + 2] / boundary_mag_sf[start_index];
 
-                    double grad_correction = -(n_x * grad_x + n_y * grad_y + n_z * grad_z);
+                        double grad_correction = -(n_x * grad_x + n_y * grad_y + n_z * grad_z);
 
-                    boundary_gradY[i * nProcessBoundarySurfaces * 3 + start_index * 3 + 0] = grad_x + grad_correction * n_x;
-                    boundary_gradY[i * nProcessBoundarySurfaces * 3 + start_index * 3 + 1] = grad_y + grad_correction * n_y;
-                    boundary_gradY[i * nProcessBoundarySurfaces * 3 + start_index * 3 + 2] = grad_z + grad_correction * n_z;
+                        boundary_gradY[i * nProcessBoundarySurfaces * 3 + start_index * 3 + 0] = grad_x + grad_correction * n_x;
+                        boundary_gradY[i * nProcessBoundarySurfaces * 3 + start_index * 3 + 1] = grad_y + grad_correction * n_y;
+                        boundary_gradY[i * nProcessBoundarySurfaces * 3 + start_index * 3 + 2] = grad_z + grad_correction * n_z;
+                    }
+                    offset += surfacePerPatch[j];
+                } else if (patchType[j] == boundaryConditions::processor) {
+                    Info << "surfacePerPatch[" << j << "] : " << surfacePerPatch[j] << endl;
+                    for (int k = 0; k < surfacePerPatch[j]; ++k) {
+                        int neighbor_start_index = offset + k;
+                        int internal_start_index = offset + surfacePerPatch[j] + k;
+                        int cellIndex = boundary_face_cell[neighbor_start_index];
+                        // correct_internal_boundary_field_vector
+                        boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3 + 0] = gradY[i * nCells * 3 + cellIndex * 3 + 0];
+                        boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3 + 1] = gradY[i * nCells * 3 + cellIndex * 3 + 1];
+                        boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3 + 2] = gradY[i * nCells * 3 + cellIndex * 3 + 2];
+                        // update processor boundary
+                        MPI_Send(&boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3], 3, MPI_DOUBLE, neighbProcNo[j], 0, MPI_COMM_WORLD);
+                        MPI_Recv(&boundary_gradY[i * nProcessBoundarySurfaces * 3 + neighbor_start_index * 3], 3, MPI_DOUBLE, neighbProcNo[j], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    }
+                    offset += 2 * surfacePerPatch[j];
                 }
-                offset += surfacePerPatch[j];
-            } else if (patchType[j] == boundaryConditions::processor) {
-                for (int k = 0; k < surfacePerPatch[j]; ++k) {
-                    int neighbor_start_index = offset + k;
-                    int internal_start_index = offset + surfacePerPatch[j] + k;
-                    int cellIndex = boundary_face_cell[neighbor_start_index];
-                    // correct_internal_boundary_field_vector
-                    boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3 + 0] = gradY[i * nCells * 3 + cellIndex * 3 + 0];
-                    boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3 + 1] = gradY[i * nCells * 3 + cellIndex * 3 + 1];
-                    boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3 + 2] = gradY[i * nCells * 3 + cellIndex * 3 + 2];
-                    // update processor boundary
-                    MPI_Send(&boundary_gradY[i * nProcessBoundarySurfaces * 3 + internal_start_index * 3], 3, MPI_DOUBLE, neighbProcNo[j], 0, MPI_COMM_WORLD);
-                    MPI_Recv(&boundary_gradY[i * nProcessBoundarySurfaces * 3 + neighbor_start_index * 3], 3, MPI_DOUBLE, neighbProcNo[j], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                }
-                offset += 2 * surfacePerPatch[j];
             }
         }
     }
+
 
     // // copy gradY to gradResult
     // for (int i = 0; i < nSpecies; ++i) {
@@ -242,9 +274,9 @@ void preProcess_Y(
     // calculate sumYDiffError
     for (int i = 0; i < nSpecies; ++i) {
         for (label j = 0; j < nCells; ++j) {
-            sumYDiffErrorPtr[3 * j + 0] += gradY[i * nCells * 3 + j * 3 + 0] * alphaPtr[j];
-            sumYDiffErrorPtr[3 * j + 1] += gradY[i * nCells * 3 + j * 3 + 1] * alphaPtr[j];
-            sumYDiffErrorPtr[3 * j + 2] += gradY[i * nCells * 3 + j * 3 + 2] * alphaPtr[j];
+            sumYDiffErrorPtr[3 * j + 0] += gradY[i * nCells * 3 + j * 3 + 0] * rhoD[i * nCells + j];
+            sumYDiffErrorPtr[3 * j + 1] += gradY[i * nCells * 3 + j * 3 + 1] * rhoD[i * nCells + j];
+            sumYDiffErrorPtr[3 * j + 2] += gradY[i * nCells * 3 + j * 3 + 2] * rhoD[i * nCells + j];
         }
         for (label j = 0; j < nProcessBoundarySurfaces; ++j) {
             boundary_sumYDiffErrorPtr[3 * j + 0] += boundary_gradY[i * nProcessBoundarySurfaces * 3 + j * 3 + 0] * boundary_alpha[j];
@@ -329,6 +361,8 @@ void preProcess_Y(
     delete[] boundary_alpha;
     delete[] boundary_phiUc;
     delete[] patchType;
+    delete[] rhoD;
+    delete[] boundary_rhoD;
 }
 
 tmp<fvScalarMatrix>
