@@ -3,6 +3,7 @@
 #include "DIVPBiCGStab.H"
 #include "DIVPCG.H"
 #include "DIVSmootherPCG.H"
+#include "clockTime.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -184,16 +185,14 @@ Foam::scalar Foam::divMatrix::solver::normFactor
     // --- Calculate A dot reference value of psi
     matrix_.sumA(tmpField, interfaceBouCoeffs_, interfaces_);
 
+
     tmpField *= gAverage(psi, matrix_.mesh().comm());
 
-    return
-        gSum
-        (
-            (mag(Apsi - tmpField) + mag(source - tmpField))(),
-            matrix_.mesh().comm()
-        )
-      + solverPerformance::small_;
+    tmp<scalarField> tmp = mag(Apsi - tmpField) + mag(source - tmpField);
 
+
+
+    return gSum(tmp(), matrix_.mesh().comm()) + solverPerformance::small_;
     // At convergence this simpler method is equivalent to the above
     // return 2*gSumMag(source) + solverPerformance::small_;
 }

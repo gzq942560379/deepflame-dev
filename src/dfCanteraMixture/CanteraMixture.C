@@ -37,6 +37,7 @@ License
 #include "cantera/kinetics/KineticsFactory.h"
 #include "cantera/transport/TransportBase.h"
 #include "cantera/transport/TransportFactory.h"
+#include "clockTime.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -72,7 +73,11 @@ Foam::CanteraMixture::CanteraMixture
     CvTemp_(nSpecies()),
     muTemp_(nSpecies())
 {
+    syncClockTime clock;
+
     // buildCanteraSolution();
+
+    Info << "Foam::CanteraMixture::CanteraMixture time0 : " << clock.timeIncrement() << endl;
 
     Y_.resize(nSpecies());
     yTemp_.resize(nSpecies());
@@ -88,8 +93,11 @@ Foam::CanteraMixture::CanteraMixture
 
     tmp<volScalarField> tYdefault;
 
+    Info << "Foam::CanteraMixture::CanteraMixture time1 : " << clock.timeIncrement() << endl;
+
     forAll(Y_, i)
     {
+        Info << "Foam::CanteraMixture::CanteraMixture i : " << i << endl;
         IOobject header
         (
             species_[i],
@@ -97,9 +105,13 @@ Foam::CanteraMixture::CanteraMixture
             mesh,
             IOobject::NO_READ
         );
+        Info << "Foam::CanteraMixture::CanteraMixture time 1.0 : " << clock.timeIncrement() << endl;
 
+        bool header_ok = header.typeHeaderOk<volScalarField>(true);
+        Info << "Foam::CanteraMixture::CanteraMixture time 1.1 : " << clock.timeIncrement() << endl;
+        
         // check if field exists and can be read
-        if (header.typeHeaderOk<volScalarField>(true))
+        if (header_ok)
         {
             Y_.set
             (
@@ -165,7 +177,6 @@ Foam::CanteraMixture::CanteraMixture
                     tYdefault = new volScalarField(time0IO, mesh);
                 }
             }
-
             Y_.set
             (
                 i,
@@ -183,13 +194,17 @@ Foam::CanteraMixture::CanteraMixture
                 )
             );
         }
+
+        Info << "Foam::CanteraMixture::CanteraMixture time 1.2 : " << clock.timeIncrement() << endl;
     }
-
-
+    Info << "Foam::CanteraMixture::CanteraMixture time 2 : " << clock.timeIncrement() << endl;
+    Info << "Foam::CanteraMixture::CanteraMixture time " << clock.elapsedTime() << endl;
 }
 
 void Foam::CanteraMixture::buildCanteraSolution(){
     // assert(CanteraMechanismFile_ end with .yaml);
+    Info << "Foam::CanteraMixture::buildCanteraSolution start" << endl;
+    syncClockTime clock;
 
     int32_t count;
     char* buffer;    
@@ -219,7 +234,11 @@ void Foam::CanteraMixture::buildCanteraSolution(){
         fin.close();
     }
 
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 0 : " << clock.timeIncrement() << endl;
+
     MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 1 : " << clock.timeIncrement() << endl;
 
     if(mpirank != 0){
         buffer = new char[count];
@@ -227,32 +246,50 @@ void Foam::CanteraMixture::buildCanteraSolution(){
 
     MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
 
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 2 : " << clock.timeIncrement() << endl;
+
     if(mpirank != 0){
         CanteraMechanism = string(buffer, count);
     }
 
     delete[] buffer;
 
-    // std::cout << CanteraMechanism << std::endl;
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 3 : " << clock.timeIncrement() << endl;
 
     Cantera::AnyMap root = Cantera::AnyMap::fromYamlString(CanteraMechanism);
     Cantera::AnyMap& phase = root["phases"].getMapWhere("name", "");
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 4 : " << clock.timeIncrement() << endl;
 
-    Cantera::newSolution(CanteraMechanismFile_, "");
     // instantiate Solution object
     CanteraSolution_ = Cantera::Solution::create();
+
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 5 : " << clock.timeIncrement() << endl;
+
     // thermo phase
     CanteraSolution_->setThermo(std::shared_ptr<Cantera::ThermoPhase>(Cantera::newPhase(phase, root)));
+
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 6 : " << clock.timeIncrement() << endl;
+
     // kinetics
     std::vector<Cantera::ThermoPhase*> phases;
     phases.push_back(CanteraSolution_->thermo().get());
     CanteraSolution_->setKinetics(Cantera::newKinetics(phases, phase, root));
+
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 7 : " << clock.timeIncrement() << endl;
     // transport
     CanteraSolution_->setTransport(std::shared_ptr<Cantera::Transport>(Cantera::newDefaultTransportMgr(CanteraSolution_->thermo().get())));
 
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 8 : " << clock.timeIncrement() << endl;
+
     CanteraGas_ = CanteraSolution_->thermo();
 
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 9 : " << clock.timeIncrement() << endl;
+
     CanteraTransport_ = std::shared_ptr<Cantera::Transport>(newTransportMgr(transportModelName_, CanteraGas_.get()));
+    
+    Info << "Foam::CanteraMixture::buildCanteraSolution time 10 : " << clock.timeIncrement() << endl;
+    Info << "Foam::CanteraMixture::buildCanteraSolution time : " << clock.elapsedTime() << endl;
+    Info << "Foam::CanteraMixture::buildCanteraSolution end" << endl;
 }
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

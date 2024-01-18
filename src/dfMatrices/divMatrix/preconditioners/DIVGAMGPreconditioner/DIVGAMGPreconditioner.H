@@ -95,25 +95,45 @@ public:
     
     
     mutable double procondition_time = 0.;
-    mutable double initVcycle_time = 0.;
-    mutable double Vcycle_time = 0.;
+    mutable double procondition_initVcycle_time = 0.;
+    mutable double procondition_Vcycle_time = 0.;
+    mutable double procondition_spmv_time = 0.;
+    mutable double procondition_misc_time = 0.;
 
     virtual void print_time() const {
-        double other_time = procondition_time - initVcycle_time - spmv_time - smooth_time - scale_time - interpolate_time - restrictField_time - prolongField_time - solveCoarsest_time;
+        double procondition_other_time = procondition_time - procondition_initVcycle_time - procondition_Vcycle_time - procondition_spmv_time - procondition_misc_time;
         Info << "DIVGAMGPreconditioner procondition profiling -------------------------------------------" << endl;
         Info << "procondition time " << procondition_time << endl;
-        Info << "initVcycle time : " << initVcycle_time << ", " << initVcycle_time / procondition_time * 100 << "%" << endl;
-        Info << "spmv time : " << spmv_time << ", " << spmv_time / procondition_time * 100 << "%" << endl;
-        Info << "smooth time : " << smooth_time << ", " << smooth_time / procondition_time * 100 << "%" << endl;
-        Info << "scale time : " << scale_time << ", " << scale_time / procondition_time * 100 << "%" << endl;
-        Info << "interpolate time : " << interpolate_time << ", " << interpolate_time / procondition_time * 100 << "%" << endl;
-        Info << "scale spmv time : " << scale_spmv_time << ", " << scale_spmv_time / procondition_time * 100 << "%" << endl;
-        Info << "interpolate spmv time : " << interpolate_spmv_time << ", " << interpolate_spmv_time / procondition_time * 100 << "%" << endl;
-        Info << "restrictField time : " << restrictField_time << ", " << restrictField_time / procondition_time * 100 << "%" << endl;
-        Info << "prolongField time : " << prolongField_time << ", " << prolongField_time / procondition_time * 100 << "%" << endl;
-        Info << "solveCoarsest time : " << solveCoarsest_time << ", " << solveCoarsest_time / procondition_time * 100 << "%" << endl;
-        Info << "other time : " << other_time << ", " << other_time / procondition_time * 100 << "%" << endl;
+        Info << "procondition initVcycle time : " << procondition_initVcycle_time << ", " << procondition_initVcycle_time / procondition_time * 100 << "%" << endl;
+        Info << "procondition Vcycle time : " << procondition_Vcycle_time << ", " << procondition_Vcycle_time / procondition_time * 100 << "%" << endl;
+        Info << "procondition spmv time : " << procondition_spmv_time << ", " << procondition_spmv_time / procondition_time * 100 << "%" << endl;
+        Info << "procondition misc time : " << procondition_misc_time << ", " << procondition_misc_time / procondition_time * 100 << "%" << endl;
+        Info << "procondition other time : " << procondition_other_time << ", " << procondition_other_time / procondition_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;
+        Info << "DIVGAMGSolver Vcycle profiling -------------------------------------------" << endl;
+        Info << "Vcycle spmv time : " << Vcycle_spmv_time << ", " << Vcycle_spmv_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle smooth time : " << Vcycle_smooth_time << ", " << Vcycle_smooth_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle scale time : " << Vcycle_scale_time << ", " << Vcycle_scale_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle interpolate time : " << Vcycle_interpolate_time << ", " << Vcycle_interpolate_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle restrictField time : " << Vcycle_restrictField_time << ", " << Vcycle_restrictField_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle prolongField time : " << Vcycle_prolongField_time << ", " << Vcycle_prolongField_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle solveCoarsest time : " << Vcycle_misc_time << ", " << Vcycle_misc_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "Vcycle misc time : " << Vcycle_solveCoarsest_time << ", " << Vcycle_solveCoarsest_time / Vcycle_total_time * 100 << "%" << endl;
+        double Vcycle_other_time = Vcycle_total_time - Vcycle_spmv_time - Vcycle_smooth_time
+        - Vcycle_scale_time - Vcycle_interpolate_time - Vcycle_restrictField_time - Vcycle_prolongField_time
+        - Vcycle_solveCoarsest_time - Vcycle_misc_time;
+        Info << "Vcycle other time : " << Vcycle_other_time << ", " << Vcycle_other_time / Vcycle_total_time * 100 << "%" << endl;
+        Info << "----------------------------------------------------------------------------------------" << endl;    
+        Info << "DIVGAMGSolver scale profiling -------------------------------------------" << endl;
+        Info << "scale total time : " << scale_total_time << ", " << scale_total_time / scale_total_time * 100 << "%" << endl;
+        Info << "scale spmv time : " << scale_spmv_time << ", " << scale_spmv_time / scale_total_time * 100 << "%" << endl;
+        Info << "scale norm time : " << scale_norm_time << ", " << scale_norm_time / scale_total_time * 100 << "%" << endl;
+        Info << "scale vector2D_reduce time : " << scale_vector2D_reduce_time << ", " << scale_vector2D_reduce_time / scale_total_time * 100 << "%" << endl;
+        Info << "scale sf time : " << scale_sf_time << ", " << scale_sf_time / scale_total_time * 100 << "%" << endl;
+        Info << "scale field time : " << scale_field_time << ", " << scale_field_time / scale_total_time * 100 << "%" << endl;
+        double scale_other_time = scale_total_time - scale_spmv_time - scale_norm_time - scale_vector2D_reduce_time - scale_sf_time - scale_field_time;
+        Info << "scale other time : " << scale_other_time << ", " << scale_other_time / scale_total_time * 100 << "%" << endl;
+        Info << "----------------------------------------------------------------------------------------" << endl;    
         // Info << "Level " << 0 << " : " << endl; 
         // matrix_.print_time();
         // forAll(divMatrixLevels_, leveli){

@@ -1,28 +1,23 @@
-double p_pre_end, p_pre_start, p_pre_time = 0.;
-double p_post_end, p_post_start, p_post_time = 0.;
-double p_build_opt_end, p_build_opt_start, p_build_opt_time = 0.;
-double p_build_org_end, p_build_org_start, p_build_org_time = 0.;
-double p_build_end, p_build_start, p_build_time = 0.;
-double p_convert_end, p_convert_start, p_convert_time = 0.;
-double p_solve_end, p_solve_start, p_solve_time = 0.;
+double p_build_opt_start, p_build_opt_end, p_build_opt_time = 0.;
+double p_build_org_start, p_build_org_end, p_build_org_time = 0.;
 
-double p_total_start = MPI_Wtime();
+double p_pre_time = 0.;
+double p_post_time = 0.;
+double p_build_time = 0.;
+double p_convert_time = 0.;
+double p_solve_time = 0.;
+double p_pimple_time = 0.;
 
-p_pre_start = MPI_Wtime();
-
-TICK0(p_pre);
+syncClockTime clock;
 
 if (!pimple.simpleRho())
 {
     rho = thermo.rho();
 }
-TICK(p_pre, 0, 1);
 
 // Thermodynamic density needs to be updated by psi*d(p) after the
 // pressure solution
 const volScalarField psip0(psi*p);
-
-TICK(p_pre, 1, 2);
 
 #ifdef OPT_GenMatrix_p
     tmp<volScalarField> trAU = rAUConstructor(UEqn);
@@ -31,11 +26,7 @@ TICK(p_pre, 1, 2);
     volScalarField rAU(1.0/UEqn.A());
 #endif
 
-TICK(p_pre, 2, 3);
-
 tmp<volScalarField> tmp_rhoRau = rho*rAU;
-
-TICK(p_pre, 3, 4);
 
 // #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
 //     tmp<surfaceScalarField> trhorAUf = rhorAUfConstructor(tmp_rhoRau, linear_weights);
@@ -44,27 +35,18 @@ TICK(p_pre, 3, 4);
 surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
 // #endif
 
-TICK(p_pre, 4, 5);
-
-
 #ifdef OPT_GenMatrix_p
     tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
 #else
     tmp<volVectorField> tUEqnH = UEqn.H();
 #endif
 
-TICK(p_pre, 5, 6);
-
 volVectorField HbyA(constrainHbyA(rAU*tUEqnH, U, p));
-
-TICK(p_pre, 6, 7);
 
 if (pimple.nCorrPiso() <= 1)
 {
     tUEqn.clear();
 }
-
-TICK(p_pre, 7, 8);
 
 #ifdef OPT_GenMatrix_p
     tmp<surfaceScalarField> tddtCorr = EulerDdtSchemeFvcDdtCorr(rho, U, phi, rhoUf);
@@ -73,8 +55,6 @@ TICK(p_pre, 7, 8);
     tmp<surfaceScalarField> tddtCorr = fvc::ddtCorr(rho, U, phi, rhoUf);
     surfaceScalarField ddtCorr = tddtCorr();
 #endif
-
-TICK(p_pre, 8, 9);
 
 // check_field_equal(ddtCorrTest, ddtCorrRef);
 
@@ -91,24 +71,16 @@ surfaceScalarField phiHbyA
 // #endif
 // construct phiHbyA directly
 
-TICK(p_pre, 9, 10);
-
 fvc::makeRelative(phiHbyA, rho, U);
-
-TICK(p_pre, 10, 11);
 
 // Update the pressure BCs to ensure flux consistency
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
 
-TICK(p_pre, 11, 12);
-
-p_pre_end = MPI_Wtime();
-p_pre_time += p_pre_end - p_pre_start;
+p_pre_time += clock.timeIncrement();
 
 if (pimple.transonic())
 {
-//     Info << "pimple.transonic()" << endl;
-    p_build_start = MPI_Wtime();
+    p_pimple_time += clock.timeIncrement();
 
     surfaceScalarField phid
     (
@@ -120,22 +92,21 @@ if (pimple.transonic())
     
     fvScalarMatrix pDDtEqn
     (
-        fvc::ddt(rho) + psi*correction(fvm::ddt(p))
+        fvc::ddt(rho) + psi * correction(fvm::ddt(p))
       + fvc::div(phiHbyA) + fvm::div(phid, p)
     );
-    p_build_end = MPI_Wtime();
-    p_build_time += p_build_end - p_build_start;
+    p_build_time += clock.timeIncrement();
 
     while (pimple.correctNonOrthogonal())
     {
-        p_build_start = MPI_Wtime();
+        p_pimple_time += clock.timeIncrement();
+
         fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
         // Relax the pressure equation to ensure diagonal-dominance
         pEqn.relax();
-        p_build_end = MPI_Wtime();
-        p_build_time += p_build_end - p_build_start;
 
-        p_convert_start = MPI_Wtime();
+        p_build_time += clock.timeIncrement();
+
 #ifdef _CSR_
         csrMatrix csr(pEqn);
 #endif
@@ -143,15 +114,14 @@ if (pimple.transonic())
         ellMatrix ell(pEqn);
 #endif
 #ifdef _DIV_
-        divMatrix div(pEqn);
+        // divMatrix div(pEqn);
+        div.copy_value_from_fvMatrix(pEqn);
 #endif
 #ifdef _LDU_
         LDUMatrix LDU(pEqn);
 #endif
-        p_convert_end = MPI_Wtime();
-        p_convert_time += p_convert_end - p_convert_start;
+        p_convert_time += clock.timeIncrement();
 
-        p_solve_start = MPI_Wtime();
 #ifdef _CSR_
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
@@ -184,23 +154,21 @@ if (pimple.transonic())
 #if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
         pEqn.solve();
 #endif
-        p_solve_end = MPI_Wtime();
-        p_solve_time += p_solve_end - p_solve_start;
+        p_solve_time += clock.timeIncrement();
 
-        p_post_start = MPI_Wtime();
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
-        p_post_end = MPI_Wtime();
-        p_post_time += p_post_end - p_post_start;
+        
+        p_post_time += clock.timeIncrement();
 
     }
 }
 else
 {
-//     Info << "not pimple.transonic()" << endl;
-    p_build_start = MPI_Wtime();
+    p_pimple_time += clock.timeIncrement();
+
 #ifdef OPT_GenMatrix_p
     p_build_opt_start = MPI_Wtime();
     tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi);
@@ -212,11 +180,9 @@ else
     p_build_org_start = MPI_Wtime();
     fvScalarMatrix pDDtEqn
     (
-        fvc::ddt(rho) + psi * 
-        correction(fvm::ddt(p))
+        fvc::ddt(rho) + psi * correction(fvm::ddt(p))
         // fvm::ddt(p)
-      + fvc::div(phiHbyA)
-      - fvm::laplacian(rhorAUf, p)
+      + fvc::div(phiHbyA) - fvm::laplacian(rhorAUf, p)
     );
     p_build_org_end = MPI_Wtime();
     p_build_org_time += p_build_org_end - p_build_org_start;
@@ -227,8 +193,7 @@ else
     p_build_org_start = MPI_Wtime();
     fvScalarMatrix pDDtEqn_answer
     (
-        fvc::ddt(rho) + psi * 
-        correction(fvm::ddt(p))
+        fvc::ddt(rho) + psi * correction(fvm::ddt(p))
       + fvc::div(phiHbyA)
       - fvm::laplacian(rhorAUf, p)
     );
@@ -238,18 +203,16 @@ else
     check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer);
 #endif
 
-    p_build_end = MPI_Wtime();
-    p_build_time += p_build_end - p_build_start;
+    p_build_time += clock.timeIncrement();
 
     while (pimple.correctNonOrthogonal())
     {
-        p_build_start = MPI_Wtime();
+        p_pimple_time += clock.timeIncrement();
 
         fvScalarMatrix pEqn(pDDtEqn);
-        p_build_end = MPI_Wtime();
-        p_build_time += p_build_end - p_build_start;
 
-        p_convert_start = MPI_Wtime();
+        p_build_time += clock.timeIncrement();
+
 #ifdef _CSR_
         csrMatrix csr(pEqn);
 #endif
@@ -257,15 +220,14 @@ else
         ellMatrix ell(pEqn);
 #endif
 #ifdef _DIV_
-        divMatrix div(pEqn);
+        // divMatrix div(pEqn);
+        div.copy_value_from_fvMatrix(pEqn);
 #endif
 #ifdef _LDU_
         LDUMatrix LDU(pEqn);
 #endif
-        p_convert_end = MPI_Wtime();
-        p_convert_time += p_convert_end - p_convert_start;
+        p_convert_time += clock.timeIncrement();
 
-        p_solve_start = MPI_Wtime();
 #ifdef _CSR_
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
@@ -298,61 +260,43 @@ else
 #if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
         pEqn.solve();
 #endif
-        p_solve_end = MPI_Wtime();
-        p_solve_time += p_solve_end - p_solve_start;
+        p_solve_time += clock.timeIncrement();
 
-        p_post_start = MPI_Wtime();
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
-        p_post_end = MPI_Wtime();
-        p_post_time += p_post_end - p_post_start;
+        p_post_time += clock.timeIncrement();
     }
 }
 
-p_post_start = MPI_Wtime();
-
-TICK0(p_post);
-
 bool limitedp = pressureControl.limit(p);
-
-TICK(p_post, 0, 1);
 
 // Thermodynamic density update
 thermo.correctRho(psi*p - psip0);
 
-TICK(p_post, 1, 2);
 if (limitedp)
 {
     rho = thermo.rho();
 }
-TICK(p_post, 2, 3);
 
 #include "rhoEqn.H"
 #include "compressibleContinuityErrs.H"
 
-TICK(p_post, 3, 4);
 // Explicitly relax pressure for momentum corrector
 p.relax();
 
-TICK(p_post, 4, 5);
 U = HbyA - rAU*fvc::grad(p);
-TICK(p_post, 5, 6);
 U.correctBoundaryConditions();
-TICK(p_post, 6, 7);
 K = 0.5*magSqr(U);
-TICK(p_post, 7, 8);
 
 if (pimple.simpleRho())
 {
     rho = thermo.rho();
 }
-TICK(p_post, 8, 9);
 
 // Correct rhoUf if the mesh is moving
 fvc::correctRhoUf(rhoUf, rho, U, phi);
-TICK(p_post, 9, 10);
 
 if (thermo.dpdt())
 {
@@ -363,13 +307,10 @@ if (thermo.dpdt())
         dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
     }
 }
-TICK(p_post, 10, 11);
 
-p_post_end = MPI_Wtime();
-p_post_time += p_post_end - p_post_start;
+p_post_time += clock.timeIncrement();
 
-double p_total_end = MPI_Wtime();
-double p_total_time = p_total_end - p_total_start;
+double p_total_time = clock.elapsedTime();
 
 Info << "p total Time : " << p_total_time << endl;
 Info << "p pre Time : " << p_pre_time << endl;
@@ -377,5 +318,6 @@ Info << "p build Time : " << p_build_time << endl;
 Info << "p convert Time : " << p_convert_time << endl;
 Info << "p solve Time : " << p_solve_time << endl;
 Info << "p post Time : " << p_post_time << endl;
-Info << "p other Time : " << p_total_time - p_pre_time - p_build_time - p_convert_time - p_solve_time - p_post_time << endl;
+Info << "p p_pimple_time Time : " << p_pimple_time << endl;
+Info << "p other Time : " << p_total_time - p_pre_time - p_build_time - p_convert_time - p_solve_time - p_post_time - p_pimple_time << endl;
 

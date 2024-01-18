@@ -9,20 +9,22 @@
 #include <cstring>
 #include "Layer.H"
 
+
+template<typename DataType>
 class DNNInferencer_blas
 {
 private:
     std::vector<int64_t> layers_;
-    std::vector<Layer<float>*> model0_;
-    std::vector<Layer<float>*> model1_;
-    std::vector<Layer<float>*> model2_;
+    std::vector<Layer<DataType>*> model0_;
+    std::vector<Layer<DataType>*> model1_;
+    std::vector<Layer<DataType>*> model2_;
 
     double FLOPs_per_sample_;
 
     int64_t total_samples_;
     bool buffer_alloced_ = false;
     int64_t batch_size_;
-    std::vector<std::vector<float>> output_buffer_;
+    std::vector<DataType*> output_buffer_;
 public:
 
     int64_t input_dim() const {return layers_.front(); }
@@ -37,9 +39,15 @@ public:
     
     // Inference
     void Inference_multiDNNs(
-        const std::vector<float>& input0, std::vector<double>& output0, int64_t input_count0,
-        const std::vector<float>& input1, std::vector<double>& output1, int64_t input_count1,
-        const std::vector<float>& input2, std::vector<double>& output2, int64_t input_count2);
+        const std::vector<DataType>& input0, std::vector<DataType>& output0, int64_t input_count0,
+        const std::vector<DataType>& input1, std::vector<DataType>& output1, int64_t input_count1,
+        const std::vector<DataType>& input2, std::vector<DataType>& output2, int64_t input_count2);
+
+    // Inference
+    void Inference_multiDNNs(
+        const DataType* input0, DataType* output0, int64_t input_count0,
+        const DataType* input1, DataType* output1, int64_t input_count1,
+        const DataType* input2, DataType* output2, int64_t input_count2);
 
 };
 

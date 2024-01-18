@@ -347,6 +347,10 @@ void Foam::DIVGAMGAgglomeration::agglomerateLduAddressing
         )
     );
 
+    divMatrixLevelPatterns_.set(
+        fineLevelIndex,
+        new divMatrix(meshLevels_[fineLevelIndex])
+    );
 
     if (debug & 2)
     {

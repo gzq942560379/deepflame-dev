@@ -76,23 +76,23 @@
     check_fvmatrix_equal(EEqn, EEqn_answer);
 #endif
 
-// #ifdef _CSR_
-//     E_convert_start = MPI_Wtime();
-//     csr.init_value_from_lduMatrix(EEqn);
-//     E_convert_end = MPI_Wtime();
-//     E_convert_time += E_convert_end - E_convert_start;
-// #endif
+#ifdef _DIV_
+    E_convert_start = MPI_Wtime();
+    div.copy_value_from_fvMatrix(EEqn);
+    E_convert_end = MPI_Wtime();
+    E_convert_time += E_convert_end - E_convert_start;
+#endif
 
     E_solve_start = MPI_Wtime();
-// #ifdef _CSR_
-//     auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(EEqn.psi());
-//     auto& source = EEqn.source();
-//     auto& internalCoeffs = EEqn.internalCoeffs();
-//     auto& boundaryCoeffs = EEqn.boundaryCoeffs();
-//     csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-// #else
+#ifdef _DIV_
+    auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(EEqn.psi());
+    auto& source = EEqn.source();
+    auto& internalCoeffs = EEqn.internalCoeffs();
+    auto& boundaryCoeffs = EEqn.boundaryCoeffs();
+    div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
     EEqn.solve();
-// #endif
+#endif
     E_solve_end = MPI_Wtime();
     E_solve_time += E_solve_end - E_solve_start;
 

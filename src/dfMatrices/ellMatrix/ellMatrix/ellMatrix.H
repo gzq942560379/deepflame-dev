@@ -56,19 +56,6 @@ private:
     labelList blocked_off_diag_colidx_; // graph of blocked matrix
     labelList blocked_off_diag_count_; // neighbor count
 
-    bool colored_ = false;
-    labelList color_of_node_;  // node_id -> color
-    label num_color_;  // number of color;
-    labelList color_ptr_; // size: (num_color_ + 1)
-    labelList nodes_of_color_;  // color -> nodes
-
-    // // map from face to lower in off_diag_value_
-    // // lower (nei,own)
-    // labelList face2lower_;
-    // // map from face to upper in off_diag_value_
-    // // lower (own,nei)
-    // labelList face2upper_;
-
     bool diagonal_;
     bool symmetric_;
     bool asymmetric_;
@@ -218,13 +205,6 @@ public:
     void analyze() const;
     void check() const;
 
-    void coloring();
-    void build_graph();
-    void hash_coloring();
-    void jpl_coloring();
-    void color_count();
-    void coloring_analyze() const;
-    
     //- Sum the coefficients on each row of the matrix
     void sumA
     (

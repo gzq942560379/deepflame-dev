@@ -26,59 +26,9 @@ License
 #include "DIVGAMGSolver.H"
 #include "vector2D.H"
 #include <mpi.h>
+#include "clockTime.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
-
-// void Foam::DIVGAMGSolver::scale
-// (
-//     scalarField& field,
-//     scalarField& Acf,
-//     const divMatrix& A,
-//     const FieldField<Field, scalar>& interfaceLevelBouCoeffs,
-//     const lduInterfaceFieldPtrsList& interfaceLevel,
-//     const scalarField& source,
-//     const direction cmpt
-// ) const
-// {
-//     double start = MPI_Wtime();
-//     A.Amul
-//     (
-//         Acf,
-//         field,
-//         interfaceLevelBouCoeffs,
-//         interfaceLevel,
-//         cmpt
-//     );
-//     double end = MPI_Wtime();
-//     scale_spmv_time += end - start;
-
-//     scalar scalingFactorNum = 0.0;
-//     scalar scalingFactorDenom = 0.0;
-
-//     forAll(field, i)
-//     {
-//         scalingFactorNum += source[i]*field[i];
-//         scalingFactorDenom += Acf[i]*field[i];
-//     }
-
-//     vector2D scalingVector(scalingFactorNum, scalingFactorDenom);
-//     A.mesh().reduce(scalingVector, sumOp<vector2D>());
-
-//     const scalar sf = scalingVector.x()/stabilise(scalingVector.y(), vSmall);
-
-//     if (debug >= 2)
-//     {
-//         Pout<< sf << " ";
-//     }
-
-//     const scalarField& D = A.diag();
-
-//     forAll(field, i)
-//     {
-//         field[i] = sf*field[i] + (source[i] - sf*Acf[i])/D[i];
-//     }
-// }
-
 
 void Foam::DIVGAMGSolver::scale
 (
@@ -91,7 +41,8 @@ void Foam::DIVGAMGSolver::scale
     const direction cmpt
 ) const
 {
-    double start = MPI_Wtime();
+    clockTime clock;
+
     A.Amul
     (
         Acf,
@@ -100,20 +51,27 @@ void Foam::DIVGAMGSolver::scale
         interfaceLevel,
         cmpt
     );
-    double end = MPI_Wtime();
-    scale_spmv_time += end - start;
+
+    scale_spmv_time += clock.timeIncrement();
 
     scalar scalingFactorNum = 0.0;
     scalar scalingFactorDenom = 0.0;
 
-    forAll(field, i)
-    {
-        scalingFactorNum += source[i]*field[i];
-        scalingFactorDenom += Acf[i]*field[i];
+#ifdef _OPENMP
+    #pragma omp parallel for reduction(+:scalingFactorNum) reduction(+:scalingFactorDenom)
+#endif
+    for(label i = 0; i < field.size(); ++i){
+        scalingFactorNum += source[i] * field[i];
+        scalingFactorDenom += Acf[i] * field[i];
     }
 
+    scale_norm_time += clock.timeIncrement();
+
     vector2D scalingVector(scalingFactorNum, scalingFactorDenom);
+
     A.mesh().reduce(scalingVector, sumOp<vector2D>());
+
+    scale_vector2D_reduce_time += clock.timeIncrement();
 
     const scalar sf = scalingVector.x()/stabilise(scalingVector.y(), vSmall);
 
@@ -122,12 +80,19 @@ void Foam::DIVGAMGSolver::scale
         Pout<< sf << " ";
     }
 
+    scale_sf_time += clock.timeIncrement();
+
     const scalarField& D = A.diag();
 
-    forAll(field, i)
-    {
-        field[i] = sf*field[i] + (source[i] - sf*Acf[i])/D[i];
+#ifdef _OPENMP
+    #pragma omp parallel for
+#endif
+    for(label i = 0; i < field.size(); ++i){
+        field[i] = sf * field[i] + (source[i] - sf * Acf[i]) / D[i];
     }
+
+    scale_field_time += clock.timeIncrement();
+    scale_total_time += clock.elapsedTime();
 }
 
 

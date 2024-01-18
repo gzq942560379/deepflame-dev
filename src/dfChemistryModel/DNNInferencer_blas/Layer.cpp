@@ -1,51 +1,20 @@
 #include "Layer.H"
+#include "kernel.H"
 #include <cmath>
-// #include <cblas.h>
 #include <sstream>
 #include <fstream>
 #include <cassert>
 #include <iostream>
 #include <mpi.h>
     
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern void sgemm_(char *transa, char *transb, int *m, int *n, int *k, float *alpha, float *a, int *lda, float *b, int *ldb, float *beta, float *c, int *ldc);
-
-#ifdef __cplusplus
-}
-#endif
-
-template<>
-void Linear<float>::forward(const Tensor<float>& input, Tensor<float>& output){
-    assert(input.dim_num() == 2);
-    assert(output.dim_num() == 2);
-    assert(input.dim(0) == output.dim(0));
-    assert(input.dim(1) == in_features_);
-    assert(out_features_ == output.dim(1));
-
-    char transA = 'N';
-    char transB = 'N';
-    float alpha = 1.f;
-    float beta = 1.f;
-    int m = out_features_;
-    int n = input.dim(0);
-    int k = in_features_;
-    float* A = weights_.data();
-    int lda = out_features_;
-    float* B = const_cast<float*>(input.data());
-    int ldb = input.dim(1);
-    float*  C = output.data();
-    int ldc = output.dim(1);
-
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int i = 0; i < input.dim(0); ++i)
-        std::copy(bias_.data(), bias_.data() + out_features_, C + i * out_features_);
-
-    sgemm_(&transA, &transB, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
+void read_float_data(float* data, int64_t len, std::string filepath){
+    std::ifstream fin(filepath, std::ios::binary);
+    if(!fin.is_open()){
+        std::cerr << "open file error : " << filepath << std::endl << std::flush;
+        abort();
+    }
+    fin.read(reinterpret_cast<char*>(data), len * sizeof(float));
+    fin.close();
 }
 
 template<>
@@ -67,22 +36,9 @@ void Linear<float>::load_parameters(const std::string& dir, int64_t layer_id){
         std::string weights_path = ss1.str();
         ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
         std::string bias_path = ss2.str();
-        // weights
-        std::ifstream weights_file(weights_path, std::ios::binary);
-        if(!weights_file.is_open()){
-            std::cerr << "open weights file error : " << weights_path << std::endl << std::flush;
-            abort();
-        }
-        weights_file.read(reinterpret_cast<char*>(weights_.data()), weights_.bytes_num());
-        weights_file.close();
-        // bias
-        std::ifstream bias_file(bias_path, std::ios::binary);
-        if(!bias_file.is_open()){
-            std::cerr << "open bias file error : " << bias_path << std::endl << std::flush;
-            abort();
-        }
-        bias_file.read(reinterpret_cast<char*>(bias_.data()), bias_.bytes_num());
-        bias_file.close();
+
+        read_float_data(weights_.data(), weights_.element_num(), weights_path);
+        read_float_data(bias_.data(), bias_.element_num(), bias_path);
     }
 
     MPI_Bcast(weights_.data(), weights_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -108,118 +64,298 @@ void LinearGELU<float>::load_parameters(const std::string& dir, int64_t layer_id
         std::string weights_path = ss1.str();
         ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
         std::string bias_path = ss2.str();
-        
-        // weights
-        std::ifstream weights_file(weights_path, std::ios::binary);
-        if(!weights_file.is_open()){
-            std::cerr << "open weights file error : " << weights_path << std::endl << std::flush;
-            abort();
-        }
-        weights_file.read(reinterpret_cast<char*>(weights_.data()), weights_.bytes_num());
-        weights_file.close();
 
-        // bias
-        std::ifstream bias_file(bias_path, std::ios::binary);
-        if(!bias_file.is_open()){
-            std::cerr << "open bias file error : " << bias_path << std::endl << std::flush;
-            abort();
-        }
-        bias_file.read(reinterpret_cast<char*>(bias_.data()), bias_.bytes_num());
-        bias_file.close();
+        read_float_data(weights_.data(), weights_.element_num(), weights_path);
+        read_float_data(bias_.data(), bias_.element_num(), bias_path);
     }
 
     MPI_Bcast(weights_.data(), weights_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
     MPI_Bcast(bias_.data(), bias_.element_num(), MPI_FLOAT, 0, MPI_COMM_WORLD);
 }
 
-
-void gelu_navie(int64_t len, float* data){
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        float x = data[i];
-        data[i] = 0.5 * x * (1.f + tanhf(sqrtf(2.f / M_PI) * (x + 0.044715f * powf(x, 3.f))));
+template<>
+void Linear<double>::load_parameters(const std::string& dir, int64_t layer_id){
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
-}
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
 
-inline float tanhf_exp(float x){
-    if(x > 8.f) return 1.;
-    if(x < -8.f) return -1.;
-    return 1.f - 2.f / (expf(2.f * x) + 1.f);
-}
+    if(mpirank == 0){
+        std::stringstream ss1,ss2;
+        ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
+        std::string weights_path = ss1.str();
+        ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
+        std::string bias_path = ss2.str();
 
-double tanh_exp(double x){
-    return 1. - 2. / (exp(2. * x) + 1.);
-}
+        float* weight_tmp = new float[weights_.element_num()];
+        float* bias_tmp = new float[bias_.element_num()];
 
-void geluf_exp(int64_t len, float* data){
-    const float const_1 = sqrtf(2.f / M_PI);
-    const float const_2 = 0.044715f;
-    const float one = 1.f;
-    const float half = 0.5;
+        read_float_data(weight_tmp, weights_.element_num(), weights_path);
+        read_float_data(bias_tmp, bias_.element_num(), bias_path);
 
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        float x = data[i];
-        data[i] = half * x * (one + tanhf_exp(const_1 * (x + const_2 * x * x * x)));
+        double* weights_data = weights_.data();
+        double* bias_data = bias_.data();
+        for(int i = 0; i < weights_.element_num(); ++i)
+            weights_data[i] = static_cast<double>(weight_tmp[i]);
+        for(int i = 0; i < bias_.element_num(); ++i)
+            bias_data[i] = static_cast<double>(bias_tmp[i]);
+
+        delete [] weight_tmp;
+        delete [] bias_tmp;
     }
-}
 
-void gelud_exp(int64_t len, float* data){
-    const double const_1 = sqrtf(2. / M_PI);
-    const double const_2 = 0.044715;
-    const double one = 1.;
-    const double half = 0.5;
-
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int64_t i = 0; i < len; ++i){
-        double x = data[i];
-        data[i] = half * x * (one + tanh_exp(const_1 * (x + const_2 * x * x * x)));
-    }
-}
-
-// TODO 
-void gelu_exp_sve(int64_t len, float* data){
-
+    MPI_Bcast(weights_.data(), weights_.element_num(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(bias_.data(), bias_.element_num(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
 template<>
-void LinearGELU<float>::forward(const Tensor<float>& input, Tensor<float>& output){
-    assert(input.dim_num() == 2);
-    assert(output.dim_num() == 2);
-    assert(input.dim(0) == output.dim(0));
-    assert(input.dim(1) == in_features_);
-    assert(out_features_ == output.dim(1));
-    
+void LinearGELU<double>::load_parameters(const std::string& dir, int64_t layer_id){
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+
+    if(mpirank == 0){
+        std::stringstream ss1,ss2;
+        ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
+        std::string weights_path = ss1.str();
+        ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
+        std::string bias_path = ss2.str();
+        
+        float* weight_tmp = new float[weights_.element_num()];
+        float* bias_tmp = new float[bias_.element_num()];
+
+        read_float_data(weight_tmp, weights_.element_num(), weights_path);
+        read_float_data(bias_tmp, bias_.element_num(), bias_path);
+
+        double* weights_data = weights_.data();
+        double* bias_data = bias_.data();
+        for(int i = 0; i < weights_.element_num(); ++i)
+            weights_data[i] = static_cast<double>(weight_tmp[i]);
+        for(int i = 0; i < bias_.element_num(); ++i)
+            bias_data[i] = static_cast<double>(bias_tmp[i]);
+
+        delete [] weight_tmp;
+        delete [] bias_tmp;
+    }
+
+    MPI_Bcast(weights_.data(), weights_.element_num(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(bias_.data(), bias_.element_num(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+}
+
+
+template<>
+void Linear<__fp16>::load_parameters(const std::string& dir, int64_t layer_id){
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        std::cerr << "DNNInferencer_blas::load_models : MPI is not initialized" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+
+    if(mpirank == 0){
+        std::stringstream ss1,ss2;
+        ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
+        std::string weights_path = ss1.str();
+        ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
+        std::string bias_path = ss2.str();
+
+        float* weight_tmp = new float[weights_.element_num()];
+        float* bias_tmp = new float[bias_.element_num()];
+
+        read_float_data(weight_tmp, weights_.element_num(), weights_path);
+        read_float_data(bias_tmp, bias_.element_num(), bias_path);
+
+        __fp16* weights_data = weights_.data();
+        __fp16* bias_data = bias_.data();
+        for(int i = 0; i < weights_.element_num(); ++i)
+            weights_data[i] = static_cast<__fp16>(weight_tmp[i]);
+        for(int i = 0; i < bias_.element_num(); ++i)
+            bias_data[i] = static_cast<__fp16>(bias_tmp[i]);
+
+        delete [] weight_tmp;
+        delete [] bias_tmp;
+    }
+    MPI_Bcast(weights_.data(), weights_.element_num() * 2, MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(bias_.data(), bias_.element_num() * 2, MPI_BYTE, 0, MPI_COMM_WORLD);
+}
+
+template<>
+void LinearGELU<__fp16>::load_parameters(const std::string& dir, int64_t layer_id){
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+    if(!flag_mpi_init){
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int mpirank;
+    int mpisize;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+
+    if(mpirank == 0){
+        std::stringstream ss1,ss2;
+        ss1 << dir << "/" << "linear_" << layer_id << "_weights_rowmajor_" << in_features_ << "_" << out_features_ << ".data";
+        std::string weights_path = ss1.str();
+        ss2 << dir << "/" << "linear_" << layer_id << "_bias_" << out_features_ << ".data";
+        std::string bias_path = ss2.str();
+        
+        float* weight_tmp = new float[weights_.element_num()];
+        float* bias_tmp = new float[bias_.element_num()];
+
+        read_float_data(weight_tmp, weights_.element_num(), weights_path);
+        read_float_data(bias_tmp, bias_.element_num(), bias_path);
+
+        __fp16* weights_data = weights_.data();
+        __fp16* bias_data = bias_.data();
+        for(int i = 0; i < weights_.element_num(); ++i)
+            weights_data[i] = static_cast<__fp16>(weight_tmp[i]);
+        for(int i = 0; i < bias_.element_num(); ++i)
+            bias_data[i] = static_cast<__fp16>(bias_tmp[i]);
+
+        delete [] weight_tmp;
+        delete [] bias_tmp;
+    }
+
+    MPI_Bcast(weights_.data(), weights_.element_num() * 2, MPI_BYTE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(bias_.data(), bias_.element_num() * 2, MPI_BYTE, 0, MPI_COMM_WORLD);
+}
+
+template<typename DataType>
+void Linear<DataType>::reset_timer(){
+    gemm_time_ = 0;
+    bias_time_ = 0;
+    total_infer_time_ = 0;
+}
+
+template<typename DataType>
+void LinearGELU<DataType>::reset_timer(){
+    gemm_time_ = 0;
+    bias_time_ = 0;
+    gelu_time_ = 0;
+    bias_gelu_fusion_time_ = 0;
+    total_infer_time_ = 0;
+}
+
+
+template<typename DataType>
+void Linear<DataType>::print_timer(){
+    std::cout << "total infer time : " << total_infer_time_ << std::endl;
+    if(total_infer_time_ > 0.){
+        std::cout << "gemm time : " << gemm_time_ << ", " << gemm_time_ * 100. / total_infer_time_ << " %" << std::endl;
+        std::cout << "bias time : " << bias_time_ << ", " << bias_time_ * 100. / total_infer_time_ << " %" << std::endl;
+    }
+}
+
+template<typename DataType>
+void LinearGELU<DataType>::print_timer(){
+    std::cout << "total infer time : " << total_infer_time_ << std::endl;
+    if(total_infer_time_ > 0.){
+        std::cout << "gemm time : " << gemm_time_ << ", " << gemm_time_ * 100. / total_infer_time_ << " %" << std::endl;
+        std::cout << "bias time : " << bias_time_ << ", " << bias_time_ * 100. / total_infer_time_ << " %" << std::endl;
+        std::cout << "gelu time : " << gelu_time_ << ", " << gelu_time_ * 100. / total_infer_time_ << " %" << std::endl;
+        std::cout << "bias gelu fusion time : " << bias_gelu_fusion_time_ << ", " << bias_gelu_fusion_time_ * 100. / total_infer_time_ << " %" << std::endl;
+    }
+}
+
+template<typename DataType>
+void Linear<DataType>::forward(const Tensor<DataType>& input, Tensor<DataType>& output){
     char transA = 'N';
     char transB = 'N';
-    float alpha = 1.f;
-    float beta = 1.f;
+    DataType alpha = 1.;
+    DataType beta = 0.;
     int m = out_features_;
     int n = input.dim(0);
     int k = in_features_;
-    float* A = weights_.data();
+    DataType* A = weights_.data();
     int lda = out_features_;
-    float* B = const_cast<float*>(input.data());
+    DataType* B = const_cast<DataType*>(input.data());
     int ldb = input.dim(1);
-    float*  C = output.data();
+    DataType*  C = output.data();
     int ldc = output.dim(1);
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(int i = 0; i < input.dim(0); ++i)
-        std::copy(bias_.data(), bias_.data() + out_features_, C + i * out_features_);
 
-    sgemm_(&transA, &transB, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc);
-    // GELU
-    geluf_exp(output.element_num(), output.data());
+    double time0 = MPI_Wtime();
+
+    gemm(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+
+    double time1 = MPI_Wtime();
+
+    bias_naive(output, bias_);
+    
+    double time2 = MPI_Wtime();
+
+    gemm_time_ += time1 - time0;
+    bias_time_ += time2 - time1;
+    total_infer_time_ += time2 - time0;
 }
 
-template class Tensor<float>;
+template<typename DataType>
+void LinearGELU<DataType>::forward(const Tensor<DataType>& input, Tensor<DataType>& output){
+    char transA = 'N';
+    char transB = 'N';
+    DataType alpha = 1.;
+    DataType beta = 0.;
+    int m = out_features_;
+    int n = input.dim(0);
+    int k = in_features_;
+    DataType* A = weights_.data();
+    int lda = out_features_;
+    DataType* B = const_cast<DataType*>(input.data());
+    int ldb = input.dim(1);
+    DataType*  C = output.data();
+    int ldc = output.dim(1);
+
+    double time0 = MPI_Wtime();
+
+    gemm(transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
+
+    double time1 = MPI_Wtime();
+
+    bias_naive(output, bias_);
+
+    double time2 = MPI_Wtime();
+
+    // GELU
+    // gelu_navie(output.element_num(), output.data());
+    // gelu_exp(output.element_num(), output.data());
+    // gelu_lookup(output.element_num(), output.data());
+    // gelu_fastexp_fusion(output.element_num(), output.data());
+    gelu_fastexp_simd(output.element_num(), output.data());
+    // bias_gelu_exp_fusion(output, bias_);
+    // bias_gelu_lookup_fusion(output, bias_);
+    
+    double time3 = MPI_Wtime();
+
+    gemm_time_ += time1 - time0;
+    bias_time_ += time2 - time1;
+    gelu_time_ += time3 - time2;
+    
+    // bias_gelu_fusion_time_ += time2 - time1;
+
+    total_infer_time_ += time3 - time0;
+}
+
+
 template class Linear<float>;
 template class LinearGELU<float>;
+
+template class Linear<double>;
+template class LinearGELU<double>;
+
+template class Linear<__fp16>;
+template class LinearGELU<__fp16>;

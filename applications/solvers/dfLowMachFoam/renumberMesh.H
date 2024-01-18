@@ -32,6 +32,8 @@ Description
     read system/renumberMeshDict if -dict option is present
 
 \*---------------------------------------------------------------------------*/
+{
+
 argList::addNote
 (
     "Renumber mesh to minimize bandwidth"
@@ -834,3 +836,5 @@ renumberMesh = true;
 
 
 // ************************************************************************* //
+
+}
