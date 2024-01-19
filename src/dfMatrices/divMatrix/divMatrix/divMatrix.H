@@ -156,6 +156,11 @@ public:
         scalarField&,
         const scalarField&
     ) const;
+    void SpMV_slave_naive
+    (
+        scalarField&,
+        const scalarField&
+    ) const;
     void SpMV_split
     (
         scalarField&,

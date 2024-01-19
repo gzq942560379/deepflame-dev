@@ -37,6 +37,7 @@ Description
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
 #endif
+#include "divMatrix_slave_kernel.h"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 void Foam::divMatrix::SpMV
@@ -61,6 +62,28 @@ void Foam::divMatrix::SpMV
     }else{
         SpMV_naive(Apsi, psi);
     }
+}
+
+
+void Foam::divMatrix::SpMV_slave_naive
+(
+    scalarField& Apsi,
+    const scalarField& psi
+) const
+{
+    divMatrix_SpMV_param_t para;
+    para.ApsiPtr = Apsi.begin();
+    para.psiPtr = const_cast<scalar*>(psi.begin());
+    para.diagPtr = const_cast<scalar*>(diag_value_.begin());
+    para.off_diag_value_Ptr = const_cast<scalar*>(off_diag_value_.begin());
+    para.distance_list_ = const_cast<label*>(distance_list_.begin());
+    para.row_block_bit_ = row_block_bit_;
+    para.row_block_size_ = row_block_size_;
+    para.distance_count_ = distance_count_;
+    para.block_count_ = block_count_;
+    para.row_ = row_;
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(divMatrix_SpMV_naive)), &para);
+    CRTS_athread_join();
 }
 
 void Foam::divMatrix::SpMV_naive

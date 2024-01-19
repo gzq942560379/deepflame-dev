@@ -38,7 +38,7 @@ if [ ! -z "$USE_BLASDNN" ]; then
     # make VERBOSE=1
     # mkdir -p $DF_ROOT/lib/
     # cp ./libDNNInferencer_blas.a $DF_ROOT/lib/
-    ./build.sh
+    make -j4
     cp ./libDNNInferencer_blas.a $DF_ROOT/lib/
 
 fi

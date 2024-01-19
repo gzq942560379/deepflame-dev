@@ -15,8 +15,6 @@ HOST_CPP_OBJ = $(patsubst %.cpp, %.o, $(HOST_CPP_SRC))
 HOST_C_OBJ = $(patsubst %.c, %.o, $(HOST_C_SRC))
 SLAVE_OBJ = $(patsubst %.c, %.o, $(SLAVE_SRC))
 
-$(info HOST_CPP_OBJ : $(HOST_CPP_OBJ))
-
 all : lib
 
 lib: $(HOST_CPP_OBJ) $(HOST_C_OBJ) $(SLAVE_OBJ)
@@ -34,3 +32,4 @@ $(SLAVE_OBJ) : %.o : %.c
 
 clean : 
 	rm -rf $(HOST_CPP_OBJ) $(HOST_C_OBJ) $(SLAVE_OBJ) $(LIB)
+

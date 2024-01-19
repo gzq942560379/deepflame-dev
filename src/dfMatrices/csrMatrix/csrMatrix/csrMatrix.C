@@ -166,11 +166,11 @@ void csrMatrix::write_pattern(const std::string& filename) const {
         }
         FILE* fw = fopen(ss.str().c_str(),"w");
         fprintf(fw,"%s\n", "%%MatrixMarket matrix coordinate pattern general");
-        fprintf(fw, "%d %d %d\n", row_, col_, off_diag_nnz_);
+        fprintf(fw, "%ld %ld %ld\n", row_, col_, off_diag_nnz_);
         for(label r = 0; r < row_; ++r){
             for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
                 label c = off_diag_colidx_[index];
-                fprintf(fw, "%d %d\n", r + 1, c + 1);
+                fprintf(fw, "%ld %ld\n", r + 1, c + 1);
             }
         }
         fclose(fw);
@@ -200,22 +200,22 @@ void csrMatrix::write(const std::string& filename) const {
         FILE* fw = fopen(ss.str().c_str(),"w");
         
         fprintf(fw,"%s\n", "%%MatrixMarket matrix coordinate real general");
-        fprintf(fw, "%d %d %d\n", row_, col_, off_diag_nnz_+row_);
+        fprintf(fw, "%ld %ld %ld\n", row_, col_, off_diag_nnz_+row_);
         Info << "csrMatrix::write 3" << endl;
         for(label r = 0; r < row_; ++r){
             for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
                 label c = off_diag_colidx_[index];
                 scalar v = off_diag_value_[index];
                 if(c < r){
-                    fprintf(fw, "%d %d %20.16g\n", r + 1, c + 1, v);
+                    fprintf(fw, "%ld %ld %20.16g\n", r + 1, c + 1, v);
                 }
             }
-            fprintf(fw, "%d %d %20.16g\n", r + 1, r + 1, diag_value_[r]);
+            fprintf(fw, "%ld %ld %20.16g\n", r + 1, r + 1, diag_value_[r]);
             for(label index = off_diag_rowptr_[r]; index < off_diag_rowptr_[r+1]; ++index){
                 label c = off_diag_colidx_[index];
                 scalar v = off_diag_value_[index];
                 if(c > r){
-                    fprintf(fw, "%d %d %20.16g\n", r + 1, c + 1, v);
+                    fprintf(fw, "%ld %ld %20.16g\n", r + 1, c + 1, v);
                 }
             }
         }
@@ -247,7 +247,7 @@ void csrMatrix::write_equation(const std::string& filename,const scalarField& so
         ss << filename << "_source_" << source.size() << "_" << index << ".dat";
         FILE* fw = fopen(ss.str().c_str(),"w");
         fprintf(fw, "%%source vector, the first line is the length of vector, and the following length lines are the value of source vector\n");
-        fprintf(fw, "%d \n", source.size());
+        fprintf(fw, "%ld \n", source.size());
         forAll(source, i){
             fprintf(fw, "%20.16g\n", source[i]);
         }        

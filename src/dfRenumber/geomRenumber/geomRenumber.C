@@ -67,7 +67,7 @@ Foam::labelList Foam::geomRenumber::renumber
         Points[i].z_ = static_cast<label>(points[i][2] * 1e6);
     }    
     
-    std::sort(Points.begin(), Points.end(), [](const auto& a, const auto& b){
+    std::sort(Points.begin(), Points.end(), [](const Point& a, const Point& b){
         return a.z_ < b.z_;
     });
 
@@ -86,12 +86,12 @@ Foam::labelList Foam::geomRenumber::renumber
     for(size_t z_split_index = 0; z_split_index < z_split_ptr.size() - 1; ++z_split_index){
         label z_start_index = z_split_ptr[z_split_index];
         label z_end_index = z_split_ptr[z_split_index+1];
-        std::sort(Points.begin() + z_start_index, Points.begin() + z_end_index, [](const auto& a, const auto& b){
+        std::sort(Points.begin() + z_start_index, Points.begin() + z_end_index, [](const Point& a, const Point& b){
             return a.y_ < b.y_;
         });
         std::vector<label> y_split_ptr;
         y_split_ptr.push_back(z_start_index);
-        for(size_t i = z_start_index + 1; i < z_end_index; ++i){
+        for(label i = z_start_index + 1; i < z_end_index; ++i){
             if(Points[i].y_ != Points[i-1].y_){
                 y_split_ptr.push_back(i);
             }
@@ -101,7 +101,7 @@ Foam::labelList Foam::geomRenumber::renumber
         for(size_t y_split_index = 0; y_split_index < y_split_ptr.size() - 1; ++y_split_index){
             label y_start_index = y_split_ptr[y_split_index];
             label y_end_index = y_split_ptr[y_split_index+1];   
-            std::sort(Points.begin() + y_start_index, Points.begin() + y_end_index, [](const auto& a, const auto& b){
+            std::sort(Points.begin() + y_start_index, Points.begin() + y_end_index, [](const Point& a, const Point& b){
                 return a.x_ < b.x_;
             });
         }

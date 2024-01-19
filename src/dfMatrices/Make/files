@@ -1,6 +1,6 @@
-
-dfMatrix/dfMatrix.C
-
+/*
+ * dfMatrix/dfMatrix.C
+ */
 csrMatrix=csrMatrix
 $(csrMatrix)/csrMatrix/csrMatrix.C
 $(csrMatrix)/csrMatrix/csrMatrixAmul.C
@@ -193,5 +193,7 @@ $(divMatrix)/solvers/divDiagonalSolver/divDiagonalSolver.C
 $(divMatrix)/solvers/DIVPCG/DIVPCG.C
 $(divMatrix)/smoothers/divJacobi/divJacobiSmoother.C
 $(divMatrix)/smoothers/divSymGaussSeidel/divSymGaussSeidelSmoother.C
+
+$(divMatrix)/divMatrix/divMatrixSpMV_slave_naive.c
 
 LIB = $(DF_LIBBIN)/libdfMatrices
