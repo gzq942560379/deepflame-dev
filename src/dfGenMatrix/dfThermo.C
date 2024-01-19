@@ -6,15 +6,15 @@
 #define SQRT8 2.8284271247461903
 
 size_t total_buffer_size;
-double *total_buffer;
+Foam::scalar *total_buffer;
 
-double *nasa_coeffs, *viscosity_coeffs, *conductivity_coeffs, *binary_diffusion_coeffs, *molecular_weights,
+Foam::scalar *nasa_coeffs, *viscosity_coeffs, *conductivity_coeffs, *binary_diffusion_coeffs, *molecular_weights,
         *viscosity_constant1, *viscosity_constant2;
 
 size_t nasa_coeffs_size, viscosity_coeffs_size, conductivity_coeffs_size, binary_diffusion_coeffs_size, molecular_weights_size,
     viscosity_constant1_size, viscosity_constant2_size;
 
-int nSpecies = 0, nBoundarySurfaces = 0, nBoundaryPatches = 0;
+Foam::label nSpecies = 0, nBoundarySurfaces = 0, nBoundaryPatches = 0;
 Foam::label nCells = 0, nFaces = 0, nProcessBoundarySurfaces = 0;
 Foam::label *surfacePerPatch;
 int *neighbProcNo;
@@ -28,8 +28,13 @@ std::string get_filename(std::string mechanism_file){
 void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volScalarField>& Y)
 {
     int mpisize, mpirank;
-    MPI_Comm_rank(MPI_COMM_WORLD,&mpirank);
-    MPI_Comm_size(MPI_COMM_WORLD,&mpisize);
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+
+    if(flag_mpi_init){
+        MPI_Comm_rank(MPI_COMM_WORLD,&mpirank);
+        MPI_Comm_rank(MPI_COMM_WORLD,&mpisize);
+    }
 
     nSpecies = Y.size();
     nCells = Y[0].size();
@@ -68,7 +73,7 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
     total_buffer_size = nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size \
         + binary_diffusion_coeffs_size + molecular_weights_size + viscosity_constant1_size + viscosity_constant2_size;
 
-    total_buffer = new double[total_buffer_size];
+    total_buffer = new Foam::scalar[total_buffer_size];
 
     nasa_coeffs = total_buffer;
     viscosity_coeffs = nasa_coeffs + nasa_coeffs_size;
@@ -78,13 +83,13 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
     viscosity_constant1 = molecular_weights + molecular_weights_size;
     viscosity_constant2 = viscosity_constant1 + viscosity_constant1_size;
 
-    // nasa_coeffs = new double[15 * nSpecies];
-    // viscosity_coeffs = new double[5 * nSpecies];
-    // conductivity_coeffs = new double[5 * nSpecies];
-    // binary_diffusion_coeffs = new double[5 * nSpecies * nSpecies];
-    // molecular_weights = new double[nSpecies];
-    // viscosity_constant1 = new double[nSpecies * nSpecies];
-    // viscosity_constant2 = new double[nSpecies * nSpecies];
+    // nasa_coeffs = new Foam::scalar[15 * nSpecies];
+    // viscosity_coeffs = new Foam::scalar[5 * nSpecies];
+    // conductivity_coeffs = new Foam::scalar[5 * nSpecies];
+    // binary_diffusion_coeffs = new Foam::scalar[5 * nSpecies * nSpecies];
+    // molecular_weights = new Foam::scalar[nSpecies];
+    // viscosity_constant1 = new Foam::scalar[nSpecies * nSpecies];
+    // viscosity_constant2 = new Foam::scalar[nSpecies * nSpecies];
 
     if(mpirank == 0){
         // read coeffs from file
@@ -108,17 +113,19 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
 
         assert(nSpecies_read == nSpecies);
 
-        fread(molecular_weights, sizeof(double), nSpecies, fp);
-        fread(nasa_coeffs, sizeof(double), 15 * nSpecies, fp);
-        fread(viscosity_coeffs, sizeof(double), 5 * nSpecies, fp);
-        fread(conductivity_coeffs, sizeof(double), 5 * nSpecies, fp);
-        fread(binary_diffusion_coeffs, sizeof(double), 5 * nSpecies * nSpecies, fp);
+        fread(molecular_weights, sizeof(Foam::scalar), nSpecies, fp);
+        fread(nasa_coeffs, sizeof(Foam::scalar), 15 * nSpecies, fp);
+        fread(viscosity_coeffs, sizeof(Foam::scalar), 5 * nSpecies, fp);
+        fread(conductivity_coeffs, sizeof(Foam::scalar), 5 * nSpecies, fp);
+        fread(binary_diffusion_coeffs, sizeof(Foam::scalar), 5 * nSpecies * nSpecies, fp);
 
         fclose(fp);
     }
 
     size_t bcast_size = molecular_weights_size + nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size + binary_diffusion_coeffs_size;
-    MPI_Bcast(total_buffer, bcast_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    if(flag_mpi_init){
+        MPI_Bcast(total_buffer, bcast_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    }
 
     // calculate constant
     for (int i = 0; i < nSpecies; ++i) {
@@ -152,37 +159,37 @@ void correctThermo
 
     // get ptr
     // get Y ptr
-    double *h_Y = new double[nSpecies * nCells];
-    double *h_boundary_Y = new double[nSpecies * nBoundarySurfaces];
+    scalar *h_Y = new scalar[nSpecies * nCells];
+    scalar *h_boundary_Y = new scalar[nSpecies * nBoundarySurfaces];
     
-    int offset = 0;
+    label offset = 0;
     forAll(Y, speciesI) {
         const volScalarField& Yi = Y[speciesI];
-        memcpy(h_Y + speciesI * nCells, &Yi[0], nCells * sizeof(double));
+        memcpy(h_Y + speciesI * nCells, &Yi[0], nCells * sizeof(scalar));
         forAll(Yi.boundaryField(), patchi) {
             const fvPatchScalarField& patchYi = Yi.boundaryField()[patchi];
-            int patchsize = patchYi.size();
-            memcpy(h_boundary_Y + offset, &patchYi[0], patchsize*sizeof(double));
+            label patchsize = patchYi.size();
+            memcpy(h_boundary_Y + offset, &patchYi[0], patchsize*sizeof(scalar));
             offset += patchsize;
         }
     }
 
     // allocate memory
-    double *mean_mole_weight = new double[nCells];
-    double *mean_boundary_mole_weight = new double[nBoundarySurfaces];
-    double *T_poly = new double[nCells * 5];
-    double *boundary_T_poly = new double[nBoundarySurfaces * 5];
-    double *mole_fraction = new double[nSpecies * nCells];
-    double *boundary_mole_fraction = new double[nSpecies * nBoundarySurfaces];
-    double *boundary_T = new double[nBoundarySurfaces];
-    double *boundary_ha = new double[nBoundarySurfaces];
-    double *boundary_psi = new double[nBoundarySurfaces];
-    double *boundary_alpha = new double[nBoundarySurfaces];
-    double *boundary_mu = new double[nBoundarySurfaces];
-    double *boundary_rho = new double[nBoundarySurfaces];
-    double *boundary_rhoD = new double[nBoundarySurfaces * nSpecies];
-    double *boundary_p = new double[nBoundarySurfaces];
-    double *h_rhoD = new double[nBoundarySurfaces];
+    scalar *mean_mole_weight = new scalar[nCells];
+    scalar *mean_boundary_mole_weight = new scalar[nBoundarySurfaces];
+    scalar *T_poly = new scalar[nCells * 5];
+    scalar *boundary_T_poly = new scalar[nBoundarySurfaces * 5];
+    scalar *mole_fraction = new scalar[nSpecies * nCells];
+    scalar *boundary_mole_fraction = new scalar[nSpecies * nBoundarySurfaces];
+    scalar *boundary_T = new scalar[nBoundarySurfaces];
+    scalar *boundary_ha = new scalar[nBoundarySurfaces];
+    scalar *boundary_psi = new scalar[nBoundarySurfaces];
+    scalar *boundary_alpha = new scalar[nBoundarySurfaces];
+    scalar *boundary_mu = new scalar[nBoundarySurfaces];
+    scalar *boundary_rho = new scalar[nBoundarySurfaces];
+    scalar *boundary_rhoD = new scalar[nBoundarySurfaces * nSpecies];
+    scalar *boundary_p = new scalar[nBoundarySurfaces];
+    scalar *h_rhoD = new scalar[nBoundarySurfaces];
 
     offset = 0;
     // construct boundary fields
@@ -193,27 +200,27 @@ void correctThermo
         const fvPatchScalarField& patchRho = rho.boundaryField()[patchi];
         const fvPatchScalarField& patchP = p.boundaryField()[patchi];
 
-        int patchsize = patchT.size();
-        memcpy(boundary_T + offset, &patchT[0], patchsize * sizeof(double));
-        memcpy(boundary_ha + offset, &patchHa[0], patchsize * sizeof(double));
-        memcpy(boundary_rho + offset, &patchRho[0], patchsize * sizeof(double));
-        memcpy(boundary_p + offset, &patchP[0], patchsize * sizeof(double));
+        label patchsize = patchT.size();
+        memcpy(boundary_T + offset, &patchT[0], patchsize * sizeof(scalar));
+        memcpy(boundary_ha + offset, &patchHa[0], patchsize * sizeof(scalar));
+        memcpy(boundary_rho + offset, &patchRho[0], patchsize * sizeof(scalar));
+        memcpy(boundary_p + offset, &patchP[0], patchsize * sizeof(scalar));
 
         offset += patchsize;
     }
     
     // set mass fraction
-    // double sum_mass, meanMoleWeight;
+    // scalar sum_mass, meanMoleWeight;
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nCells; ++i) {
-        double sum_mass = 0.;
-        double meanMoleWeight = 0;
-        for (int j = 0; j < nSpecies; ++j) {
+    for (label i = 0; i < nCells; ++i) {
+        scalar sum_mass = 0.;
+        scalar meanMoleWeight = 0;
+        for (label j = 0; j < nSpecies; ++j) {
             sum_mass += h_Y[j * nCells + i] / molecular_weights[j];
         }
-        for (int j = 0; j < nSpecies; ++j) {
+        for (label j = 0; j < nSpecies; ++j) {
             mole_fraction[j * nCells + i] = h_Y[j * nCells + i] / (molecular_weights[j] * sum_mass);
             meanMoleWeight += mole_fraction[j * nCells + i] * molecular_weights[j];
         }
@@ -222,13 +229,13 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
-        double sum_mass = 0.;
-        double meanMoleWeight = 0;
-        for (int j = 0; j < nSpecies; ++j) {
+    for (label i = 0; i < nBoundarySurfaces; ++i) {
+        scalar sum_mass = 0.;
+        scalar meanMoleWeight = 0;
+        for (label j = 0; j < nSpecies; ++j) {
             sum_mass += h_boundary_Y[j * nBoundarySurfaces + i] / molecular_weights[j];
         }
-        for (int j = 0; j < nSpecies; ++j) {
+        for (label j = 0; j < nSpecies; ++j) {
             boundary_mole_fraction[j * nBoundarySurfaces + i] = h_boundary_Y[j * nBoundarySurfaces + i] / (molecular_weights[j] * sum_mass);
             meanMoleWeight += boundary_mole_fraction[j * nBoundarySurfaces + i] * molecular_weights[j];
         }
@@ -239,15 +246,15 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nCells; ++i) {
+    for (label i = 0; i < nCells; ++i) {
         // Newton's method
-        double T_init = T[i];
-        double h_target = ha[i];
-        double h, cp, delta_T;
-        for (int n = 0; n < 10; ++n) { // max_iter = 10
+        scalar T_init = T[i];
+        scalar h_target = ha[i];
+        scalar h, cp, delta_T;
+        for (label n = 0; n < 10; ++n) { // max_iter = 10
             // calculate h
             h = 0.;
-            for (int j = 0; j < nSpecies; ++j) {
+            for (label j = 0; j < nSpecies; ++j) {
                 if (T_init > nasa_coeffs[j * 15 + 0]) {
                     h += (nasa_coeffs[j * 15 + 1] + nasa_coeffs[j * 15 + 2] * T_init / 2 + nasa_coeffs[j * 15 + 3] * T_init * T_init / 3 + 
                             nasa_coeffs[j * 15 + 4] * T_init * T_init * T_init / 4 + nasa_coeffs[j * 15 + 5] * T_init * T_init * T_init * T_init / 5 + 
@@ -260,7 +267,7 @@ void correctThermo
             }
             // calculate cp
             cp = 0.;
-            for (int j = 0; j < nSpecies; j++) {
+            for (label j = 0; j < nSpecies; j++) {
                 if (T_init > nasa_coeffs[j * 15 + 0]) {
                     cp += h_Y[j * nCells + i] * (nasa_coeffs[j * 15 + 1] + nasa_coeffs[j * 15 + 2] * T_init + nasa_coeffs[j * 15 + 3] * T_init * T_init + 
                             nasa_coeffs[j * 15 + 4] * T_init * T_init * T_init + 
@@ -282,7 +289,7 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nCells; ++i) {
+    for (label i = 0; i < nCells; ++i) {
         T_poly[i * 5 + 0] = 1.;
         T_poly[i * 5 + 1] = std::log(T[i]);
         T_poly[i * 5 + 2] = T_poly[i * 5 + 1] * T_poly[i * 5 + 1];
@@ -294,7 +301,7 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nCells; ++i) {
+    for (label i = 0; i < nCells; ++i) {
         psi[i] = mean_mole_weight[i] / (GAS_CANSTANT * T[i]);
         rho[i] = p[i] * psi[i];
     }
@@ -303,22 +310,22 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nCells; ++i) {
-        // double *species_viscosity = new double[nSpecies];
-        double species_viscosity[nSpecies];
-        double sqrt_T = std::sqrt(T[i]);
-        for (int j = 0; j < nSpecies; ++j) {
-            double dot_product = 0.;
-            for (int k = 0; k < 5; ++k) {
+    for (label i = 0; i < nCells; ++i) {
+        // scalar *species_viscosity = new scalar[nSpecies];
+        scalar species_viscosity[nSpecies];
+        scalar sqrt_T = std::sqrt(T[i]);
+        for (label j = 0; j < nSpecies; ++j) {
+            scalar dot_product = 0.;
+            for (label k = 0; k < 5; ++k) {
                 dot_product += viscosity_coeffs[j * 5 + k] * T_poly[i * 5 + k];
             }
             species_viscosity[j] = dot_product;
         }
-        double mu_mix = 0.;
-        for (int j = 0; j < nSpecies; ++j) {
-            double sum = 0.;
-            for (int k = 0; k < nSpecies; ++k) {
-                double temp = 1.0 + (species_viscosity[j] / species_viscosity[k]) *
+        scalar mu_mix = 0.;
+        for (label j = 0; j < nSpecies; ++j) {
+            scalar sum = 0.;
+            for (label k = 0; k < nSpecies; ++k) {
+                scalar temp = 1.0 + (species_viscosity[j] / species_viscosity[k]) *
                           viscosity_constant2[j * nSpecies + k];
                 sum += mole_fraction[k * nCells + i] / SQRT8 * viscosity_constant1[j * nSpecies + k] * (temp * temp);
             }
@@ -331,27 +338,27 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nCells; ++i) {
-        // double *species_thermal_conductivities = new double[nSpecies];
-        double species_thermal_conductivities[nSpecies];
-        double dot_product;
-        for (int j = 0; j < nSpecies; ++j) {
+    for (label i = 0; i < nCells; ++i) {
+        // scalar *species_thermal_conductivities = new scalar[nSpecies];
+        scalar species_thermal_conductivities[nSpecies];
+        scalar dot_product;
+        for (label j = 0; j < nSpecies; ++j) {
             dot_product = 0.;
-            for (int k = 0; k < 5; ++k) {
+            for (label k = 0; k < 5; ++k) {
                 dot_product += conductivity_coeffs[j * 5 + k] * T_poly[i * 5 + k];
             }
             species_thermal_conductivities[j] = dot_product * sqrt(T[i]);
         }
-        double sum_conductivity = 0.;
-        double sum_inv_conductivity = 0.;
-        for (int j = 0; j < nSpecies; ++j) {
+        scalar sum_conductivity = 0.;
+        scalar sum_inv_conductivity = 0.;
+        for (label j = 0; j < nSpecies; ++j) {
             sum_conductivity += mole_fraction[j * nCells + i] * species_thermal_conductivities[j];
             sum_inv_conductivity += mole_fraction[j * nCells + i] / species_thermal_conductivities[j];
         }
-        double lambda_mix = 0.5 * (sum_conductivity + 1.0 / sum_inv_conductivity);
+        scalar lambda_mix = 0.5 * (sum_conductivity + 1.0 / sum_inv_conductivity);
         // calculate cp
-        double cp = 0.;
-        for (int j = 0; j < nSpecies; ++j) {
+        scalar cp = 0.;
+        for (label j = 0; j < nSpecies; ++j) {
             if (T[i] > nasa_coeffs[j * 15 + 0]) {
                 cp += h_Y[j * nCells + i] * (nasa_coeffs[j * 15 + 1] + nasa_coeffs[j * 15 + 2] * T[i] + nasa_coeffs[j * 15 + 3] * T[i] * T[i] + 
                         nasa_coeffs[j * 15 + 4] * T[i] * T[i] * T[i] + 
@@ -367,24 +374,24 @@ void correctThermo
 
     // calculate rhoD
 #ifdef MIXED
-    for (int i = 0; i < nCells; ++i) {
-        double powT = T[i] * sqrt(T[i]);
-        double local_mean_mole_weight = mean_mole_weight[i];
-        double local_rho_div_p = rho[i] / p[i];
-        for (int j = 0; j < nSpecies; ++j) {
+    for (label i = 0; i < nCells; ++i) {
+        scalar powT = T[i] * sqrt(T[i]);
+        scalar local_mean_mole_weight = mean_mole_weight[i];
+        scalar local_rho_div_p = rho[i] / p[i];
+        for (label j = 0; j < nSpecies; ++j) {
             if (mole_fraction[i * nCells + j] + 1e-10 > 1.) {
                 rhoD[i * nSpecies + j] = 0.;
                 continue;
             }
-            double sum1 = 0.;
-            double sum2 = 0.;
-            for (int k = 0; k < nSpecies; ++k) {
+            scalar sum1 = 0.;
+            scalar sum2 = 0.;
+            for (label k = 0; k < nSpecies; ++k) {
                 if (j == k) continue;
-                double tmp = 0.;
-                for (int l = 0; l < 5; ++l) {
+                scalar tmp = 0.;
+                for (label l = 0; l < 5; ++l) {
                     tmp += binary_diffusion_coeffs[j * nSpecies * 5 + k * 5 + l] * T_poly[i * 5 + l];
                 }
-                double local_D = tmp * powT;
+                scalar local_D = tmp * powT;
 
                 sum1 += mole_fraction[i * nCells + k] / local_D;
                 sum2 += mole_fraction[i * nCells + k] * molecular_weights[k] / local_D;
@@ -394,9 +401,9 @@ void correctThermo
         }
     }
 #else
-    for (int j = 0; j < nSpecies; ++j) {
+    for (label j = 0; j < nSpecies; ++j) {
         volScalarField& rhoD = chemistry->rhoD(j);
-        memcpy(&rhoD[0], &alpha[0], nCells * sizeof(double));
+        memcpy(&rhoD[0], &alpha[0], nCells * sizeof(scalar));
     }
 #endif
 
@@ -406,15 +413,15 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
+    for (label i = 0; i < nBoundarySurfaces; ++i) {
         // Newton's method
-        double T_init = boundary_T[i];
-        double h_target = boundary_ha[i];
-        double h, cp, delta_T;
-        for (int n = 0; n < 10; ++n) { // max_iter = 10
+        scalar T_init = boundary_T[i];
+        scalar h_target = boundary_ha[i];
+        scalar h, cp, delta_T;
+        for (label n = 0; n < 10; ++n) { // max_iter = 10
             // calculate h
             h = 0.;
-            for (int j = 0; j < nSpecies; ++j) {
+            for (label j = 0; j < nSpecies; ++j) {
                 if (T_init > nasa_coeffs[j * 15 + 0]) {
                     h += (nasa_coeffs[j * 15 + 1] + nasa_coeffs[j * 15 + 2] * T_init / 2 + nasa_coeffs[j * 15 + 3] * T_init * T_init / 3 + 
                             nasa_coeffs[j * 15 + 4] * T_init * T_init * T_init / 4 + nasa_coeffs[j * 15 + 5] * T_init * T_init * T_init * T_init / 5 + 
@@ -427,7 +434,7 @@ void correctThermo
             }
             // calculate cp
             cp = 0.;
-            for (int j = 0; j < nSpecies; ++j) {
+            for (label j = 0; j < nSpecies; ++j) {
                 if (T_init > nasa_coeffs[j * 15 + 0]) {
                     cp += h_boundary_Y[j * nBoundarySurfaces + i] * (nasa_coeffs[j * 15 + 1] + nasa_coeffs[j * 15 + 2] * T_init + nasa_coeffs[j * 15 + 3] * T_init * T_init + 
                             nasa_coeffs[j * 15 + 4] * T_init * T_init * T_init + 
@@ -449,7 +456,7 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
+    for (label i = 0; i < nBoundarySurfaces; ++i) {
         boundary_T_poly[i * 5 + 0] = 1.;
         boundary_T_poly[i * 5 + 1] = log(boundary_T[i]);
         boundary_T_poly[i * 5 + 2] = boundary_T_poly[i * 5 + 1] * boundary_T_poly[i * 5 + 1];
@@ -461,7 +468,7 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
+    for (label i = 0; i < nBoundarySurfaces; ++i) {
         boundary_psi[i] = mean_boundary_mole_weight[i] / (GAS_CANSTANT * boundary_T[i]);
         boundary_rho[i] = boundary_p[i] * boundary_psi[i];
     }
@@ -470,22 +477,22 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
-        // double *species_viscosity = new double[nSpecies];
-        double species_viscosity[nSpecies];
-        double sqrt_T = std::sqrt(boundary_T[i]);
-        for (int j = 0; j < nSpecies; ++j) {
-            double dot_product = 0.;
-            for (int k = 0; k < 5; ++k) {
+    for (label i = 0; i < nBoundarySurfaces; ++i) {
+        // scalar *species_viscosity = new scalar[nSpecies];
+        scalar species_viscosity[nSpecies];
+        scalar sqrt_T = std::sqrt(boundary_T[i]);
+        for (label j = 0; j < nSpecies; ++j) {
+            scalar dot_product = 0.;
+            for (label k = 0; k < 5; ++k) {
                 dot_product += viscosity_coeffs[j * 5 + k] * boundary_T_poly[i * 5 + k];
             }
             species_viscosity[j] = dot_product;
         }
-        double mu_mix = 0.;
-        for (int j = 0; j < nSpecies; ++j) {
-            double sum = 0.;
-            for (int k = 0; k < nSpecies; ++k) {
-                double temp = 1.0 + (species_viscosity[j] / species_viscosity[k]) *
+        scalar mu_mix = 0.;
+        for (label j = 0; j < nSpecies; ++j) {
+            scalar sum = 0.;
+            for (label k = 0; k < nSpecies; ++k) {
+                scalar temp = 1.0 + (species_viscosity[j] / species_viscosity[k]) *
                           viscosity_constant2[j * nSpecies + k];
                 sum += boundary_mole_fraction[k * nBoundarySurfaces + i] / SQRT8 * viscosity_constant1[j * nSpecies + k] * (temp * temp);
             }
@@ -498,27 +505,27 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nBoundarySurfaces; ++i) {
-        // double *species_thermal_conductivities = new double[nSpecies];
-        double species_thermal_conductivities[nSpecies];
-        double dot_product;
-        for (int j = 0; j < nSpecies; ++j) {
+    for (label i = 0; i < nBoundarySurfaces; ++i) {
+        // scalar *species_thermal_conductivities = new scalar[nSpecies];
+        scalar species_thermal_conductivities[nSpecies];
+        scalar dot_product;
+        for (label j = 0; j < nSpecies; ++j) {
             dot_product = 0.;
-            for (int k = 0; k < 5; ++k) {
+            for (label k = 0; k < 5; ++k) {
                 dot_product += conductivity_coeffs[j * 5 + k] * boundary_T_poly[i * 5 + k];
             }
             species_thermal_conductivities[j] = dot_product * sqrt(boundary_T[i]);
         }
-        double sum_conductivity = 0.;
-        double sum_inv_conductivity = 0.;
-        for (int j = 0; j < nSpecies; ++j) {
+        scalar sum_conductivity = 0.;
+        scalar sum_inv_conductivity = 0.;
+        for (label j = 0; j < nSpecies; ++j) {
             sum_conductivity += boundary_mole_fraction[j * nBoundarySurfaces + i] * species_thermal_conductivities[j];
             sum_inv_conductivity += boundary_mole_fraction[j * nBoundarySurfaces + i] / species_thermal_conductivities[j];
         }
-        double lambda_mix = 0.5 * (sum_conductivity + 1.0 / sum_inv_conductivity);
+        scalar lambda_mix = 0.5 * (sum_conductivity + 1.0 / sum_inv_conductivity);
         // calculate cp
-        double cp = 0.;
-        for (int j = 0; j < nSpecies; ++j) {
+        scalar cp = 0.;
+        for (label j = 0; j < nSpecies; ++j) {
             if (boundary_T[i] > nasa_coeffs[j * 15 + 0]) {
                 cp += h_boundary_Y[j * nBoundarySurfaces + i] * (nasa_coeffs[j * 15 + 1] + nasa_coeffs[j * 15 + 2] * boundary_T[i] + nasa_coeffs[j * 15 + 3] * boundary_T[i] * boundary_T[i] + 
                         nasa_coeffs[j * 15 + 4] * boundary_T[i] * boundary_T[i] * boundary_T[i] + 
@@ -537,8 +544,8 @@ void correctThermo
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for (int i = 0; i < nSpecies; ++i) {
-        for (int j = 0; j < nBoundarySurfaces; ++j) {
+    for (label i = 0; i < nSpecies; ++i) {
+        for (label j = 0; j < nBoundarySurfaces; ++j) {
             boundary_rhoD[i * nBoundarySurfaces + j] = boundary_alpha[j];
         }
     }
@@ -554,18 +561,18 @@ void correctThermo
         fvPatchScalarField& patchAlpha = const_cast<fvPatchScalarField&>(alpha.boundaryField()[patchi]);
         fvPatchScalarField& patchMu = const_cast<fvPatchScalarField&>(mu.boundaryField()[patchi]);
 
-        int patchSize = patchT.size();
+        label patchSize = patchT.size();
 
-        memcpy(&patchT[0], boundary_T + offset, patchSize * sizeof(double));
-        memcpy(&patchHa[0], boundary_ha + offset, patchSize * sizeof(double));
-        memcpy(&patchRho[0], boundary_rho + offset, patchSize * sizeof(double));
-        memcpy(&patchPsi[0], boundary_psi + offset, patchSize * sizeof(double));
-        memcpy(&patchAlpha[0], boundary_alpha + offset, patchSize * sizeof(double));
-        memcpy(&patchMu[0], boundary_mu + offset, patchSize * sizeof(double));
+        memcpy(&patchT[0], boundary_T + offset, patchSize * sizeof(scalar));
+        memcpy(&patchHa[0], boundary_ha + offset, patchSize * sizeof(scalar));
+        memcpy(&patchRho[0], boundary_rho + offset, patchSize * sizeof(scalar));
+        memcpy(&patchPsi[0], boundary_psi + offset, patchSize * sizeof(scalar));
+        memcpy(&patchAlpha[0], boundary_alpha + offset, patchSize * sizeof(scalar));
+        memcpy(&patchMu[0], boundary_mu + offset, patchSize * sizeof(scalar));
 
-        for (int j = 0; j < nSpecies; ++j) {
+        for (label j = 0; j < nSpecies; ++j) {
             fvPatchScalarField& patchRhoD = const_cast<fvPatchScalarField&>(chemistry->rhoD(j).boundaryField()[patchi]);
-            memcpy(&patchRhoD[0], boundary_rhoD + offset + j * nBoundarySurfaces, patchSize * sizeof(double));
+            memcpy(&patchRhoD[0], boundary_rhoD + offset + j * nBoundarySurfaces, patchSize * sizeof(scalar));
         }
         offset += patchSize;
     }
