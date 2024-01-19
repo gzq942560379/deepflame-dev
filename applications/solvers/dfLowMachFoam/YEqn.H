@@ -45,7 +45,7 @@ preProcess_Y(Y, phiUc, sumYDiffError, chemistry, upwindWeights, thermo.alpha(), 
 
 #ifdef OPT_GenMatrix_Y_check
 forAll(Y, i){
-    check_field_boundary_equal(gradResult[i], gradResultRef[i]);
+    check_field_boundary_equal(gradResult[i], gradResultRef[i], "gradY");
 }
 gradResult.clear();
 Info << "gradResult pass " << endl;
@@ -57,14 +57,12 @@ forAll(Y, i)
     sumYDiffErrorRef += fvcGradY;
     gradResult.push_back(fvcGradY);
 }
-check_field_boundary_equal(sumYDiffError, sumYDiffErrorRef);
+check_field_boundary_equal(sumYDiffErrorRef, sumYDiffError, "sumYDiffError");
 Info << "sumYDiffError pass " << endl;
 
-TICK(Y_phiUc, 0, 1);
 const surfaceScalarField phiUcRef = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
-check_field_boundary_equal(phiUc, phiUcRef);
+check_field_boundary_equal(phiUcRef, phiUc, "phiUc");
 Info << "phiUc pass " << endl;
-TICK(Y_phiUc, 1, 2);
 Y_phiUc_end = MPI_Wtime();
 Y_phiUc_time += Y_phiUc_end - Y_phiUc_start;
 #endif
@@ -180,7 +178,7 @@ forAll(Y, i)
         );
         Y_build_old_end = MPI_Wtime();
         Y_build_old_time += Y_build_old_end - Y_build_old_start;
-        check_fvmatrix_equal(YiEqn, YiEqn_answer);
+        check_fvmatrix_equal(YiEqn_answer, YiEqn, "YiEqn");
 #endif
 #ifdef _DIV_
             Y_convert_start = MPI_Wtime();

@@ -235,7 +235,6 @@ void preProcess_Y(
                     }
                     offset += surfacePerPatch[j];
                 } else if (patchType[j] == boundaryConditions::processor) {
-                    Info << "surfacePerPatch[" << j << "] : " << surfacePerPatch[j] << endl;
                     for (label k = 0; k < surfacePerPatch[j]; ++k) {
                         label neighbor_start_index = offset + k;
                         label internal_start_index = offset + surfacePerPatch[j] + k;
