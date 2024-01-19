@@ -291,6 +291,20 @@ GenMatrix_p(
     const volScalarField& phi
 );
 
+tmp<fvScalarMatrix>
+GenMatrix_p(
+    const volScalarField& rho,
+    volScalarField& p,
+    const surfaceScalarField& phi,
+    const volScalarField& rAU,
+    const volVectorField& U,
+    const volVectorField& HbyA,
+    const volScalarField& thermoPsi,
+    // debug
+    surfaceScalarField& rhorAUf,
+    surfaceScalarField& phiHbyA
+);
+
 // thermo
 
 // construct new variables
@@ -323,11 +337,11 @@ void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const wor
 } // End namespace Foam
 
 void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volScalarField>& Y);
-extern int nSpecies;
+extern Foam::label nSpecies;
 extern Foam::label nCells;
 extern Foam::label nFaces;
-extern int nBoundarySurfaces;
-extern int nBoundaryPatches;
+extern Foam::label nBoundarySurfaces;
+extern Foam::label nBoundaryPatches;
 extern Foam::label nProcessBoundarySurfaces;
 extern Foam::label *surfacePerPatch;
 extern int *neighbProcNo;
