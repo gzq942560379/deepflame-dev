@@ -3,28 +3,52 @@
 
 namespace Foam{
 
-#define RELATIVE_ERROR_TOLERANCE 1e-6
-#define ABSULTE_ERROR_TOLERANCE 1e-10
+#define RELATIVE_ERROR_TOLERANCE 1e-12
+#define ABSULTE_ERROR_TOLERANCE 1e-12
+#define ZERO_TOLERANCE 1e-12
 
 void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name){
     if(a.size() != b.size()){
         SeriousError << "In check_field_error, two field have different size !!!" << endl;
         MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
     }
-    double max_absulte_error = 0.;
+    // double max_absulte_error = 0.;
+    bool check_faild = false;
     double max_relative_error = 0.;
+    double aa, bb, max_absulte_error;
     for(label i = 0; i < a.size(); ++i){
         double absulte_error = std::abs(a[i] - b[i]);
-        double relative_error = absulte_error / std::abs(a[i]);
-        max_absulte_error = std::max(max_absulte_error, absulte_error);
-        max_relative_error = std::max(max_relative_error, relative_error);
+        double relative_error = std::abs(a[i]) < ZERO_TOLERANCE ? absulte_error : absulte_error / std::abs(a[i]);
+        if(absulte_error > ABSULTE_ERROR_TOLERANCE && relative_error > RELATIVE_ERROR_TOLERANCE){
+            Info << name << " error : " << endl;
+            Info << "a[i] : " << a[i] << endl;
+            Info << "b[i] : " << b[i] << endl;
+            Info << "absulte_error : " << absulte_error << endl;
+            Info << "relative_error : " << relative_error << endl;
+            check_faild = true;
+        }
+        if(relative_error > max_relative_error){
+            aa = a[i];
+            bb = b[i];
+            max_absulte_error = absulte_error;
+        }
     }
-    if(max_relative_error > RELATIVE_ERROR_TOLERANCE && max_absulte_error > ABSULTE_ERROR_TOLERANCE){
-        Info << name << " error : " << endl;
+    if(check_faild){
+        MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+    }else{
+        Info << "error check : " << name << "-------------------------------------" << endl;
+        Info << "aa : " << aa << endl;
+        Info << "bb : " << bb << endl;
         Info << "max_absulte_error : " << max_absulte_error << endl;
         Info << "max_relative_error : " << max_relative_error << endl;
-        MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+        Info << "---------------------------------------------------------" << endl;
     }
+    // if(max_relative_error > RELATIVE_ERROR_TOLERANCE && max_absulte_error > ABSULTE_ERROR_TOLERANCE){
+    // if(max_relative_error > RELATIVE_ERROR_TOLERANCE){
+    //     Info << name << " error : " << endl;
+    //     Info << "max_relative_error : " << max_relative_error << endl;
+    //     MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+    // }
 }
 
 void check_field_equal(const Field<scalar>& a, const Field<scalar>& b){
