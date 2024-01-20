@@ -323,10 +323,10 @@ void preProcess_Y(
 #pragma omp parallel for
 #endif
         for (label c = 0; c < nCells; ++c) {
-            scalar meshVTmp = meshVPtr[c];;
-            gradY_Species[c * 3 + 0] /= meshVTmp;
-            gradY_Species[c * 3 + 1] /= meshVTmp;
-            gradY_Species[c * 3 + 2] /= meshVTmp;
+            scalar meshVRTmp = 1. / meshVPtr[c];;
+            gradY_Species[c * 3 + 0] *= meshVRTmp;
+            gradY_Species[c * 3 + 1] *= meshVRTmp;
+            gradY_Species[c * 3 + 2] *= meshVRTmp;
         }
 
         gardY_div_time += clock.timeIncrement();
