@@ -180,33 +180,13 @@ GenMatrix_U(
     Field<vector>& igGrad = gGrad;
     Field<tensor>& igGradU = gGradU;
 
-    const labelList& face_scheduling = structureMeshSchedule.face_scheduling();
-
-    #pragma omp parallel for
-    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for(label facei = face_start; facei < face_end; ++facei){
-            vector pSfssf = mesh.Sf()[facei] * pfPtr[facei];
-            igGrad[l[facei]] += pSfssf;
-            igGrad[u[facei]] -= pSfssf;
-            tensor USfssf = mesh.Sf()[facei] * Uf[facei];
-            igGradU[l[facei]] += USfssf;
-            igGradU[u[facei]] -= USfssf;
-        }
-    }
-    #pragma omp parallel for
-    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for(label facei = face_start; facei < face_end; ++facei){
-            vector pSfssf = mesh.Sf()[facei] * pfPtr[facei];
-            igGrad[l[facei]] += pSfssf;
-            igGrad[u[facei]] -= pSfssf;
-            tensor USfssf = mesh.Sf()[facei] * Uf[facei];
-            igGradU[l[facei]] += USfssf;
-            igGradU[u[facei]] -= USfssf;
-        }
+    for(label facei = 0; facei < nFaces; ++facei){
+        vector pSfssf = mesh.Sf()[facei] * pfPtr[facei];
+        igGrad[l[facei]] += pSfssf;
+        igGrad[u[facei]] -= pSfssf;
+        tensor USfssf = mesh.Sf()[facei] * Uf[facei];
+        igGradU[l[facei]] += USfssf;
+        igGradU[u[facei]] -= USfssf;
     }
 
     TICK(GenMatrix_U, 7, 8);
@@ -304,29 +284,10 @@ GenMatrix_U(
         gGradUCoeff_f[facei] = mesh.Sf()[facei] & (weightsPtr[facei]*(gGradUCoeffPtr[l[facei]] - gGradUCoeffPtr[u[facei]]) + gGradUCoeffPtr[u[facei]]);
     }
 
-    // for (label facei = 0; facei < nFaces; ++facei)
-    // {
-    //     igDivGradUCoeff[l[facei]] += gGradUCoeff_f[facei];
-    //     igDivGradUCoeff[u[facei]] -= gGradUCoeff_f[facei];
-    // }
-    
-    #pragma omp parallel for
-    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for(label facei = face_start; facei < face_end; ++facei){
-            igDivGradUCoeff[l[facei]] += gGradUCoeff_f[facei];
-            igDivGradUCoeff[u[facei]] -= gGradUCoeff_f[facei];
-        }
-    }
-    #pragma omp parallel for
-    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for(label facei = face_start; facei < face_end; ++facei){
-            igDivGradUCoeff[l[facei]] += gGradUCoeff_f[facei];
-            igDivGradUCoeff[u[facei]] -= gGradUCoeff_f[facei];
-        }
+    for (label facei = 0; facei < nFaces; ++facei)
+    {
+        igDivGradUCoeff[l[facei]] += gGradUCoeff_f[facei];
+        igDivGradUCoeff[u[facei]] -= gGradUCoeff_f[facei];
     }
 
     TICK(GenMatrix_U, 14, 15);
@@ -407,28 +368,10 @@ GenMatrix_U(
     }
     TICK(GenMatrix_U, 21, 22);
 
-    // for (label face=0; face< nFaces; ++face)
-    // {
-    //     diagPtr[l[face]] -= lowerPtr[face];
-    //     diagPtr[u[face]] -= upperPtr[face];
-    // }
-    #pragma omp parallel for
-    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for(label facei = face_start; facei < face_end; ++facei){
-            diagPtr[l[facei]] -= lowerPtr[facei];
-            diagPtr[u[facei]] -= upperPtr[facei];
-        }
-    }
-    #pragma omp parallel for
-    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for(label facei = face_start; facei < face_end; ++facei){
-            diagPtr[l[facei]] -= lowerPtr[facei];
-            diagPtr[u[facei]] -= upperPtr[facei];
-        }
+    for (label face=0; face< nFaces; ++face)
+    {
+        diagPtr[l[face]] -= lowerPtr[face];
+        diagPtr[u[face]] -= upperPtr[face];
     }
 
     TICK(GenMatrix_U, 22, 23);

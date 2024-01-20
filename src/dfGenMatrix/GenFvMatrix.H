@@ -13,7 +13,7 @@
 #include <mpi.h>
 // #include <algorithm>
 // #include "PstreamGlobals.H"
-#include "StructureMeshSchedule.H"
+#include "StructuredMeshSchedule.H"
 #include "processorFvPatchField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

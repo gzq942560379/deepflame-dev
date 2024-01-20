@@ -40,12 +40,6 @@ void check_field_error(const Field<scalar>& answer, const Field<scalar>& check, 
         Info << "max_relative_error : " << max_relative_error << endl;
         Info << "---------------------------------------------------------" << endl;
     }
-    // if(max_relative_error > RELATIVE_ERROR_TOLERANCE && max_absulte_error > ABSULTE_ERROR_TOLERANCE){
-    // if(max_relative_error > RELATIVE_ERROR_TOLERANCE){
-    //     Info << name << " error : " << endl;
-    //     Info << "max_relative_error : " << max_relative_error << endl;
-    //     MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
-    // }
 }
 
 void check_field_equal(const Field<scalar>& answer, const Field<scalar>& check, const word& name){
