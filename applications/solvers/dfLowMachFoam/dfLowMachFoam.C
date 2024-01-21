@@ -61,7 +61,7 @@ Description
 #include "CombustionModel.H"
 #include "CorrectPhi.H"
 
-#include "StructureMeshSchedule.H"
+#include "StructuredMeshSchedule.H"
 #include <typeinfo>
 #include "env.H"
 #include "GenFvMatrix.H"
@@ -283,6 +283,34 @@ int main(int argc, char *argv[])
     Info << "Renumber time : " << renumber_time << endl; 
 
     init_const_coeff_ptr(fileName(CanteraTorchProperties.lookup("CanteraMechanismFile")).expand(), Y);
+
+    surfaceScalarField upwindWeights
+    (
+        IOobject
+        (
+            "upwindWeights",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimensionSet(0,0,0,0,0,0,0), 0)
+    );
+
+    surfaceScalarField phiUc
+    (
+        IOobject
+        (
+            "phiUc",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimensionSet(1,0,-1,0,0,0,0), 0)
+    );
 
     #include "ScheduleSetup.H"
     double ScheduleSetup_time = initClock.timeIncrement();
