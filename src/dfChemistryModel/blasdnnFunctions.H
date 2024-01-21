@@ -44,9 +44,30 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     }
 
     int input_dim = mixture_.nSpecies() + 2;
-    std::vector<double> NNInputs0(Cell0.size() * input_dim);
-    std::vector<double> NNInputs1(Cell1.size() * input_dim);
-    std::vector<double> NNInputs2(Cell2.size() * input_dim);
+    
+    __fp16* NNInputs0 = (__fp16*)aligned_alloc(64, (Cell0.size() * input_dim) * sizeof(__fp16));
+    __fp16* NNInputs1 = (__fp16*)aligned_alloc(64, (Cell1.size() * input_dim) * sizeof(__fp16));
+    __fp16* NNInputs2 = (__fp16*)aligned_alloc(64, (Cell2.size() * input_dim) * sizeof(__fp16));
+
+    memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(__fp16));
+    memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(__fp16));
+    memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(__fp16));
+
+    // float* NNInputs0 = (float*)aligned_alloc(64, (Cell0.size() * input_dim) * sizeof(float));
+    // float* NNInputs1 = (float*)aligned_alloc(64, (Cell1.size() * input_dim) * sizeof(float));
+    // float* NNInputs2 = (float*)aligned_alloc(64, (Cell2.size() * input_dim) * sizeof(float));
+
+    // memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(float));
+    // memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(float));
+    // memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(float));
+
+    // double* NNInputs0 = (double*)aligned_alloc(64, (Cell0.size() * input_dim) * sizeof(double));
+    // double* NNInputs1 = (double*)aligned_alloc(64, (Cell1.size() * input_dim) * sizeof(double));
+    // double* NNInputs2 = (double*)aligned_alloc(64, (Cell2.size() * input_dim) * sizeof(double));
+
+    // memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(double));
+    // memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(double));
+    // memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(double));
 
 #ifdef _OPENMP
     #pragma omp parallel
@@ -62,7 +83,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 #endif
         for(size_t celli = 0; celli<Cell0.size(); ++celli){
             size_t cellI = Cell0[celli];
-
             scalar Ti = T_[cellI];
             scalar pi = p_[cellI];
             size_t offset = celli * input_dim;
@@ -128,9 +148,18 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 
     // module inference
     int output_dim = mixture_.nSpecies() + 2;
-    std::vector<double> results0(Cell0.size() * output_dim);
-    std::vector<double> results1(Cell1.size() * output_dim);
-    std::vector<double> results2(Cell2.size() * output_dim);
+
+    __fp16* results0 = (__fp16*)aligned_alloc(64, (Cell0.size() * output_dim) * sizeof(__fp16));
+    __fp16* results1 = (__fp16*)aligned_alloc(64, (Cell1.size() * output_dim) * sizeof(__fp16));
+    __fp16* results2 = (__fp16*)aligned_alloc(64, (Cell2.size() * output_dim) * sizeof(__fp16));
+
+    // float* results0 = (float*)aligned_alloc(64, (Cell0.size() * output_dim) * sizeof(float));
+    // float* results1 = (float*)aligned_alloc(64, (Cell1.size() * output_dim) * sizeof(float));
+    // float* results2 = (float*)aligned_alloc(64, (Cell2.size() * output_dim) * sizeof(float));
+
+    // double* results0 = (double*)aligned_alloc(64, (Cell0.size() * output_dim) * sizeof(double));
+    // double* results1 = (double*)aligned_alloc(64, (Cell1.size() * output_dim) * sizeof(double));
+    // double* results2 = (double*)aligned_alloc(64, (Cell2.size() * output_dim) * sizeof(double));
 
     if(Cell0.size() + Cell1.size() + Cell2.size() < (size_t)mesh_.nCells()){
         Warning << "Cell0.size() + Cell1.size() + Cell2.size() < mesh_.nCells()" << endl;
@@ -241,6 +270,12 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     }
 
     double update_end = MPI_Wtime();
+    free(NNInputs0);
+    free(NNInputs1);
+    free(NNInputs2);
+    free(results0);
+    free(results1);
+    free(results2);
 
     Info << "=== end solve_DNN with BLASDNN === " << endl;
 
@@ -251,11 +286,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
     double update_time = update_end - update_start;
 
+    Info << "solve_DNN_blas profiling --------------------------------------------------" << endl;
     Info << "solve_DNN_blas time : " << solve_DNN_blas_time << endl;
     Info << "prepare dnn input time : " << prepare_dnn_input_time << endl;
     Info << "dnn inference time : " << dnn_infer_time << endl;
     Info << "update time : " << update_time << endl;
     Info << "other time : " << solve_DNN_blas_time - prepare_dnn_input_time - dnn_infer_time - update_time << endl;
+    Info << "---------------------------------------------------------------------------" << endl;
 
     if (!this->chemistry_)
     {

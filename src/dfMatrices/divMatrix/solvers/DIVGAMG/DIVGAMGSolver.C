@@ -79,11 +79,11 @@ Foam::DIVGAMGSolver::DIVGAMGSolver
     directSolveCoarsest_(false),
     agglomeration_(DIVGAMGAgglomeration::New(matrix_.ldu(), controlDict_)),
     matrixLevels_(agglomeration_.size()),
-    divMatrixLevels_(agglomeration_.size()),
     primitiveInterfaceLevels_(agglomeration_.size()),
     interfaceLevels_(agglomeration_.size()),
     interfaceLevelsBouCoeffs_(agglomeration_.size()),
-    interfaceLevelsIntCoeffs_(agglomeration_.size())
+    interfaceLevelsIntCoeffs_(agglomeration_.size()),
+    divMatrixLevels_(agglomeration_.size())
 {
     readControls();
 
@@ -369,6 +369,17 @@ const Foam::lduMatrix& Foam::DIVGAMGSolver::matrixLevel(const label i) const
     }
 }
 
+const Foam::divMatrix& Foam::DIVGAMGSolver::divMatrixLevel(const label i) const
+{
+    if (i == 0)
+    {
+        return matrix_;
+    }
+    else
+    {
+        return divMatrixLevels_[i - 1];
+    }
+}
 
 const Foam::lduInterfaceFieldPtrsList& Foam::DIVGAMGSolver::interfaceLevel
 (

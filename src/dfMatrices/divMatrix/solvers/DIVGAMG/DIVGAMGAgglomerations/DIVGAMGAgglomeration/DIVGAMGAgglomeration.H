@@ -44,6 +44,7 @@ SourceFiles
 #include "runTimeSelectionTables.H"
 
 #include "boolList.H"
+#include "divMatrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -114,6 +115,9 @@ protected:
         //- Hierarchy of mesh addressing
         PtrList<lduPrimitiveMesh> meshLevels_;
 
+        divMatrix divMatrixPattern_;
+
+        PtrList<divMatrix> divMatrixLevelPatterns_;
 
         // Processor agglomeration
 
@@ -323,6 +327,9 @@ public:
 
             //- Return LDU mesh of given level
             const lduMesh& meshLevel(const label leveli) const;
+
+            //- Return LDU mesh of given level
+            const divMatrix& divMatrixLevel(const label leveli) const;
 
             //- Do we have mesh for given level?
             bool hasMeshLevel(const label leveli) const;

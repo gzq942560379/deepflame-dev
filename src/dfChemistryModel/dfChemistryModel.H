@@ -174,7 +174,9 @@ public IOdictionary
 
 #ifdef USE_BLASDNN
         // tensorflow
-        DNNInferencer_blas<double> DNNInferencer_blas_;
+        // DNNInferencer_blas<double> DNNInferencer_blas_;
+        // DNNInferencer_blas<float> DNNInferencer_blas_;
+        DNNInferencer_blas<__fp16> DNNInferencer_blas_;
         string BLASDNNModelPath_;
 #endif
 
@@ -319,6 +321,8 @@ public:
         PtrList<volScalarField>& Y() {return Y_;}
 
         const volScalarField& rhoD(const label i) const {return rhoD_[i];}
+        
+        volScalarField& rhoD(const label i) {return rhoD_[i];}
 
         const volScalarField& hai(const label i) {return hai_[i];}
 

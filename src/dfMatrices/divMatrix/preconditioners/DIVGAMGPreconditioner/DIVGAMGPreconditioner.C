@@ -25,6 +25,7 @@ License
 
 #include "DIVGAMGPreconditioner.H"
 #include <mpi.h>
+#include <clockTime.H>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -86,9 +87,8 @@ void Foam::DIVGAMGPreconditioner::precondition
     const direction cmpt
 ) const
 {
-    double start ,end;
+    clockTime clock;
 
-    double procondition_start = MPI_Wtime();
     wA = 0.0;
     scalarField AwA(wA.size());
     scalarField finestCorrection(wA.size());
@@ -108,8 +108,9 @@ void Foam::DIVGAMGPreconditioner::precondition
     scalarField ApsiScratch;
     scalarField finestCorrectionScratch;
 
+    procondition_misc_time += clock.timeIncrement();
+
     // Initialise the above data structures
-    start = MPI_Wtime();
     initVcycle
     (
         coarseCorrFields,
@@ -118,11 +119,9 @@ void Foam::DIVGAMGPreconditioner::precondition
         ApsiScratch,
         finestCorrectionScratch
     );
-    end = MPI_Wtime();
-    initVcycle_time += end - start;
 
+    procondition_initVcycle_time += clock.timeIncrement();
 
-    start = MPI_Wtime();
     for (label cycle=0; cycle<nVcycles_; cycle++)
     {
         Vcycle
@@ -146,6 +145,8 @@ void Foam::DIVGAMGPreconditioner::precondition
             cmpt
         );
 
+        procondition_Vcycle_time += clock.timeIncrement();
+
         if (cycle < nVcycles_-1)
         {
             // Calculate finest level residual field
@@ -153,12 +154,10 @@ void Foam::DIVGAMGPreconditioner::precondition
             finestResidual = rA;
             finestResidual -= AwA;
         }
+        procondition_spmv_time += clock.timeIncrement();
     }
-    end = MPI_Wtime();
-    Vcycle_time += end - start;
 
-    double procondition_end = MPI_Wtime();
-    procondition_time += procondition_end - procondition_start;
+    procondition_time += clock.elapsedTime();
 }
 
 

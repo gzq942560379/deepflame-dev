@@ -13,7 +13,8 @@
 #include <mpi.h>
 // #include <algorithm>
 // #include "PstreamGlobals.H"
-#include "StructureMeshSchedule.H"
+#include "StructuredMeshSchedule.H"
+#include "processorFvPatchField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -254,7 +255,18 @@ GenMatrix_Y(
     const Switch splitting,
     const scalar Sct,
     CombustionModel<basicThermo>& combustion,
-    fv::convectionScheme<scalar>& mvConvection
+    const surfaceScalarField& upwindWeights
+);
+
+void preProcess_Y(
+    PtrList<volScalarField>& Y,
+    surfaceScalarField& phiUc,
+    volVectorField& sumYDiffError,
+    // std::vector<volVectorField>& gradResult,
+    dfChemistryModel<basicThermo>* chemistry,
+    surfaceScalarField& upwindWeights,
+    const volScalarField& alpha,
+    const surfaceScalarField& phi
 );
 
 tmp<fvScalarMatrix>
@@ -279,14 +291,73 @@ GenMatrix_p(
     const volScalarField& phi
 );
 
+tmp<fvScalarMatrix>
+GenMatrix_p(
+    const volScalarField& rho,
+    volScalarField& p,
+    const surfaceScalarField& phi,
+    const volScalarField& rAU,
+    const volVectorField& U,
+    const volVectorField& HbyA,
+    const volScalarField& thermoPsi,
+    // debug
+    surfaceScalarField& rhorAUf,
+    surfaceScalarField& phiHbyA
+);
 
-void check_fvmatrix_equal(const fvScalarMatrix& a,const fvScalarMatrix& b);
-void check_fvmatrix_equal(const fvVectorMatrix& a,const fvVectorMatrix& b);
+// thermo
 
-void check_field_equal(const Field<scalar>& a, const Field<scalar>& b);
-void check_field_error(const Field<scalar>& a, const Field<scalar>& b, const word& name);
+// construct new variables
+// thermo_rho
+// thermo_
+
+// correctThermo
+void correctThermo
+(
+    const PtrList<volScalarField>& Y,
+    volScalarField& T,
+    volScalarField& ha,
+    volScalarField& rho,
+    volScalarField& psi,
+    volScalarField& alpha,
+    volScalarField& mu,
+    volScalarField& p,
+    dfChemistryModel<basicThermo>* chemistry
+);
+
+void check_fvmatrix_equal(const fvScalarMatrix& answer,const fvScalarMatrix& check, const word& name);
+void check_fvmatrix_equal(const fvVectorMatrix& answer,const fvVectorMatrix& check, const word& name);
+
+void check_field_equal(const Field<scalar>& answer, const Field<scalar>& check, const word& name);
+void check_field_boundary_equal(const volScalarField& answer, const volScalarField& check, const word& name);
+void check_field_boundary_equal(const volVectorField& answer, const volVectorField& check, const word& name);
+void check_field_boundary_equal(const surfaceScalarField& answer, const surfaceScalarField& check, const word& name);
+void check_field_error(const Field<scalar>& answer, const Field<scalar>& check, const word& name);
 
 } // End namespace Foam
 
+void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volScalarField>& Y);
+extern Foam::label nSpecies;
+extern Foam::label nCells;
+extern Foam::label nFaces;
+extern Foam::label nBoundarySurfaces;
+extern Foam::label nBoundaryPatches;
+extern Foam::label nProcessBoundarySurfaces;
+extern Foam::label *surfacePerPatch;
+extern int *neighbProcNo;
+
+enum boundaryConditions{
+    zeroGradient,
+    fixedValue,
+    coupled,
+    empty,
+    gradientEnergy,
+    calculated,
+    cyclic,
+    processor,
+    extrapolated,
+    fixedEnergy,
+    processorCyclic
+};
 
 // ************************************************************************* //

@@ -55,14 +55,11 @@ void Foam::divMatrix::Jacobi
         }else{
             Jacobi_split(psi, bPrime);
         }
-
-
     }else{
         Jacobi_naive(psi, bPrime);
     }
     double end = MPI_Wtime();
     Jacobi_time_ += end - start;
-
 }
 
 void Foam::divMatrix::Jacobi_naive
@@ -167,7 +164,6 @@ void Foam::divMatrix::Jacobi_split_unroll32_sve
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
             const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
-
             svfloat64_t vpsi0, vpsi1, vpsi2, vpsi3;
             svfloat64_t tmp0, tmp1, tmp2, tmp3;
             svfloat64_t vdiag0, vdiag1, vdiag2, vdiag3;
@@ -248,7 +244,6 @@ void Foam::divMatrix::Jacobi_split_unroll32_sve
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
             const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
-
             svfloat64_t vpsi0, vpsi1, vpsi2, vpsi3;
             svfloat64_t tmp0, tmp1, tmp2, tmp3;
             svfloat64_t vdiag0, vdiag1, vdiag2, vdiag3;
@@ -303,7 +298,6 @@ void Foam::divMatrix::Jacobi_split_unroll32_sve
             scalar* __restrict__ psiPtr_offset = psiPtr + rbs;
             const scalar* const __restrict__ bPrimePtr_offset = bPrimePtr + rbs;
             const scalar* const __restrict__ diagPtr_offset = diagPtr + rbs;
-            
             svfloat64_t vpsi0, vpsi1, vpsi2, vpsi3;
             svfloat64_t tmp0, tmp1, tmp2, tmp3;
             svfloat64_t vdiag0, vdiag1, vdiag2, vdiag3;
