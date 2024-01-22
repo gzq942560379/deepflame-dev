@@ -182,7 +182,6 @@ GenMatrix_U(
     label offset = 0;
 
     label *patchTypePtr = new label[nPatch];
-    MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
     for(label patchi = 0 ; patchi < nPatch ; ++patchi)
     {
         std::string patchTypeStr = U.boundaryField()[patchi].type();
@@ -1075,7 +1074,7 @@ GenMatrix_U(
     
     offset = 0;
     for (label patchi = 0; patchi < nPatch; ++patchi){
-        for (label s = 0; s < patchSize[s]; ++s){
+        for (label s = 0; s < patchSize[patchi]; ++s){
             label start_index = offset + s;
             fvm.internalCoeffs()[patchi][s][0] = internalCoeffsPtr[start_index * 3];
             fvm.internalCoeffs()[patchi][s][1] = internalCoeffsPtr[start_index * 3 + 1];

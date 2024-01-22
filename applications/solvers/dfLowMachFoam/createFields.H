@@ -1,4 +1,4 @@
-syncClockTime createFieldsClock;
+clockTime createFieldsClock;
 
 #include "createRDeltaT.H"
 
