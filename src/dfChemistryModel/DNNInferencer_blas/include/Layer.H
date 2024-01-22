@@ -4,36 +4,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
-
-template<typename DataType>
-class Tensor{
-private:
-    std::vector<int64_t> shape_;
-    int64_t element_num_;
-    DataType* data_;
-    bool owner_;
-public:
-    Tensor(std::vector<int64_t> shape):
-        shape_(shape),
-        element_num_(std::accumulate(shape_.begin(),shape_.end(),1,std::multiplies<int64_t>())),
-        data_(new DataType[element_num_]),
-        owner_(true){};
-
-    Tensor(std::vector<int64_t> shape, DataType* data):
-        shape_(shape), 
-        element_num_(std::accumulate(shape_.begin(),shape_.end(),1,std::multiplies<int64_t>())),
-        data_(data), 
-        owner_(false){};
-    ~Tensor(){
-        if(owner_)  delete[] data_;
-    }
-    int64_t dim_num() const {return shape_.size();};
-    int64_t element_num() const {return element_num_;};
-    int64_t bytes_num() const {return element_num_ * sizeof(DataType);};
-    int64_t dim(int64_t i) const {return shape_[i];};
-    const DataType* data() const {return data_;};
-    DataType* data() {return data_;};
-};
+#include "Tensor.H"
 
 template<typename DataType>
 class Layer{
@@ -42,10 +13,8 @@ public:
     virtual void forward(const Tensor<DataType>& input, Tensor<DataType>& output) = 0;
     virtual void load_parameters(const std::string& dir, int64_t layer_id) = 0;
 
-#ifdef DEF_PROFILING
-    virtual void profiling_reset() = 0;
-    virtual void print_profiling_info() = 0;
-#endif
+    virtual void reset_timer() = 0;
+    virtual void print_timer() = 0;
 
 };
 
@@ -59,13 +28,9 @@ private:
     // (out_features,)
     Tensor<DataType> bias_;
 
-#ifdef DEF_PROFILING
-    // profiling
-    int64_t sample_processed_;
-    double infer_time_;
-    double infer_gemm_time_;
-    double infer_add_time_;
-#endif
+    double gemm_time_;
+    double bias_time_;
+    double total_infer_time_;
 
 public:
     Linear(int64_t in_features,int64_t out_features):
@@ -77,10 +42,8 @@ public:
 
     virtual void forward(const Tensor<DataType>& input, Tensor<DataType>& output);
     virtual void load_parameters(const std::string& dir, int64_t layer_id);
-#ifdef DEF_PROFILING
-    virtual void profiling_reset();
-    virtual void print_profiling_info();
-#endif
+    virtual void reset_timer();
+    virtual void print_timer();
 };
 
 template<typename DataType>
@@ -93,14 +56,10 @@ private:
     // (out_features,)
     Tensor<DataType> bias_;
 
-#ifdef DEF_PROFILING
-    // profiling
-    int64_t sample_processed_;
-    double infer_time_;
-    double infer_gemm_time_;
-    double infer_add_time_;
-    double infer_gelu_time_;
-#endif
+    double gemm_time_;
+    double bias_time_;
+    double gelu_time_;
+    double total_infer_time_;
 
 public:
     LinearGELU(int64_t in_features,int64_t out_features):
@@ -112,8 +71,6 @@ public:
 
     virtual void forward(const Tensor<DataType>& input, Tensor<DataType>& output);
     virtual void load_parameters(const std::string& dir, int64_t layer_id);
-#ifdef DEF_PROFILING
-    virtual void profiling_reset();
-    virtual void print_profiling_info();
-#endif
+    virtual void reset_timer();
+    virtual void print_timer();
 };

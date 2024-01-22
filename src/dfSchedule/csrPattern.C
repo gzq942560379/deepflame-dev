@@ -3,6 +3,7 @@
 #include <string>
 #include <PstreamGlobals.H>
 #include "csrPattern.H"
+#include <utility>
 
 namespace Foam{
 
@@ -362,17 +363,17 @@ void csrPattern::order_natrue(std::vector<label>& order){
 }
 
 void csrPattern::order_longest_row(std::vector<label>& order){
-    std::vector<std::tuple<label,label>> row_length_tuples(n_);
+    std::vector<std::pair<label,label>> row_length_pairs(n_);
     for(label r = 0; r < n_; ++r){
-        row_length_tuples[r] = std::make_tuple(r, rowptr_[r+1] - rowptr_[r]);
+        row_length_pairs[r] = std::make_pair(r, rowptr_[r+1] - rowptr_[r]);
     }
     // 按 行长 从大到小 行号 从小到大 排序
-    std::sort(row_length_tuples.begin(), row_length_tuples.end(), [](const auto& a, const auto& b){
-        return std::get<1>(a) == std::get<1>(b) ? std::get<0>(a) < std::get<0>(b) : std::get<1>(a) > std::get<1>(b);
+    std::sort(row_length_pairs.begin(), row_length_pairs.end(), [](const std::pair<label,label>& a, const std::pair<label,label>& b){
+        return a.second == b.second ? a.first < b.first : a.second > b.second;
     });
     order.resize(n_);
     for(label r = 0; r < n_; ++r){
-        order[r] = std::get<0>(row_length_tuples[r]);
+        order[r] = row_length_pairs[r].first;
     }
 }
 

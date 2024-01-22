@@ -1,9 +1,9 @@
 #pragma once
 #include <cstdint>
-#include <vector>
+#include <cstdbool>
 #include <numeric>
-#include <functional>
-#include <cmath>
+#include <string>
+#include <vector>
 
 template<typename DataType>
 class Tensor{
@@ -16,7 +16,7 @@ public:
     Tensor(std::vector<int64_t> shape):
         shape_(shape),
         element_num_(std::accumulate(shape_.begin(),shape_.end(),1,std::multiplies<int64_t>())),
-        data_((DataType*)aligned_alloc(64, element_num_ * sizeof(DataType))),
+        data_(new DataType[element_num_]),
         owner_(true){};
 
     Tensor(std::vector<int64_t> shape, DataType* data):
@@ -25,7 +25,7 @@ public:
         data_(data), 
         owner_(false){};
     ~Tensor(){
-        if(owner_)  free(data_);
+        if(owner_)  delete[] data_;
     }
     int64_t dim_num() const {return shape_.size();};
     int64_t element_num() const {return element_num_;};
@@ -33,16 +33,7 @@ public:
     int64_t dim(int64_t i) const {return shape_[i];};
     const DataType* data() const {return data_;};
     DataType* data() {return data_;};
-    bool has_nan(){
-        for(int64_t i = 0; i < element_num_; ++i){
-            if(std::isnan(data_[i])){
-                return true;
-            }
-        }
-        return false;
-    }
 };
 
-template class Tensor<__fp16>;
 template class Tensor<float>;
 template class Tensor<double>;

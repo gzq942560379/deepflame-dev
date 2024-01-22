@@ -8,7 +8,7 @@ BLAS_LIB    =   -L/home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepF
 
 MATH_LIB    =   -lm -lm_slave
 
-DEF		=	-DDEF_PROFILING
+DEF		=	
 
 INC     =   $(YAML_INC)
 LIB     =   $(YAML_LIB) $(BLAS_LIB) $(MATH_LIB)
