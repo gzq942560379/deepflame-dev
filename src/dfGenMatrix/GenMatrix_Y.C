@@ -324,7 +324,7 @@ void preProcess_Y(
 #pragma omp parallel for
 #endif
         for (label c = 0; c < nCells; ++c) {
-            scalar meshVRTmp = 1. / meshVPtr[c];;
+            scalar meshVRTmp = 1. / meshVPtr[c];
             gradY_Species[c * 3 + 0] *= meshVRTmp;
             gradY_Species[c * 3 + 1] *= meshVRTmp;
             gradY_Species[c * 3 + 2] *= meshVRTmp;
