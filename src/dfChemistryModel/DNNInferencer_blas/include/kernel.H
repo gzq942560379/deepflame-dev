@@ -48,6 +48,12 @@ template<typename T>
 void gelu_ldm_lookup_slave(int64_t len, T* data);
 
 template<typename T>
+void gelu_fastexp(int64_t len, T* data);
+
+template<typename T>
+void gelu_fastexp_slave(int64_t len, T* data);
+
+template<typename T>
 void bias_naive(Tensor<T>& input, const Tensor<T>& bias);
 
 template<typename T>
@@ -59,7 +65,16 @@ void bias_ldm_slave(Tensor<T>& input, const Tensor<T>& bias);
 template<typename T>
 void bias_gelu_ldm_lookup_slave(Tensor<T>& input, const Tensor<T>& bias);
 
-// impletement
+template<typename T>
+void bias_gelu_ldm_lookup_prefetch_slave(Tensor<T>& input, const Tensor<T>& bias);
+
+template<typename T>
+void bias_gelu_fastexp_slave(Tensor<T>& input, const Tensor<T>& bias);
+
+template<typename T>
+void bias_gelu_fastexp_simd_slave(Tensor<T>& input, const Tensor<T>& bias);
+
+// impletement -----------------------------------------------------------
 
 template<typename T>
 T tanh_exp(T x){

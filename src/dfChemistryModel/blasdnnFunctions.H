@@ -5,15 +5,18 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     const DeltaTType& deltaT
 )
 {
-    double solve_DNN_blas_start = MPI_Wtime();
-
-    double prepare_dnn_input_start = MPI_Wtime();
+    double init_time = 0.;
+    double prepare_time = 0.;
+    double inference_time = 0.;
+    double update_time = 0.;
+    
+    clockTime clock;
 
     scalar deltaTMin = great;
 
     Info<<"=== begin solve_DNN with BLASDNN === "<<endl;
 
-    std::vector<size_t> Cell0, Cell1, Cell2;
+    std::vector<label> Cell0, Cell1, Cell2;
     
     const double lambda = 0.1;
 
@@ -31,7 +34,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         // NN1
         if(((Qdoti >= 3e7) && (Ti < 2000) && (Ti >= 700)) || ((Qdoti > 7e8) && Ti > 2000)) //choose2
         {
-
             Cell1.push_back(cellI);
             continue;
         }
@@ -43,46 +45,72 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         }
     }
 
-    int input_dim = mixture_.nSpecies() + 2;
-    
-    __fp16* NNInputs0 = (__fp16*)aligned_alloc(64, (Cell0.size() * input_dim) * sizeof(__fp16));
-    __fp16* NNInputs1 = (__fp16*)aligned_alloc(64, (Cell1.size() * input_dim) * sizeof(__fp16));
-    __fp16* NNInputs2 = (__fp16*)aligned_alloc(64, (Cell2.size() * input_dim) * sizeof(__fp16));
+    int nSpecies = mixture_.nSpecies();
+    int input_dim = nSpecies + 2;
+    int output_dim = nSpecies + 2;
 
-    memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(__fp16));
-    memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(__fp16));
-    memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(__fp16));
+    // NNInputs0 = (__fp16*)df_alloc((Cell0.size() * input_dim) * sizeof(__fp16));
+    // NNInputs1 = (__fp16*)df_alloc((Cell1.size() * input_dim) * sizeof(__fp16));
+    // NNInputs2 = (__fp16*)df_alloc((Cell2.size() * input_dim) * sizeof(__fp16));
 
-    // float* NNInputs0 = (float*)aligned_alloc(64, (Cell0.size() * input_dim) * sizeof(float));
-    // float* NNInputs1 = (float*)aligned_alloc(64, (Cell1.size() * input_dim) * sizeof(float));
-    // float* NNInputs2 = (float*)aligned_alloc(64, (Cell2.size() * input_dim) * sizeof(float));
+    // if(input_buffer == nullptr && output_buffer == nullptr){
+    //     input_buffer = (__fp16*)df_alloc((mesh_.nCells() * input_dim) * sizeof(__fp16));
+    // }
+
+    // NNInputs0 = input_buffer;
+    // NNInputs1 = NNInputs0 + Cell0.size() * input_dim;
+    // NNInputs2 = NNInputs1 + Cell1.size() * input_dim;
+
+    // memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(__fp16));
+    // memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(__fp16));
+    // memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(__fp16));
+
+    // NNInputs0 = (float*)df_alloc((Cell0.size() * input_dim) * sizeof(float));
+    // NNInputs1 = (float*)df_alloc((Cell1.size() * input_dim) * sizeof(float));
+    // NNInputs2 = (float*)df_alloc((Cell2.size() * input_dim) * sizeof(float));
 
     // memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(float));
     // memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(float));
     // memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(float));
 
-    // double* NNInputs0 = (double*)aligned_alloc(64, (Cell0.size() * input_dim) * sizeof(double));
-    // double* NNInputs1 = (double*)aligned_alloc(64, (Cell1.size() * input_dim) * sizeof(double));
-    // double* NNInputs2 = (double*)aligned_alloc(64, (Cell2.size() * input_dim) * sizeof(double));
+    NNInputs0 = (double*)df_alloc((Cell0.size() * input_dim) * sizeof(double));
+    NNInputs1 = (double*)df_alloc((Cell1.size() * input_dim) * sizeof(double));
+    NNInputs2 = (double*)df_alloc((Cell2.size() * input_dim) * sizeof(double));
 
-    // memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(double));
-    // memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(double));
-    // memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(double));
+    memset(NNInputs0, '\0', (Cell0.size() * input_dim) * sizeof(double));
+    memset(NNInputs1, '\0', (Cell1.size() * input_dim) * sizeof(double));
+    memset(NNInputs2, '\0', (Cell2.size() * input_dim) * sizeof(double));
 
+    // module inference
+
+    // results0 = (__fp16*)df_alloc((Cell0.size() * output_dim) * sizeof(__fp16));
+    // results1 = (__fp16*)df_alloc((Cell1.size() * output_dim) * sizeof(__fp16));
+    // results2 = (__fp16*)df_alloc((Cell2.size() * output_dim) * sizeof(__fp16));
+
+    // results0 = (float*)df_alloc((Cell0.size() * output_dim) * sizeof(float));
+    // results1 = (float*)df_alloc((Cell1.size() * output_dim) * sizeof(float));
+    // results2 = (float*)df_alloc((Cell2.size() * output_dim) * sizeof(float));
+
+    results0 = (double*)df_alloc((Cell0.size() * output_dim) * sizeof(double));
+    results1 = (double*)df_alloc((Cell1.size() * output_dim) * sizeof(double));
+    results2 = (double*)df_alloc((Cell2.size() * output_dim) * sizeof(double));
+
+    init_time += clock.timeIncrement();
+    
 #ifdef _OPENMP
     #pragma omp parallel
 #endif
     {
-        scalarList yPre_(mixture_.nSpecies());
-        scalarList yBCT_(mixture_.nSpecies());
-        scalarList yTmp_(mixture_.nSpecies());
-        scalarList u_(mixture_.nSpecies());
+        scalarList yPre_(nSpecies);
+        scalarList yBCT_(nSpecies);
+        scalarList yTmp_(nSpecies);
+        scalarList u_(nSpecies);
         // get problems
 #ifdef _OPENMP
         #pragma omp for
 #endif
         for(size_t celli = 0; celli<Cell0.size(); ++celli){
-            size_t cellI = Cell0[celli];
+            label cellI = Cell0[celli];
             scalar Ti = T_[cellI];
             scalar pi = p_[cellI];
             size_t offset = celli * input_dim;
@@ -103,7 +131,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         #pragma omp for
 #endif
         for(size_t celli = 0; celli<Cell1.size(); ++celli){
-            size_t cellI = Cell1[celli];
+            label cellI = Cell1[celli];
             scalar Ti = T_[cellI];
             scalar pi = p_[cellI];
             size_t offset = celli * input_dim;
@@ -124,12 +152,12 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         #pragma omp for
 #endif
         for(size_t celli = 0; celli<Cell2.size(); ++celli){
-            size_t cellI = Cell2[celli];
+            label cellI = Cell2[celli];
             scalar Ti = T_[cellI];
             scalar pi = p_[cellI];
             size_t offset = celli * input_dim;
-            NNInputs2[offset + 0] = (Ti - Xmu2_[0])/Xstd2_[0];
-            NNInputs2[offset + 1] = (pi / 101325 - Xmu2_[1])/Xstd2_[1];
+            NNInputs2[offset + 0] = (Ti - Xmu2_[0])/ Xstd2_[0];
+            NNInputs2[offset + 1] = (pi / 101325 - Xmu2_[1])/ Xstd2_[1];
             for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
             {
                 yPre_[i] = Y_[i][cellI];
@@ -144,57 +172,41 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     }
 
 
-    double prepare_dnn_input_end = MPI_Wtime();
+    prepare_time += clock.timeIncrement();
 
-    // module inference
-    int output_dim = mixture_.nSpecies() + 2;
+    // if(Cell0.size() + Cell1.size() + Cell2.size() < (size_t)mesh_.nCells()){
+    //     Warning << "Cell0.size() + Cell1.size() + Cell2.size() < mesh_.nCells()" << endl;
+    // }
 
-    __fp16* results0 = (__fp16*)aligned_alloc(64, (Cell0.size() * output_dim) * sizeof(__fp16));
-    __fp16* results1 = (__fp16*)aligned_alloc(64, (Cell1.size() * output_dim) * sizeof(__fp16));
-    __fp16* results2 = (__fp16*)aligned_alloc(64, (Cell2.size() * output_dim) * sizeof(__fp16));
-
-    // float* results0 = (float*)aligned_alloc(64, (Cell0.size() * output_dim) * sizeof(float));
-    // float* results1 = (float*)aligned_alloc(64, (Cell1.size() * output_dim) * sizeof(float));
-    // float* results2 = (float*)aligned_alloc(64, (Cell2.size() * output_dim) * sizeof(float));
-
-    // double* results0 = (double*)aligned_alloc(64, (Cell0.size() * output_dim) * sizeof(double));
-    // double* results1 = (double*)aligned_alloc(64, (Cell1.size() * output_dim) * sizeof(double));
-    // double* results2 = (double*)aligned_alloc(64, (Cell2.size() * output_dim) * sizeof(double));
-
-    if(Cell0.size() + Cell1.size() + Cell2.size() < (size_t)mesh_.nCells()){
-        Warning << "Cell0.size() + Cell1.size() + Cell2.size() < mesh_.nCells()" << endl;
-    }
-
-    double dnn_infer_start = MPI_Wtime();
     DNNInferencer_blas_.Inference_multiDNNs(
         NNInputs0, results0, Cell0.size(),
         NNInputs1, results1, Cell1.size(),
         NNInputs2, results2, Cell2.size());
-    double dnn_infer_end = MPI_Wtime();
 
-    double update_start = MPI_Wtime();
+    inference_time += clock.timeIncrement();
 
     // update Q & RR
 #ifdef _OPENMP
     #pragma omp parallel
 #endif
     {
-        scalarList yPre_(mixture_.nSpecies());
-        scalarList yBCT_(mixture_.nSpecies());
-        scalarList yTmp_(mixture_.nSpecies());
-        scalarList u_(mixture_.nSpecies());
+        scalarList yPre_(nSpecies);
+        scalarList yBCT_(nSpecies);
+        scalarList yTmp_(nSpecies);
+        scalarList u_(nSpecies);
         // - NN0
 #ifdef _OPENMP
         #pragma omp for
 #endif
         for(size_t cellI = 0; cellI<Cell0.size(); cellI ++)
         {
+            label cellId = Cell0[cellI];
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
             scalar Yt = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
-                yPre_[i] = Y_[i][Cell0[cellI]];
-                yTmp_[i] = Y_[i][Cell0[cellI]];
+                yPre_[i] = Y_[i][cellId];
+                yTmp_[i] = Y_[i][cellId];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
             }
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
@@ -203,12 +215,12 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
                 yTmp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
                 Yt += yTmp_[i]; // normalization
             }
-            Qdot_[Cell0[cellI]] = 0;
+            Qdot_[cellId] = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yTmp_[i] = yTmp_[i] / Yt;
-                RR_[i][Cell0[cellI]] = (yTmp_[i] - Y_[i][Cell0[cellI]])*rho_[Cell0[cellI]]/1e-6;
-                Qdot_[Cell0[cellI]] -= hc_[i]*RR_[i][Cell0[cellI]];
+                RR_[i][cellId] = (yTmp_[i] - Y_[i][cellId])*rho_[cellId]/1e-6;
+                Qdot_[cellId] -= hc_[i]*RR_[i][cellId];
             }
         }
         // - NN1
@@ -217,12 +229,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 #endif
         for(size_t cellI = 0; cellI<Cell1.size(); cellI ++)
         {
+            label cellId = Cell1[cellI];
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
             scalar Yt = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
-                yPre_[i] = Y_[i][Cell1[cellI]];
-                yTmp_[i] = Y_[i][Cell1[cellI]];
+                yPre_[i] = Y_[i][cellId];
+                yTmp_[i] = Y_[i][cellId];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
             }
             for (size_t i=0; i<(CanteraGas_->nSpecies() - 1); i++) // minus 1 for Y_AR
@@ -231,12 +244,12 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
                 yTmp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
                 Yt += yTmp_[i];
             }
-            Qdot_[Cell1[cellI]] = 0;
+            Qdot_[cellId] = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yTmp_[i] = yTmp_[i] / Yt;
-                RR_[i][Cell1[cellI]] = (yTmp_[i] - Y_[i][Cell1[cellI]])*rho_[Cell1[cellI]]/1e-6;
-                Qdot_[Cell1[cellI]] -= hc_[i]*RR_[i][Cell1[cellI]];
+                RR_[i][cellId] = (yTmp_[i] - Y_[i][cellId])*rho_[cellId]/1e-6;
+                Qdot_[cellId] -= hc_[i]*RR_[i][cellId];
             }
         }
         // - NN2
@@ -245,53 +258,51 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 #endif
         for(size_t cellI = 0; cellI<Cell2.size(); cellI ++)
         {
+            label cellId = Cell2[cellI];
             size_t offset = cellI * (CanteraGas_->nSpecies() + 2);
             scalar Yt = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
-                yPre_[i] = Y_[i][Cell2[cellI]];
-                yTmp_[i] = Y_[i][Cell2[cellI]];
+                yPre_[i] = Y_[i][cellId];
+                yTmp_[i] = Y_[i][cellId];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function reverse-BCT
             }
             for (size_t i=0; i<(CanteraGas_->nSpecies() - 1); i++) // minus 1 for Y_AR
             {
-                u_[i] = results2[offset + i + 2]*Ystd2_[i]+Ymu2_[i];
+                u_[i] = results2[offset + i + 2] * Ystd2_[i] + Ymu2_[i];
                 yTmp_[i] = pow((yBCT_[i] + u_[i]*1e-6)*lambda+1,1/lambda);
                 Yt += yTmp_[i];
             }
-            Qdot_[Cell2[cellI]] = 0;
+            Qdot_[cellId] = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             {
                 yTmp_[i] = yTmp_[i] / Yt;
-                RR_[i][Cell2[cellI]] = (yTmp_[i] - Y_[i][Cell2[cellI]])*rho_[Cell2[cellI]]/1e-6;
-                Qdot_[Cell2[cellI]] -= hc_[i]*RR_[i][Cell2[cellI]];
+                RR_[i][cellId] = (yTmp_[i] - Y_[i][cellId])*rho_[cellId] / 1e-6;
+                Qdot_[cellId] -= hc_[i]*RR_[i][cellId];
             }
         }
     }
 
-    double update_end = MPI_Wtime();
-    free(NNInputs0);
-    free(NNInputs1);
-    free(NNInputs2);
-    free(results0);
-    free(results1);
-    free(results2);
+    update_time = clock.timeIncrement();
+
+    df_free(NNInputs0);
+    df_free(NNInputs1);
+    df_free(NNInputs2);
+    df_free(results0);
+    df_free(results1);
+    df_free(results2);
 
     Info << "=== end solve_DNN with BLASDNN === " << endl;
-
-    double solve_DNN_blas_end = MPI_Wtime();
-
-    double solve_DNN_blas_time = solve_DNN_blas_end - solve_DNN_blas_start;
-    double prepare_dnn_input_time = prepare_dnn_input_end - prepare_dnn_input_start;
-    double dnn_infer_time = dnn_infer_end - dnn_infer_start;
-    double update_time = update_end - update_start;
+    
+    double solve_DNN_blas_time = clock.elapsedTime();
 
     Info << "solve_DNN_blas profiling --------------------------------------------------" << endl;
     Info << "solve_DNN_blas time : " << solve_DNN_blas_time << endl;
-    Info << "prepare dnn input time : " << prepare_dnn_input_time << endl;
-    Info << "dnn inference time : " << dnn_infer_time << endl;
+    Info << "init time : " << init_time << endl;
+    Info << "prepare time : " << prepare_time << endl;
+    Info << "inference time : " << inference_time << endl;
     Info << "update time : " << update_time << endl;
-    Info << "other time : " << solve_DNN_blas_time - prepare_dnn_input_time - dnn_infer_time - update_time << endl;
+    Info << "other time : " << solve_DNN_blas_time - init_time - prepare_time - inference_time - update_time << endl;
     Info << "---------------------------------------------------------------------------" << endl;
 
     if (!this->chemistry_)

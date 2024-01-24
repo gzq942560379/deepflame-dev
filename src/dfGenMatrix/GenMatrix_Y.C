@@ -205,7 +205,9 @@ void preProcess_Y(
         const MeshSchedule& schedule = MeshSchedule::getMeshSchedule();
         const labelList& face_scheduling = schedule.face_scheduling();
 
+#ifdef _OPENMP
         #pragma omp parallel for
+#endif
         for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
             label face_start = face_scheduling[face_scheduling_i]; 
             label face_end = face_scheduling[face_scheduling_i+1];
@@ -224,7 +226,9 @@ void preProcess_Y(
                 gradY_Species[neighbor * 3 + 2] -= grad_z;
             }
         }
+#ifdef _OPENMP
         #pragma omp parallel for
+#endif
         for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
             label face_start = face_scheduling[face_scheduling_i]; 
             label face_end = face_scheduling[face_scheduling_i+1];

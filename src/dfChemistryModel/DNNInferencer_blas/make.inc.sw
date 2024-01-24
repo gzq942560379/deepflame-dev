@@ -1,10 +1,10 @@
 
 
-YAML_HOME   =   /home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/yaml-cpp-0.7.0
+YAML_HOME   =   ${DeepFlame_HOME}/software/yaml-cpp-0.7.0
 YAML_INC    =   -I$(YAML_HOME)/include
 YAML_LIB    =   -L$(YAML_HOME)/lib64 -lyaml-cpp
 
-BLAS_LIB    =   -L/home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/xMath-SACA -lswblas
+BLAS_LIB    =   -L${DeepFlame_HOME}/software/xMath-SACA -lswblas
 
 MATH_LIB    =   -lm -lm_slave
 

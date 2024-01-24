@@ -32,7 +32,7 @@ DNNInferencer_blas<DataType>::~DNNInferencer_blas() {
     model2_.clear();
 
     for(size_t i = 0; i < output_buffer_.size(); ++i){
-        free(output_buffer_[i]);
+        blasdnn_free(output_buffer_[i]);
     }
 }
 
@@ -152,8 +152,7 @@ void DNNInferencer_blas<DataType>::load_models(const std::string dir){
     buffer_alloced_ = true;
     FLOPs_per_sample_ = 0;
     for(size_t i = 1; i < layers_.size() - 1; ++i){
-        // output_buffer_.emplace_back(std::vector<DataType>(batch_size_ * layers_[i]));
-        output_buffer_.push_back((DataType*)aligned_alloc(64, batch_size_ * layers_[i] * sizeof(DataType)));
+        output_buffer_.push_back((DataType*)blasdnn_alloc(batch_size_ * layers_[i] * sizeof(DataType)));
         FLOPs_per_sample_ += 2.0 * layers_[i - 1] * layers_[i];
     }
 }

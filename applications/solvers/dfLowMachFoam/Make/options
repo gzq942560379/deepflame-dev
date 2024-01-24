@@ -79,10 +79,10 @@ EXE_LIBS = \
     $(if $(PYTHON_LIB_DIR),-lpython3,) \
     $(if $(USE_BLASDNN), -L$(DF_SRC)/dfChemistryModel/DNNInferencer_blas/build -lDNNInferencer_blas,) \
     -L$(CANTERA_ROOT)/lib -lcantera \
-    -L/home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/sundials-5.3.0/lib64 -lsundials_cvode -lsundials_cvodes -lsundials_sunlinsollapackband -lsundials_sunlinsollapackdense \
-    /home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/xMath-SACA/libswlapack.a \
-    /home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/xMath-SACA/libswblas.a \
-    -L/home/export/online1/mdt00/shisuan/jiaweile/guozhuoqiang/DeepFlame/software/yaml-cpp-0.7.0/lib64 -lyaml-cpp \
+    -L${DeepFlame_HOME}/software/sundials-5.3.0/lib64 -lsundials_cvode -lsundials_cvodes -lsundials_sunlinsollapackband -lsundials_sunlinsollapackdense \
+    ${DeepFlame_HOME}/software/xMath-SACA/libswlapack.a \
+    ${DeepFlame_HOME}/software/xMath-SACA/libswblas.a \
+    -L${DeepFlame_HOME}/software/yaml-cpp-0.7.0/lib64 -lyaml-cpp \
     -lgfortran    
     
     

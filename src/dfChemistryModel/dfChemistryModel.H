@@ -173,10 +173,16 @@ public IOdictionary
 #endif
 
 #ifdef USE_BLASDNN
+
+
+        // __fp16 *input_buffer = nullptr, *output_buffer = nullptr, *NNInputs0,  *NNInputs1, *NNInputs2, *results0, *results1, *results2;
+        // float *input_buffer = nullptr, *output_buffer = nullptr, *NNInputs0,  *NNInputs1, *NNInputs2, *results0, *results1, *results2;
+        double *input_buffer = nullptr, *output_buffer = nullptr, *NNInputs0,  *NNInputs1, *NNInputs2, *results0, *results1, *results2;
+
         // tensorflow
-        // DNNInferencer_blas<double> DNNInferencer_blas_;
+        // DNNInferencer_blas<__fp16> DNNInferencer_blas_;
         // DNNInferencer_blas<float> DNNInferencer_blas_;
-        DNNInferencer_blas<__fp16> DNNInferencer_blas_;
+        DNNInferencer_blas<double> DNNInferencer_blas_;
         string BLASDNNModelPath_;
 #endif
 

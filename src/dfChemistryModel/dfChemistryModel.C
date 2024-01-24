@@ -33,6 +33,7 @@ License
 #include <mpi.h>
 #include <yaml-cpp/yaml.h>
 #include "PstreamGlobals.H"
+#include "memory.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
