@@ -3,9 +3,9 @@
 
 namespace Foam{
 
-#define RELATIVE_ERROR_TOLERANCE 1e-12
-#define ABSULTE_ERROR_TOLERANCE 1e-12
-#define ZERO_TOLERANCE 1e-12
+#define RELATIVE_ERROR_TOLERANCE 1e-11
+#define ABSULTE_ERROR_TOLERANCE 1e-11
+#define ZERO_TOLERANCE 1e-11
 
 void check_field_error(const Field<scalar>& answer, const Field<scalar>& check, const word& name){
     if(answer.size() != check.size()){

@@ -6,6 +6,8 @@
 #include "orthogonalSnGrad.H"
 #include "clockTime.H"
 
+#define _OPENMP
+
 namespace Foam{
 
 // pre process
@@ -68,7 +70,6 @@ void preProcess_Y(
     scalar *upwindWeightsPtr = upwindWeights.begin();
 
     scalar *gradY = new scalar[nSpecies * nCells * 3];
-    // memset(gradY, '\0', nSpecies * nCells * 3 * sizeof(scalar));
     scalarPtr* boundaryGradY = new scalarPtr[nSpecies * nPatches];
     scalarPtr* boundaryGradYInternal = new scalarPtr[nSpecies * nPatches];
     
@@ -323,7 +324,7 @@ void preProcess_Y(
 #pragma omp parallel for
 #endif
         for (label c = 0; c < nCells; ++c) {
-            scalar meshVRTmp = 1. / meshVPtr[c];;
+            scalar meshVRTmp = 1. / meshVPtr[c];
             gradY_Species[c * 3 + 0] *= meshVRTmp;
             gradY_Species[c * 3 + 1] *= meshVRTmp;
             gradY_Species[c * 3 + 2] *= meshVRTmp;
@@ -562,13 +563,11 @@ GenMatrix_Y(
     CombustionModel<basicThermo>& combustion,
     const surfaceScalarField& upwindWeights
 ){
+    clockTime clock;
     assert(splitting == false);
 
     const fvMesh& mesh = Yi.mesh();
     assert(mesh.moving() == false);
-
-    const label *own = &mesh.owner()[0];
-    const label *nei = &mesh.neighbour()[0];
 
     // construct fvMatrix
     tmp<fvScalarMatrix> tfvm
@@ -590,128 +589,144 @@ GenMatrix_Y(
     scalar* __restrict__ lowerPtr = &fvm.lower()[0];
     scalar* __restrict__ upperPtr = &fvm.upper()[0];
 
-    tmp<fv::snGradScheme<scalar>> tsnGradScheme_(new fv::orthogonalSnGrad<scalar>(mesh));
-    const surfaceScalarField& deltaCoeffsTmp = tsnGradScheme_().deltaCoeffs(Yi)();
+    const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const labelList& face_scheduling = meshSchedule.face_scheduling();
+    const label nCells = meshSchedule.nCells();
+    const label nFaces = meshSchedule.nFaces();
+    const label nPatches = meshSchedule.nPatches();
+    const List<MeshSchedule::PatchType> patchTypes = meshSchedule.patchTypes();
+    const labelList& patchSizes = meshSchedule.patchSizes();
 
-    // allocate
+    // basic variable
+    const label *own = &mesh.owner()[0];
+    const label *nei = &mesh.neighbour()[0];
     const surfaceScalarField& weights = mesh.surfaceInterpolation::weights(); // interpolation weight (linear)
     const scalar *weightsPtr = &weights[0];
-    const scalar *rhoPtr = &rho[0];
     const scalar *meshVPtr = &mesh.V()[0];
+    const scalar *deltaCoeffsPtr = &mesh.deltaCoeffs()[0];
+    const scalar *magSfPtr = &mesh.magSf()[0];
+
+    Info << "Gen_Y init : " << clock.timeIncrement() << endl;
+
+    // allocate memory
+    typedef scalar* scalarPtr;
+    typedef const scalar* constScalarPtr;
+    typedef const label* constLabelPtr;
+
+    constScalarPtr* boundary_phi = new constScalarPtr[nPatches];
+    constScalarPtr* boundary_phiUc = new constScalarPtr[nPatches];
+    constScalarPtr* boundaryWeights = new constScalarPtr[nPatches];
+    constScalarPtr* boundary_delta_coeffs = new constScalarPtr[nPatches];
+    constScalarPtr* boundary_mag_sf = new constScalarPtr[nPatches];
+    constScalarPtr* boundary_rhoD = new constScalarPtr[nPatches];
+    scalarPtr* boundary_rhoD_internal = new scalarPtr[nPatches];
+    scalarPtr* boundary_upwind_weights = new scalarPtr[nPatches];
+    constLabelPtr* faceCells = new constLabelPtr[nPatches];
+
+    scalarPtr* internal_coeffs = new scalarPtr[nPatches];
+    scalarPtr* boundary_coeffs = new scalarPtr[nPatches];
+    scalarPtr* value_internal_coeffs = new scalarPtr[nPatches];
+    scalarPtr* value_boundary_coeffs = new scalarPtr[nPatches];
+    scalarPtr* gradient_internal_coeffs = new scalarPtr[nPatches];
+    scalarPtr* gradient_boundary_coeffs = new scalarPtr[nPatches];
+
+    const scalar *rhoPtr = &rho[0];
     const scalar *rhoOldTimePtr = &rho.oldTime()[0];
     const scalar *YiOldTimePtr = &Yi.oldTime()[0];
     const scalar *phiPtr = &phi[0];
     const scalar *phiUcPtr = &phiUc[0];
     const scalar *rhoDPtr = &rhoD[0];
-    const scalar *deltaCoeffsPtr = &mesh.deltaCoeffs()[0];
-    const scalar *magSfPtr = &mesh.magSf()[0];
     const scalar *suPtr = &su[0];
-    scalar *boundary_phi = new scalar[nProcessBoundarySurfaces];
-    scalar *boundary_phiUc = new scalar[nProcessBoundarySurfaces];
-    scalar *internal_coeffs = new scalar[nProcessBoundarySurfaces]();
-    scalar *boundary_coeffs = new scalar[nProcessBoundarySurfaces]();
-    scalar *value_internal_coeffs = new scalar[nProcessBoundarySurfaces];
-    scalar *value_boundary_coeffs = new scalar[nProcessBoundarySurfaces];
-    scalar *gradient_internal_coeffs = new scalar[nProcessBoundarySurfaces];
-    scalar *gradient_boundary_coeffs = new scalar[nProcessBoundarySurfaces];
-    scalar *boundary_weights = new scalar[nProcessBoundarySurfaces];
-    scalar *boundary_delta_coeffs = new scalar[nProcessBoundarySurfaces];
-    scalar *boundary_rhoD = new scalar[nProcessBoundarySurfaces];
-    scalar *boundary_mag_sf = new scalar[nProcessBoundarySurfaces];
-    scalar *boundary_upwind_weights = new scalar[nProcessBoundarySurfaces];
-    label offset = 0;
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        const fvsPatchScalarField& patchPhi = phi.boundaryField()[i];
-        const fvsPatchScalarField& patchPhiUc = phiUc.boundaryField()[i];
-        const scalarField& pWeights = mesh.surfaceInterpolation::weights().boundaryField()[i];
-        const scalarField& pDeltaCoeffs = mesh.deltaCoeffs().boundaryField()[i];
-        const fvPatchScalarField& pRhoD = rhoD.boundaryField()[i];
-        const scalarField& pMagSf = mesh.magSf().boundaryField()[i];
 
-        label patchsize = patchPhi.size();
-        if (patchPhi.type() == "processor") {
-            memcpy(boundary_phi + offset, &patchPhi[0], patchsize * sizeof(scalar));
-            std::fill(boundary_phi + offset + patchsize, boundary_phi + offset + 2 * patchsize, 0.);
+    for (label patchi = 0; patchi < nPatches; ++patchi) {
+        label patchSize = patchSizes[patchi];
+        faceCells[patchi] = mesh.boundary()[patchi].faceCells().begin(); // patchSize
+        boundary_mag_sf[patchi] = mesh.magSf().boundaryField()[patchi].begin(); // patchSize
+        boundaryWeights[patchi] = mesh.surfaceInterpolation::weights().boundaryField()[patchi].begin(); // patchSize
+        boundary_delta_coeffs[patchi] = mesh.deltaCoeffs().boundaryField()[patchi].begin(); // patchSize
 
-            memcpy(boundary_phiUc + offset, &patchPhiUc[0], patchsize * sizeof(scalar));
-            std::fill(boundary_phiUc + offset + patchsize, boundary_phiUc + offset + 2 * patchsize, 0.);
-            
-            memcpy(boundary_weights + offset, &pWeights[0], patchsize*sizeof(scalar));
-            memcpy(boundary_weights + offset + patchsize, &pWeights[0], patchsize*sizeof(scalar));
+        const fvsPatchScalarField& patchPhi = phi.boundaryField()[patchi];
+        boundary_phi[patchi] = patchPhi.begin(); // patchSize
 
-            memcpy(boundary_delta_coeffs + offset, &pDeltaCoeffs[0], patchsize*sizeof(scalar));
-            memcpy(boundary_delta_coeffs + offset + patchsize, &pDeltaCoeffs[0], patchsize*sizeof(scalar));
+        const fvsPatchScalarField& patchPhiUc = phiUc.boundaryField()[patchi];
+        boundary_phiUc[patchi] = patchPhiUc.begin(); // patchSize
 
-            memcpy(boundary_rhoD + offset, &pRhoD[0], patchsize * sizeof(scalar));
+        const fvPatchScalarField& patchRhoD = rhoD.boundaryField()[patchi];
+        boundary_rhoD[patchi] = patchRhoD.begin(); // patchSize
+
+        internal_coeffs[patchi] = new scalar[patchSize];
+        boundary_coeffs[patchi] = new scalar[patchSize];
+        value_internal_coeffs[patchi] = new scalar[patchSize];
+        value_boundary_coeffs[patchi] = new scalar[patchSize];
+        gradient_internal_coeffs[patchi] = new scalar[patchSize];
+        gradient_boundary_coeffs[patchi] = new scalar[patchSize];
+        boundary_upwind_weights[patchi] = new scalar[patchSize];
+
+        if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
             scalarField patchRhoDInternal = 
-                    dynamic_cast<const processorFvPatchField<scalar>&>(pRhoD).patchInternalField()();
-            memcpy(boundary_rhoD + offset + patchsize, &patchRhoDInternal[0], patchsize * sizeof(scalar));
-
-            memcpy(boundary_mag_sf + offset, &pMagSf[0], patchsize*sizeof(scalar));
-            memcpy(boundary_mag_sf + offset + patchsize, &pMagSf[0], patchsize*sizeof(scalar));
-            
-            offset += 2 * patchsize;
-        } else {
-            memcpy(boundary_phi + offset, &patchPhi[0], patchsize * sizeof(scalar));
-            memcpy(boundary_phiUc + offset, &patchPhiUc[0], patchsize * sizeof(scalar));
-            memcpy(boundary_weights + offset, &pWeights[0], patchsize*sizeof(scalar));
-            memcpy(boundary_delta_coeffs + offset, &pDeltaCoeffs[0], patchsize*sizeof(scalar));
-            memcpy(boundary_rhoD + offset, &pRhoD[0], patchsize * sizeof(scalar));
-            memcpy(boundary_mag_sf + offset, &pMagSf[0], patchsize*sizeof(scalar));
-
-            offset += patchsize;
-        }
-    }
-    label *patchType = new label[nBoundaryPatches];
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        if (Yi.boundaryField()[i].type() == "processor") {
-            patchType[i] = boundaryConditions::processor;
-        } else if (Yi.boundaryField()[i].type() == "zeroGradient") {
-            patchType[i] = boundaryConditions::zeroGradient;
+                    dynamic_cast<const processorFvPatchField<scalar>&>(patchRhoD).patchInternalField()();
+            boundary_rhoD_internal[patchi] = new scalar[patchSize];
+            memcpy(boundary_rhoD_internal[patchi], patchRhoDInternal.begin(), patchSize * sizeof(scalar));
+        } else if (patchTypes[patchi] == MeshSchedule::PatchType::wall) {
+            boundary_rhoD_internal[patchi] = nullptr;
         } else {
             Info << "boundary condition not supported" << endl;
             std::exit(-1);
         }
     }
 
-    offset = 0;
-    for (label i = 0; i < nProcessBoundarySurfaces; ++i) {
-        if (boundary_phi[i] >= 0) {
-            boundary_upwind_weights[i] = 1.;
-        } else {
-            boundary_upwind_weights[i] = 0.;
+    Info << "Gen_Y allocate : " << clock.timeIncrement() << endl;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (label patchi = 0; patchi < nPatches; ++patchi) {
+        for (label f = 0; f < patchSizes[patchi]; ++f) {
+            boundary_upwind_weights[patchi][f] = boundary_phi[patchi][f] >= 0 ? 1.: 0.;
         }
     }
+
+    Info << "Gen_Y upwind weight : " << clock.timeIncrement() << endl;
 
     // update boundary coeffs
-    offset = 0;
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        if (patchType[i] == boundaryConditions::zeroGradient) {
-            std::fill(value_internal_coeffs + offset, value_internal_coeffs + offset + surfacePerPatch[i], 1.);
-            std::fill(value_boundary_coeffs + offset, value_boundary_coeffs + offset + surfacePerPatch[i], 0.);
-            std::fill(gradient_internal_coeffs + offset, gradient_internal_coeffs + offset + surfacePerPatch[i], 0.);
-            std::fill(gradient_boundary_coeffs + offset, gradient_boundary_coeffs + offset + surfacePerPatch[i], 0.);
-
-            offset += surfacePerPatch[i];
-        } else if (patchType[i] == boundaryConditions::processor) {
-            for (label j = 0; j < surfacePerPatch[i]; ++j) {
-                label start_index = offset + j;
-                scalar bouDeltaCoeffs = boundary_delta_coeffs[start_index];
-                scalar bouWeight = boundary_upwind_weights[start_index];
-                value_internal_coeffs[start_index] = bouWeight;
-                value_boundary_coeffs[start_index] = 1 - bouWeight;
-                gradient_internal_coeffs[start_index] = -1 * bouDeltaCoeffs;
-                gradient_boundary_coeffs[start_index] = bouDeltaCoeffs;
+    for (label patchi = 0; patchi < nPatches; ++patchi) {
+        if (patchTypes[patchi] == MeshSchedule::PatchType::wall) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for (label f = 0; f < patchSizes[patchi]; ++f){
+                value_internal_coeffs[patchi][f] = 1.;
+                value_boundary_coeffs[patchi][f] = 0.;
+                gradient_internal_coeffs[patchi][f] = 0.;
+                gradient_boundary_coeffs[patchi][f] = 0.;
+            } 
+        } else if (patchTypes[patchi] == MeshSchedule::PatchType::processor) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for (label f = 0; f < patchSizes[patchi]; ++f){
+                scalar bouDeltaCoeffs = boundary_delta_coeffs[patchi][f];
+                scalar bouWeight = boundary_upwind_weights[patchi][f];
+                value_internal_coeffs[patchi][f] = bouWeight;
+                value_boundary_coeffs[patchi][f] = 1 - bouWeight;
+                gradient_internal_coeffs[patchi][f] = -1 * bouDeltaCoeffs;
+                gradient_boundary_coeffs[patchi][f] = bouDeltaCoeffs;
             }
-            offset += 2 * surfacePerPatch[i];
-        }
+        }    
     }
 
+    Info << "Gen_Y update boundary coeffs : " << clock.timeIncrement() << endl;
+
     // ddt
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label i = 0; i < nCells; ++i) {
         diagPtr[i] += rDeltaT * rhoPtr[i] * meshVPtr[i];
         sourcePtr[i] += rDeltaT * rhoOldTimePtr[i] * YiOldTimePtr[i] * meshVPtr[i];
     }
+
+    Info << "Gen_Y ddt : " << clock.timeIncrement() << endl;
 
     // fvmDiv(phi, Yi)
     // - internal
@@ -723,29 +738,27 @@ GenMatrix_Y(
         scalar upper_value = (1 - w) * f;
         upperPtr[i] += upper_value;
         lowerPtr[i] += lower_value;
-
-        label owner = own[i];
-        label neighbor = nei[i];
-        diagPtr[owner] -= lower_value;
-        diagPtr[neighbor] -= upper_value;
     }
 
     // - boundary
-    offset = 0;
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        for (label j = 0; j < surfacePerPatch[i]; ++j) {
-            label start_index = offset + j;
-            scalar boundary_f = boundary_phi[start_index];
-            internal_coeffs[start_index] += value_internal_coeffs[start_index] * boundary_f;
-            boundary_coeffs[start_index] -= value_boundary_coeffs[start_index] * boundary_f;
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for (label f = 0; f < patchSizes[patchi]; ++f){
+            scalar boundary_f = boundary_phi[patchi][f];
+            internal_coeffs[patchi][f] = value_internal_coeffs[patchi][f] * boundary_f;
+            boundary_coeffs[patchi][f] = -1. * value_boundary_coeffs[patchi][f] * boundary_f;
         }
-        if (patchType[i] == boundaryConditions::processor) offset += 2 * surfacePerPatch[i];
-        else offset += surfacePerPatch[i];
     }
 
+    Info << "Gen_Y div phi : " << clock.timeIncrement() << endl;
 
     // fvmDiv(phiUc, Yi)
     // - internal
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label i = 0; i < nFaces; ++i) {
         scalar w = upwindWeights[i];
         scalar f = phiUcPtr[i];
@@ -754,27 +767,27 @@ GenMatrix_Y(
         scalar upper_value = (1 - w) * f;
         upperPtr[i] += upper_value;
         lowerPtr[i] += lower_value;
+    }
 
-        label owner = own[i];
-        label neighbor = nei[i];
-        diagPtr[owner] -= lower_value;
-        diagPtr[neighbor] -= upper_value;
-    }
     // - boundary
-    offset = 0;
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        for (label j = 0; j < surfacePerPatch[i]; ++j) {
-            label start_index = offset + j;
-            scalar boundary_f = boundary_phiUc[start_index];
-            internal_coeffs[start_index] += value_internal_coeffs[start_index] * boundary_f;
-            boundary_coeffs[start_index] -= value_boundary_coeffs[start_index] * boundary_f;
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for (label f = 0; f < patchSizes[patchi]; ++f){
+            scalar boundary_f = boundary_phiUc[patchi][f];
+            internal_coeffs[patchi][f] += boundary_f * value_internal_coeffs[patchi][f];
+            boundary_coeffs[patchi][f] -= boundary_f * value_boundary_coeffs[patchi][f];
         }
-        if (patchType[i] == boundaryConditions::processor) offset += 2 * surfacePerPatch[i];
-        else offset += surfacePerPatch[i];
     }
+
+    Info << "Gen_Y div phiUc : " << clock.timeIncrement() << endl;
 
     // fvm::laplacian(DEff(), Yi)
     // - internal
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label i = 0; i < nFaces; ++i) {
         label owner = own[i];
         label neighbor = nei[i];
@@ -786,55 +799,103 @@ GenMatrix_Y(
 
         upperPtr[i] += upper_value;
         lowerPtr[i] += lower_value;
-
-        diagPtr[owner] -= lower_value;
-        diagPtr[neighbor] -= upper_value;
     }
+
     // - boundary
-    offset = 0;
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        for (label j = 0; j < surfacePerPatch[i]; ++j) {
-            label start_index = offset + j;
-            scalar boundary_value = boundary_rhoD[start_index] * boundary_mag_sf[start_index];
-            internal_coeffs[start_index] -= boundary_value * gradient_internal_coeffs[start_index];
-            boundary_coeffs[start_index] += boundary_value * gradient_boundary_coeffs[start_index];
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for (label f = 0; f < patchSizes[patchi]; ++f){
+            scalar boundary_value = boundary_rhoD[patchi][f] * boundary_mag_sf[patchi][f];
+            internal_coeffs[patchi][f] -= boundary_value * gradient_internal_coeffs[patchi][f];
+            boundary_coeffs[patchi][f] += boundary_value * gradient_boundary_coeffs[patchi][f];
         }
-        if (patchType[i] == boundaryConditions::processor) offset += 2 * surfacePerPatch[i];
-        else offset += surfacePerPatch[i];
+    }
+    Info << "Gen_Y laplacian DEff : " << clock.timeIncrement() << endl;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label j = face_start; j < face_end; ++j) {
+            label owner = own[j];
+            label neighbor = nei[j];
+            diagPtr[owner] -= lowerPtr[j];
+            diagPtr[neighbor] -= upperPtr[j];
+        }
+    }
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label j = face_start; j < face_end; ++j) {
+            label owner = own[j];
+            label neighbor = nei[j];
+            diagPtr[owner] -= lowerPtr[j];
+            diagPtr[neighbor] -= upperPtr[j];
+        }
     }
 
-    // add source 
+    Info << "Gen_Y diag : " << clock.timeIncrement() << endl;
+
+    // add source
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label i = 0; i < nCells; ++i) {
         sourcePtr[i] += meshVPtr[i] * suPtr[i];
     }
 
     // cpoy result to fvm
-    offset = 0;
-    for (label i = 0; i < nBoundaryPatches; ++i) {
-        for (label j = 0; j < surfacePerPatch[i]; ++j) {
-            label start_index = offset + j;
-            fvm.internalCoeffs()[i][j] = internal_coeffs[start_index];
-            fvm.boundaryCoeffs()[i][j] = boundary_coeffs[start_index];
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+        for (label f = 0; f < patchSizes[patchi]; ++f){
+            fvm.internalCoeffs()[patchi][f] = internal_coeffs[patchi][f];
+            fvm.boundaryCoeffs()[patchi][f] = boundary_coeffs[patchi][f];
         }
-        if (patchType[i] == boundaryConditions::processor) offset += 2 * surfacePerPatch[i];
-        else offset += surfacePerPatch[i];
     }
+
+    Info << "Gen_Y copy back : " << clock.timeIncrement() << endl;
+    
 
     // free ptrs
     delete[] boundary_phi;
     delete[] boundary_phiUc;
+    delete[] boundaryWeights;
+    delete[] boundary_delta_coeffs;
+    delete[] boundary_mag_sf;
+    delete[] boundary_rhoD;
+    delete[] boundary_upwind_weights;
+    delete[] faceCells;
+
+    for(label i = 0; i < nPatches; ++i){
+        if (boundary_rhoD_internal[i] != nullptr){
+            delete[] boundary_rhoD_internal[i];
+        }
+        delete[] internal_coeffs[i];
+        delete[] boundary_coeffs[i];
+        delete[] value_internal_coeffs[i];
+        delete[] value_boundary_coeffs[i];
+        delete[] gradient_internal_coeffs[i];
+        delete[] gradient_boundary_coeffs[i];
+    }
+    delete[] boundary_rhoD_internal;
     delete[] internal_coeffs;
     delete[] boundary_coeffs;
     delete[] value_internal_coeffs;
     delete[] value_boundary_coeffs;
     delete[] gradient_internal_coeffs;
     delete[] gradient_boundary_coeffs;
-    delete[] boundary_weights;
-    delete[] boundary_delta_coeffs;
-    delete[] boundary_rhoD;
-    delete[] boundary_mag_sf;
-    delete[] boundary_upwind_weights;
-    delete[] patchType;
+
+    Info << "Gen_Y free : " << clock.timeIncrement() << endl;
+    Info << "Gen_Y total : " << clock.elapsedTime() << endl;
 
     return tfvm;
 }

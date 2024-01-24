@@ -305,6 +305,19 @@ GenMatrix_p(
     surfaceScalarField& phiHbyA
 );
 
+void postProcess_P(
+    volScalarField& p,
+    fvScalarMatrix& pEqn,
+    surfaceScalarField& phi,
+    volVectorField& U,
+    const volScalarField& rAU,
+    const volVectorField& HbyA,
+    volScalarField& K,
+    volScalarField& dpdt,
+
+    surfaceScalarField& phiHbyA
+);
+
 // thermo
 
 // construct new variables

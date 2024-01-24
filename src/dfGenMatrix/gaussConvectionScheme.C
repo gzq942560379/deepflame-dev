@@ -346,6 +346,13 @@ gaussConvectionSchemeFvcDiv
 (
     const tmp<GeometricField<scalar, fvsPatchField, surfaceMesh>>& tssf
 );
+
+template
+tmp<GeometricField<scalar, fvPatchField, volMesh>>
+fvcSurfaceIntegrate
+(
+    const tmp<GeometricField<scalar, fvsPatchField, surfaceMesh>>& tssf
+);
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
