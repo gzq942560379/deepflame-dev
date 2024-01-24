@@ -19,12 +19,12 @@ if (!pimple.simpleRho())
 // pressure solution
 const volScalarField psip0(psi*p);
 
-#ifdef OPT_GenMatrix_p
-    tmp<volScalarField> trAU = rAUConstructor(UEqn);
-    volScalarField& rAU = trAU.ref();
-#else
+// #ifdef OPT_GenMatrix_p
+//     tmp<volScalarField> trAU = rAUConstructor(UEqn);
+//     volScalarField& rAU = trAU.ref();
+// #else
     volScalarField rAU(1.0/UEqn.A());
-#endif
+// #endif
 
 tmp<volScalarField> tmp_rhoRau = rho*rAU;
 
@@ -35,11 +35,11 @@ tmp<volScalarField> tmp_rhoRau = rho*rAU;
 surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
 // #endif
 
-#ifdef OPT_GenMatrix_p
-    tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
-#else
+// #ifdef OPT_GenMatrix_p
+//     tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
+// #else
     tmp<volVectorField> tUEqnH = UEqn.H();
-#endif
+// #endif
 
 volVectorField HbyA(constrainHbyA(rAU*tUEqnH, U, p));
 
@@ -47,14 +47,14 @@ if (pimple.nCorrPiso() <= 1)
 {
     tUEqn.clear();
 }
-
-#ifdef OPT_GenMatrix_p
+rho.oldTime();
+// #ifdef OPT_GenMatrix_p
+//     tmp<surfaceScalarField> tddtCorr = EulerDdtSchemeFvcDdtCorr(rho, U, phi, rhoUf);
+//     surfaceScalarField ddtCorr = tddtCorr();
+// #else
     tmp<surfaceScalarField> tddtCorr = EulerDdtSchemeFvcDdtCorr(rho, U, phi, rhoUf);
     surfaceScalarField ddtCorr = tddtCorr();
-#else
-    tmp<surfaceScalarField> tddtCorr = fvc::ddtCorr(rho, U, phi, rhoUf);
-    surfaceScalarField ddtCorr = tddtCorr();
-#endif
+// #endif
 
 // check_field_equal(ddtCorrTest, ddtCorrRef);
 
@@ -71,107 +71,22 @@ surfaceScalarField phiHbyA
 // #endif
 // construct phiHbyA directly
 
-fvc::makeRelative(phiHbyA, rho, U);
-
 // Update the pressure BCs to ensure flux consistency
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
 
 p_pre_time += clock.timeIncrement();
 
-if (pimple.transonic())
-{
-    p_pimple_time += clock.timeIncrement();
-
-    surfaceScalarField phid
-    (
-        "phid",
-        (fvc::interpolate(psi)/fvc::interpolate(rho))*phiHbyA
-    );
-
-    phiHbyA -= fvc::interpolate(psi*p)*phiHbyA/fvc::interpolate(rho);
-    
-    fvScalarMatrix pDDtEqn
-    (
-        fvc::ddt(rho) + psi * correction(fvm::ddt(p))
-      + fvc::div(phiHbyA) + fvm::div(phid, p)
-    );
-    p_build_time += clock.timeIncrement();
-
-    while (pimple.correctNonOrthogonal())
-    {
-        p_pimple_time += clock.timeIncrement();
-
-        fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
-        // Relax the pressure equation to ensure diagonal-dominance
-        pEqn.relax();
-
-        p_build_time += clock.timeIncrement();
-
-#ifdef _CSR_
-        csrMatrix csr(pEqn);
-#endif
-#ifdef _ELL_
-        ellMatrix ell(pEqn);
-#endif
-#ifdef _DIV_
-        // divMatrix div(pEqn);
-        div.copy_value_from_fvMatrix(pEqn);
-#endif
-#ifdef _LDU_
-        LDUMatrix LDU(pEqn);
-#endif
-        p_convert_time += clock.timeIncrement();
-
-#ifdef _CSR_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _ELL_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _DIV_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _LDU_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-
-#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
-        pEqn.solve();
-#endif
-        p_solve_time += clock.timeIncrement();
-
-        if (pimple.finalNonOrthogonalIter())
-        {
-            phi = phiHbyA + pEqn.flux();
-        }
-        
-        p_post_time += clock.timeIncrement();
-
-    }
-}
-else
-{
+// {
     p_pimple_time += clock.timeIncrement();
 
 #ifdef OPT_GenMatrix_p
     p_build_opt_start = MPI_Wtime();
-    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phiHbyA, rhorAUf, psi);
+    surfaceScalarField phiHbyATest = phiHbyA;
+    surfaceScalarField rhorAUfTest = rhorAUf;
+    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phi, rAU, U, HbyA, psi, rhorAUfTest, phiHbyATest);
+    check_field_boundary_equal(rhorAUf, rhorAUfTest, "rhorAUf");
+    check_field_boundary_equal(phiHbyA, phiHbyATest, "phiHbyA");
+
     fvScalarMatrix pDDtEqn = tpDDtEqn.ref();
     p_build_opt_end = MPI_Wtime();
     p_build_opt_time += p_build_opt_end - p_build_opt_start;
@@ -181,7 +96,6 @@ else
     fvScalarMatrix pDDtEqn
     (
         fvc::ddt(rho) + psi * correction(fvm::ddt(p))
-        // fvm::ddt(p)
       + fvc::div(phiHbyA) - fvm::laplacian(rhorAUf, p)
     );
     p_build_org_end = MPI_Wtime();
@@ -200,10 +114,15 @@ else
     p_build_org_end = MPI_Wtime();
     p_build_org_time += p_build_org_end - p_build_org_start;
     Info << "p_build_org_time : " << p_build_org_time << endl;
-    check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer);
+    check_fvmatrix_equal(pDDtEqn, pDDtEqn_answer, "pDDtEqn");
 #endif
 
     p_build_time += clock.timeIncrement();
+    
+    volVectorField Uref = U;
+    surfaceScalarField phiref = phi;
+    volScalarField Kref = K;
+    volScalarField dpdtref = dpdt;
 
     while (pimple.correctNonOrthogonal())
     {
@@ -262,13 +181,15 @@ else
 #endif
         p_solve_time += clock.timeIncrement();
 
+        postProcess_P(p, pEqn, phiref, Uref, rAU, HbyA, Kref, dpdtref, phiHbyA);
+
         if (pimple.finalNonOrthogonalIter())
         {
             phi = phiHbyA + pEqn.flux();
         }
         p_post_time += clock.timeIncrement();
     }
-}
+// }
 
 bool limitedp = pressureControl.limit(p);
 
@@ -307,6 +228,12 @@ if (thermo.dpdt())
         dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
     }
 }
+
+check_field_boundary_equal(U, Uref, "U");
+check_field_boundary_equal(phi, phiref, "phi");
+check_field_boundary_equal(K, Kref, "K");
+check_field_equal(dpdt, dpdtref, "dpdt");
+
 
 p_post_time += clock.timeIncrement();
 
