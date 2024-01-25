@@ -5,7 +5,7 @@
 #include "linear.H"
 #include "orthogonalSnGrad.H"
 namespace Foam{
-
+// #undef _OPENMP
 tmp<fvVectorMatrix>
 GenMatrix_U(
     const volScalarField& rho,
@@ -15,6 +15,7 @@ GenMatrix_U(
     compressible::turbulenceModel& turbulence
 ){
 
+    clockTime clock;
     typedef scalar* scalarPtr;
     typedef const scalar* constScalarPtr;
     typedef const label* constLabelPtr;
@@ -23,6 +24,7 @@ GenMatrix_U(
     assert(mesh.moving() == false);
 
     const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const labelList& face_scheduling = meshSchedule.face_scheduling();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -44,6 +46,14 @@ GenMatrix_U(
     const scalar* const __restrict__ rhoPtr = &rho.primitiveField()[0];
     const scalar* const __restrict__ rhoOldTimePtr = &rho.oldTime().primitiveField()[0];
     const scalar* const __restrict__ pPtr = &p[0];
+    scalar *gradUPtr = new scalar[nCells * 9]; // nCells * 9
+    
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (label i = 0; i < nCells * 9; ++i){
+        gradUPtr[i] = 0.;
+    }
     
     // intermediate variable
 
@@ -62,38 +72,6 @@ GenMatrix_U(
     scalar* __restrict__ lowerPtr = &fvm.lower()[0];
     scalar* __restrict__ upperPtr = &fvm.upper()[0];
 
-    surfaceVectorField Uf(
-        IOobject
-        (
-            "interpolate("+U.name()+')',
-            U.instance(),
-            U.db()
-        ),
-        mesh,
-        mesh.Sf().dimensions()*U.dimensions()
-    );
-
-    volTensorField gGradU(
-        IOobject
-        (
-            "gradU",
-            Uf.instance(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensioned<tensor>
-        (
-            "0",
-            Uf.dimensions()/dimLength,
-            Zero
-        ),
-        extrapolatedCalculatedFvPatchField<tensor>::typeName
-    );
-
-    scalar *gradUPtr = &gGradU[0][0];
-
 
     volScalarField gamma = (turbulence.rho()*turbulence.nuEff()).ref();
     const scalar* const __restrict__ gammaPtr = &gamma[0];
@@ -107,16 +85,6 @@ GenMatrix_U(
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
     
     // allocate memory
-
-    label allPatchSize = 0;
-    for(label patchi = 0 ; patchi < nPatches ; ++patchi){
-        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
-            allPatchSize += 2 * patchSizes[patchi];
-        } else {
-            allPatchSize += patchSizes[patchi];
-        }
-    }
-
     scalarPtr* internalCoeffsPtr = new scalarPtr[nPatches];
     scalarPtr* boundaryCoeffsPtr = new scalarPtr[nPatches];
     scalarPtr* valueInternalCoeffs = new scalarPtr[nPatches];
@@ -144,12 +112,12 @@ GenMatrix_U(
     for (label patchi = 0; patchi < nPatches; ++patchi){
         label patchSize = patchSizes[patchi];
 
-        internalCoeffsPtr[patchi] = new scalar[patchSize * 3]();
-        boundaryCoeffsPtr[patchi] = new scalar[patchSize * 3]();
-        valueInternalCoeffs[patchi] = new scalar[patchSize * 3]();
-        valueBoundaryCoeffs[patchi] = new scalar[patchSize * 3]();
-        gradientInternalCoeffs[patchi] = new scalar[patchSize * 3]();
-        gradientBoundaryCoeffs[patchi] = new scalar[patchSize * 3]();
+        internalCoeffsPtr[patchi] = new scalar[patchSize * 3];
+        boundaryCoeffsPtr[patchi] = new scalar[patchSize * 3];
+        valueInternalCoeffs[patchi] = new scalar[patchSize * 3];
+        valueBoundaryCoeffs[patchi] = new scalar[patchSize * 3];
+        gradientInternalCoeffs[patchi] = new scalar[patchSize * 3];
+        gradientBoundaryCoeffs[patchi] = new scalar[patchSize * 3];
 
         const fvPatchVectorField& patchU = U.boundaryField()[patchi];
         const fvPatchScalarField& pTurbRho = turbulence.rho().boundaryField()[patchi];
@@ -210,6 +178,7 @@ GenMatrix_U(
             std::exit(-1);
         }
     }
+    Info << "GenMatrix_U init : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -221,11 +190,10 @@ GenMatrix_U(
 #pragma omp parallel
 #endif
     for(label patchi = 0 ; patchi < nPatches ; ++patchi){
-
-        if(patchSizes[patchi] == 0) continue;  
-
-        /* update_boundary_coeffs_zeroGradient_vector */
         if (patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
                 valueInternalCoeffs[patchi][s * 3 + 0] = 1;
                 valueInternalCoeffs[patchi][s * 3 + 1] = 1;
@@ -241,8 +209,10 @@ GenMatrix_U(
                 gradientBoundaryCoeffs[patchi][s * 3 + 2] = 0;
             }
         }
-        /* update_boundary_coeffs_processor_vector */
         else if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
                 valueInternalCoeffs[patchi][s * 3 + 0] = boundaryWeight[patchi][s];
                 valueInternalCoeffs[patchi][s * 3 + 1] = boundaryWeight[patchi][s];
@@ -263,6 +233,7 @@ GenMatrix_U(
             std::exit(-1);        
         }
     }
+    Info << "GenMatrix_U update boundary coeffs : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -278,6 +249,7 @@ GenMatrix_U(
         sourcePtr[1 + c * 3] += rDeltaT * rhoOldTimePtr[c] * UOldTimePtr[1 + c * 3] * meshVPtr[c];
         sourcePtr[2 + c * 3] += rDeltaT * rhoOldTimePtr[c] * UOldTimePtr[2 + c * 3] * meshVPtr[c];
     }
+    Info << "GenMatrix_U ddt : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -289,31 +261,49 @@ GenMatrix_U(
 #ifdef _OPENMP    
 #pragma omp parallel for
 #endif
-    for(label f = 0; f < nFaces; ++f){
-        scalar lower_value = - weightsPtr[f] * phiPtr[f];
-        scalar upper_value = (- weightsPtr[f] + 1.) * phiPtr[f];        
-        lowerPtr[f] += lower_value;
-        upperPtr[f] += upper_value;
-        diagPtr[l[f]] -= lower_value;
-        diagPtr[u[f]] -= upper_value;
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar lower_value = - weightsPtr[f] * phiPtr[f];
+            scalar upper_value = (- weightsPtr[f] + 1.) * phiPtr[f];        
+            lowerPtr[f] += lower_value;
+            upperPtr[f] += upper_value;
+            diagPtr[l[f]] -= lower_value;
+            diagPtr[u[f]] -= upper_value;
+        }
     }
-
-    /* fvm_div_vector_boundary */
 #ifdef _OPENMP    
 #pragma omp parallel for
 #endif
-    for(label patchi= 0; patchi < nPatches ; ++patchi){
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar lower_value = - weightsPtr[f] * phiPtr[f];
+            scalar upper_value = (- weightsPtr[f] + 1.) * phiPtr[f];        
+            lowerPtr[f] += lower_value;
+            upperPtr[f] += upper_value;
+            diagPtr[l[f]] -= lower_value;
+            diagPtr[u[f]] -= upper_value;
+        }
+    }
 
-        if (patchSizes[patchi] == 0) continue;
+    /* fvm_div_vector_boundary */
+    for(label patchi= 0; patchi < nPatches ; ++patchi){
+#ifdef _OPENMP    
+#pragma omp parallel for
+#endif
         for(label s = 0; s < patchSizes[patchi] ; ++s){
-            internalCoeffsPtr[patchi][s * 3 + 0] += boundaryPhi[patchi][s] * valueInternalCoeffs[patchi][s * 3 + 0];
-            internalCoeffsPtr[patchi][s * 3 + 1] += boundaryPhi[patchi][s] * valueInternalCoeffs[patchi][s * 3 + 1];
-            internalCoeffsPtr[patchi][s * 3 + 2] += boundaryPhi[patchi][s] * valueInternalCoeffs[patchi][s * 3 + 2];
+            internalCoeffsPtr[patchi][s * 3 + 0] = boundaryPhi[patchi][s] * valueInternalCoeffs[patchi][s * 3 + 0];
+            internalCoeffsPtr[patchi][s * 3 + 1] = boundaryPhi[patchi][s] * valueInternalCoeffs[patchi][s * 3 + 1];
+            internalCoeffsPtr[patchi][s * 3 + 2] = boundaryPhi[patchi][s] * valueInternalCoeffs[patchi][s * 3 + 2];
             boundaryCoeffsPtr[patchi][s * 3 + 0] = -boundaryPhi[patchi][s] * valueBoundaryCoeffs[patchi][s * 3 + 0];
             boundaryCoeffsPtr[patchi][s * 3 + 1] = -boundaryPhi[patchi][s] * valueBoundaryCoeffs[patchi][s * 3 + 1];
             boundaryCoeffsPtr[patchi][s * 3 + 2] = -boundaryPhi[patchi][s] * valueBoundaryCoeffs[patchi][s * 3 + 2];
         }
     }
+    Info << "GenMatrix_U div : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -323,33 +313,49 @@ GenMatrix_U(
 
     /* fvm_laplacian_internal */
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-    for(label f = 0; f < nFaces; ++f){
-
-        scalar w = weightsPtr[f];
-        scalar face_gamma = w * gammaPtr[l[f]] + (1 - w) * gammaPtr[u[f]];
-
-        scalar upper_value = face_gamma * meshMagSfPtr[f] * deltaCoeffsPtr[f];
-        scalar lower_value = upper_value;
-
-        lower_value = lower_value * (-1);
-        upper_value = upper_value * (-1);
-
-        lowerPtr[f] += lower_value;
-        upperPtr[f] += upper_value;
-
-        diagPtr[l[f]] -= lower_value;
-        diagPtr[u[f]] -= upper_value;
-
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar w = weightsPtr[f];
+            scalar face_gamma = w * gammaPtr[l[f]] + (1 - w) * gammaPtr[u[f]];
+            scalar upper_value = face_gamma * meshMagSfPtr[f] * deltaCoeffsPtr[f];
+            scalar lower_value = upper_value;
+            lower_value = lower_value * (-1);
+            upper_value = upper_value * (-1);
+            lowerPtr[f] += lower_value;
+            upperPtr[f] += upper_value;
+            diagPtr[l[f]] -= lower_value;
+            diagPtr[u[f]] -= upper_value;
+        }
+    }
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar w = weightsPtr[f];
+            scalar face_gamma = w * gammaPtr[l[f]] + (1 - w) * gammaPtr[u[f]];
+            scalar upper_value = face_gamma * meshMagSfPtr[f] * deltaCoeffsPtr[f];
+            scalar lower_value = upper_value;
+            lower_value = lower_value * (-1);
+            upper_value = upper_value * (-1);
+            lowerPtr[f] += lower_value;
+            upperPtr[f] += upper_value;
+            diagPtr[l[f]] -= lower_value;
+            diagPtr[u[f]] -= upper_value;
+        }
     }
     
     /*  fvm_laplacian_vector_boundary */
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
     for(label patchi= 0; patchi < nPatches ; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for(label s = 0; s < patchSizes[patchi] ; ++s){
             internalCoeffsPtr[patchi][s * 3 + 0] += (-1) * bouTurbRho[patchi][s] * bouTurbNuEff[patchi][s] * boundaryMagSf[patchi][s] * gradientInternalCoeffs[patchi][s * 3 + 0];
             internalCoeffsPtr[patchi][s * 3 + 1] += (-1) * bouTurbRho[patchi][s] * bouTurbNuEff[patchi][s] * boundaryMagSf[patchi][s] * gradientInternalCoeffs[patchi][s * 3 + 1];
@@ -360,6 +366,7 @@ GenMatrix_U(
             
         }
     }
+    Info << "GenMatrix_U laplacian : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -369,56 +376,92 @@ GenMatrix_U(
 
     /* fvc_grad_vector_internal */
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-    for(label f = 0; f < nFaces; ++f){
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar ssfx = weightsPtr[f] * (UOldTimePtr[3 * l[f]] - UOldTimePtr[3 * u[f]]) + UOldTimePtr[3 * u[f]];
+            scalar ssfy = weightsPtr[f] * (UOldTimePtr[3 * l[f] + 1] - UOldTimePtr[3 * u[f] + 1]) + UOldTimePtr[3 * u[f] + 1];
+            scalar ssfz = weightsPtr[f] * (UOldTimePtr[3 * l[f] + 2] - UOldTimePtr[3 * u[f] + 2]) + UOldTimePtr[3 * u[f] + 2];
 
-        scalar ssfx = weightsPtr[f] * (UOldTimePtr[3 * l[f]] - UOldTimePtr[3 * u[f]]) + UOldTimePtr[3 * u[f]];
-        scalar ssfy = weightsPtr[f] * (UOldTimePtr[3 * l[f] + 1] - UOldTimePtr[3 * u[f] + 1]) + UOldTimePtr[3 * u[f] + 1];
-        scalar ssfz = weightsPtr[f] * (UOldTimePtr[3 * l[f] + 2] - UOldTimePtr[3 * u[f] + 2]) + UOldTimePtr[3 * u[f] + 2];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
 
-        scalar Sfx = meshSfPtr[3 * f];
-        scalar Sfy = meshSfPtr[3 * f + 1];
-        scalar Sfz = meshSfPtr[3 * f + 2];
-
-        gradUPtr[9 * l[f]] += Sfx * ssfx;
-        gradUPtr[9 * l[f] + 1] += Sfx * ssfy;
-        gradUPtr[9 * l[f] + 2] += Sfx * ssfz;
-        gradUPtr[9 * l[f] + 3] += Sfy * ssfx;
-        gradUPtr[9 * l[f] + 4] += Sfy * ssfy;
-        gradUPtr[9 * l[f] + 5] += Sfy * ssfz;
-        gradUPtr[9 * l[f] + 6] += Sfz * ssfx;
-        gradUPtr[9 * l[f] + 7] += Sfz * ssfy;
-        gradUPtr[9 * l[f] + 8] += Sfz * ssfz;
-        gradUPtr[9 * u[f]] -= Sfx * ssfx;
-        gradUPtr[9 * u[f] + 1] -= Sfx * ssfy;
-        gradUPtr[9 * u[f] + 2] -= Sfx * ssfz;
-        gradUPtr[9 * u[f] + 3] -= Sfy * ssfx;
-        gradUPtr[9 * u[f] + 4] -= Sfy * ssfy;
-        gradUPtr[9 * u[f] + 5] -= Sfy * ssfz;
-        gradUPtr[9 * u[f] + 6] -= Sfz * ssfx;
-        gradUPtr[9 * u[f] + 7] -= Sfz * ssfy;
-        gradUPtr[9 * u[f] + 8] -= Sfz * ssfz;
+            gradUPtr[9 * l[f]] += Sfx * ssfx;
+            gradUPtr[9 * l[f] + 1] += Sfx * ssfy;
+            gradUPtr[9 * l[f] + 2] += Sfx * ssfz;
+            gradUPtr[9 * l[f] + 3] += Sfy * ssfx;
+            gradUPtr[9 * l[f] + 4] += Sfy * ssfy;
+            gradUPtr[9 * l[f] + 5] += Sfy * ssfz;
+            gradUPtr[9 * l[f] + 6] += Sfz * ssfx;
+            gradUPtr[9 * l[f] + 7] += Sfz * ssfy;
+            gradUPtr[9 * l[f] + 8] += Sfz * ssfz;
+            gradUPtr[9 * u[f]] -= Sfx * ssfx;
+            gradUPtr[9 * u[f] + 1] -= Sfx * ssfy;
+            gradUPtr[9 * u[f] + 2] -= Sfx * ssfz;
+            gradUPtr[9 * u[f] + 3] -= Sfy * ssfx;
+            gradUPtr[9 * u[f] + 4] -= Sfy * ssfy;
+            gradUPtr[9 * u[f] + 5] -= Sfy * ssfz;
+            gradUPtr[9 * u[f] + 6] -= Sfz * ssfx;
+            gradUPtr[9 * u[f] + 7] -= Sfz * ssfy;
+            gradUPtr[9 * u[f] + 8] -= Sfz * ssfz;
+        }
     }
 
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar ssfx = weightsPtr[f] * (UOldTimePtr[3 * l[f]] - UOldTimePtr[3 * u[f]]) + UOldTimePtr[3 * u[f]];
+            scalar ssfy = weightsPtr[f] * (UOldTimePtr[3 * l[f] + 1] - UOldTimePtr[3 * u[f] + 1]) + UOldTimePtr[3 * u[f] + 1];
+            scalar ssfz = weightsPtr[f] * (UOldTimePtr[3 * l[f] + 2] - UOldTimePtr[3 * u[f] + 2]) + UOldTimePtr[3 * u[f] + 2];
+
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+
+            gradUPtr[9 * l[f]] += Sfx * ssfx;
+            gradUPtr[9 * l[f] + 1] += Sfx * ssfy;
+            gradUPtr[9 * l[f] + 2] += Sfx * ssfz;
+            gradUPtr[9 * l[f] + 3] += Sfy * ssfx;
+            gradUPtr[9 * l[f] + 4] += Sfy * ssfy;
+            gradUPtr[9 * l[f] + 5] += Sfy * ssfz;
+            gradUPtr[9 * l[f] + 6] += Sfz * ssfx;
+            gradUPtr[9 * l[f] + 7] += Sfz * ssfy;
+            gradUPtr[9 * l[f] + 8] += Sfz * ssfz;
+            gradUPtr[9 * u[f]] -= Sfx * ssfx;
+            gradUPtr[9 * u[f] + 1] -= Sfx * ssfy;
+            gradUPtr[9 * u[f] + 2] -= Sfx * ssfz;
+            gradUPtr[9 * u[f] + 3] -= Sfy * ssfx;
+            gradUPtr[9 * u[f] + 4] -= Sfy * ssfy;
+            gradUPtr[9 * u[f] + 5] -= Sfy * ssfz;
+            gradUPtr[9 * u[f] + 6] -= Sfz * ssfx;
+            gradUPtr[9 * u[f] + 7] -= Sfz * ssfy;
+            gradUPtr[9 * u[f] + 8] -= Sfz * ssfz;
+        }
+    }
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     for(label patchi = 0; patchi < nPatches ; ++patchi){
-
-        if (patchSizes[patchi] == 0) continue;
         if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
-            /* fvc_grad_vector_boundary_zeroGradient */
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0; s < patchSizes[patchi] ; ++s){
                 scalar bouSfx = boundarySf[patchi][s * 3 + 0];
                 scalar bouSfy = boundarySf[patchi][s * 3 + 1];
                 scalar bouSfz = boundarySf[patchi][s * 3 + 2];
-
                 scalar boussfx = boundaryU[patchi][s * 3 + 0];
                 scalar boussfy = boundaryU[patchi][s * 3 + 1];
                 scalar boussfz = boundaryU[patchi][s * 3 + 2];
-
                 scalar grad_xx = bouSfx * boussfx;
                 scalar grad_xy = bouSfx * boussfy;
                 scalar grad_xz = bouSfx * boussfz;
@@ -428,7 +471,6 @@ GenMatrix_U(
                 scalar grad_zx = bouSfz * boussfx;
                 scalar grad_zy = bouSfz * boussfy;
                 scalar grad_zz = bouSfz * boussfz;
-
                 gradUPtr[faceCells[patchi][s] * 9] += grad_xx;
                 gradUPtr[faceCells[patchi][s] * 9 + 1] += grad_xy;
                 gradUPtr[faceCells[patchi][s] * 9 + 2] += grad_xz;
@@ -441,19 +483,17 @@ GenMatrix_U(
             }
 
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
-            /* fvc_grad_vector_boundary_processor */
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0; s < patchSizes[patchi] ; ++s){
-
                 scalar bouWeight = boundaryWeight[patchi][s];
-
                 scalar bouSfx = boundarySf[patchi][s * 3 + 0];
                 scalar bouSfy = boundarySf[patchi][s * 3 + 1];
                 scalar bouSfz = boundarySf[patchi][s * 3 + 2];
-
                 scalar boussfx = (1 - bouWeight) * boundaryU[patchi][s * 3 + 0] + bouWeight * boundaryU_internal[patchi][s * 3 + 0];
                 scalar boussfy = (1 - bouWeight) * boundaryU[patchi][s * 3 + 1] + bouWeight * boundaryU_internal[patchi][s * 3 + 1];
                 scalar boussfz = (1 - bouWeight) * boundaryU[patchi][s * 3 + 2] + bouWeight * boundaryU_internal[patchi][s * 3 + 2];
-
                 scalar grad_xx = bouSfx * boussfx;
                 scalar grad_xy = bouSfx * boussfy;
                 scalar grad_xz = bouSfx * boussfz;
@@ -463,7 +503,6 @@ GenMatrix_U(
                 scalar grad_zx = bouSfz * boussfx;
                 scalar grad_zy = bouSfz * boussfy;
                 scalar grad_zz = bouSfz * boussfz;
-
                 gradUPtr[faceCells[patchi][s] * 9] += grad_xx;
                 gradUPtr[faceCells[patchi][s] * 9 + 1] += grad_xy;
                 gradUPtr[faceCells[patchi][s] * 9 + 2] += grad_xz;
@@ -473,38 +512,39 @@ GenMatrix_U(
                 gradUPtr[faceCells[patchi][s] * 9 + 6] += grad_zx;
                 gradUPtr[faceCells[patchi][s] * 9 + 7] += grad_zy;
                 gradUPtr[faceCells[patchi][s] * 9 + 8] += grad_zz;
-
             }
         }else {
             Info << "patch type not supported" << endl;
             std::exit(-1);        
         }
     }
+    Info << "GenMatrix_U gradU : " << clock.timeIncrement() << endl;
 
     /* divide_cell_volume_tsr */
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
     for(label c = 0; c < nCells; ++c){
-        gradUPtr[9 * c] = gradUPtr[9 * c] / meshVPtr[c];
-        gradUPtr[9 * c + 1] = gradUPtr[9 * c + 1] / meshVPtr[c];
-        gradUPtr[9 * c + 2] = gradUPtr[9 * c + 2] / meshVPtr[c];
-        gradUPtr[9 * c + 3] = gradUPtr[9 * c + 3] / meshVPtr[c];
-        gradUPtr[9 * c + 4] = gradUPtr[9 * c + 4] / meshVPtr[c];
-        gradUPtr[9 * c + 5] = gradUPtr[9 * c + 5] / meshVPtr[c];
-        gradUPtr[9 * c + 6] = gradUPtr[9 * c + 6] / meshVPtr[c];
-        gradUPtr[9 * c + 7] = gradUPtr[9 * c + 7] / meshVPtr[c];
-        gradUPtr[9 * c + 8] = gradUPtr[9 * c + 8] / meshVPtr[c];
+        scalar meshVRTmp = 1. / meshVPtr[c];
+        gradUPtr[9 * c] = gradUPtr[9 * c] * meshVRTmp;
+        gradUPtr[9 * c + 1] = gradUPtr[9 * c + 1] * meshVRTmp;
+        gradUPtr[9 * c + 2] = gradUPtr[9 * c + 2] * meshVRTmp;
+        gradUPtr[9 * c + 3] = gradUPtr[9 * c + 3] * meshVRTmp;
+        gradUPtr[9 * c + 4] = gradUPtr[9 * c + 4] * meshVRTmp;
+        gradUPtr[9 * c + 5] = gradUPtr[9 * c + 5] * meshVRTmp;
+        gradUPtr[9 * c + 6] = gradUPtr[9 * c + 6] * meshVRTmp;
+        gradUPtr[9 * c + 7] = gradUPtr[9 * c + 7] * meshVRTmp;
+        gradUPtr[9 * c + 8] = gradUPtr[9 * c + 8] * meshVRTmp;
     }
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     for(label patchi = 0; patchi < nPatches; ++patchi){
-
-        if(patchSizes[patchi] == 0) continue;
         if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
-            /* fvc_grad_vector_correctBC_zeroGradient */
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0; s < patchSizes[patchi] ; ++s){
                 scalar grad_xx = gradUPtr[faceCells[patchi][s] * 9];
                 scalar grad_xy = gradUPtr[faceCells[patchi][s] * 9 + 1];
@@ -515,15 +555,12 @@ GenMatrix_U(
                 scalar grad_zx = gradUPtr[faceCells[patchi][s] * 9 + 6];
                 scalar grad_zy = gradUPtr[faceCells[patchi][s] * 9 + 7];
                 scalar grad_zz = gradUPtr[faceCells[patchi][s] * 9 + 8];
-
                 scalar n_x = boundarySf[patchi][s * 3 + 0] / boundaryMagSf[patchi][s];
                 scalar n_y = boundarySf[patchi][s * 3 + 1] / boundaryMagSf[patchi][s];
                 scalar n_z = boundarySf[patchi][s * 3 + 2] / boundaryMagSf[patchi][s];
-
                 scalar grad_correction_x = - (n_x * grad_xx + n_y * grad_yx + n_z * grad_zx);
                 scalar grad_correction_y = - (n_x * grad_xy + n_y * grad_yy + n_z * grad_zy);
                 scalar grad_correction_z = - (n_x * grad_xz + n_y * grad_yz + n_z * grad_zz);
-
                 boundaryGradU[patchi][s * 9 + 0] = grad_xx + n_x * grad_correction_x;
                 boundaryGradU[patchi][s * 9 + 1] = grad_xy + n_x * grad_correction_y;
                 boundaryGradU[patchi][s * 9 + 2] = grad_xz + n_x * grad_correction_z;
@@ -533,13 +570,13 @@ GenMatrix_U(
                 boundaryGradU[patchi][s * 9 + 6] = grad_zx + n_z * grad_correction_x;
                 boundaryGradU[patchi][s * 9 + 7] = grad_zy + n_z * grad_correction_y;
                 boundaryGradU[patchi][s * 9 + 8] = grad_zz + n_z * grad_correction_z;
-                
             }
 
-        }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
-            /* fvc_grad_vector_correctBC_processor */
+        } else if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0; s < patchSizes[patchi] ; ++s){
-
                 boundaryGradU_internal[patchi][s * 9 + 0] = gradUPtr[faceCells[patchi][s] * 9];
                 boundaryGradU_internal[patchi][s * 9 + 1] = gradUPtr[faceCells[patchi][s] * 9 + 1];
                 boundaryGradU_internal[patchi][s * 9 + 2] = gradUPtr[faceCells[patchi][s] * 9 + 2];
@@ -548,11 +585,7 @@ GenMatrix_U(
                 boundaryGradU_internal[patchi][s * 9 + 5] = gradUPtr[faceCells[patchi][s] * 9 + 5];
                 boundaryGradU_internal[patchi][s * 9 + 6] = gradUPtr[faceCells[patchi][s] * 9 + 6];
                 boundaryGradU_internal[patchi][s * 9 + 7] = gradUPtr[faceCells[patchi][s] * 9 + 7];
-                boundaryGradU_internal[patchi][s * 9 + 8] = gradUPtr[faceCells[patchi][s] * 9 + 8];
-                            
-                MPI_Send(&boundaryGradU_internal[patchi][s * 9], 9, MPI_DOUBLE, neighbProcNo[patchi], 0, MPI_COMM_WORLD);
-                MPI_Recv(&boundaryGradU[patchi][s * 9], 9, MPI_DOUBLE, neighbProcNo[patchi], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            
+                boundaryGradU_internal[patchi][s * 9 + 8] = gradUPtr[faceCells[patchi][s] * 9 + 8];           
             }
         }
         else{
@@ -560,13 +593,16 @@ GenMatrix_U(
             std::exit(-1);        
         }
     }
-
-    /* --------------------------------------------------------------------------------------------------------------------------------------------- */
-
-    /**
-     *  **if use turbulence model**
-     *  getTurbulenceKEpsilon_Smagorinsky
-    */
+    for (label patchi = 0; patchi < nPatches; ++patchi) {
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+            MPI_Sendrecv(
+                boundaryGradU_internal[patchi], 9 * patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0,
+                boundaryGradU[patchi], 9 * patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0,
+                MPI_COMM_WORLD, MPI_STATUS_IGNORE
+            );
+        }
+    }
+    Info << "GenMatrix_U gradU boundary : " << clock.timeIncrement() << endl;
 
    /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -576,7 +612,7 @@ GenMatrix_U(
     
     /* scale_dev2t_tensor_kernel(internal) */
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
     for (label c = 0; c < nCells; ++c)
     {
@@ -603,10 +639,10 @@ GenMatrix_U(
     }
 
     /* scale_dev2t_tensor_kernel(boundary) */
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
     for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (label s = 0; s < patchSizes[patchi]; ++s){
             scalar scale = bouTurbRho[patchi][s] * bouTurbNuEff[patchi][s];
             scalar val_xx = boundaryGradU[patchi][s * 9 + 0];
@@ -651,7 +687,8 @@ GenMatrix_U(
                 boundaryGradU_internal[patchi][s * 9 + 8] = scale * (val_zz - trace_coeff);
             }
         }
-    }   
+    }
+    Info << "GenMatrix_U tensor opt : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
     
@@ -661,55 +698,81 @@ GenMatrix_U(
 
     /* fvc_div_cell_tensor_internal */
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-    for (label f = 0; f < nFaces ; ++f){
-
-        scalar w = weightsPtr[f];
-        label owner = l[f];
-        label neighbor = u[f];
-
-        scalar Sfx = meshSfPtr[3 * f];
-        scalar Sfy = meshSfPtr[3 * f + 1];
-        scalar Sfz = meshSfPtr[3 * f + 2];
-
-        scalar ssf_xx = (w * (gradUPtr[owner * 9] - gradUPtr[neighbor * 9]) + gradUPtr[neighbor * 9]);
-        scalar ssf_xy = (w * (gradUPtr[owner * 9 + 1] - gradUPtr[neighbor * 9 + 1]) + gradUPtr[neighbor * 9 + 1]);
-        scalar ssf_xz = (w * (gradUPtr[owner * 9 + 2] - gradUPtr[neighbor * 9 + 2]) + gradUPtr[neighbor * 9 + 2]);
-        scalar ssf_yx = (w * (gradUPtr[owner * 9 + 3] - gradUPtr[neighbor * 9 + 3]) + gradUPtr[neighbor * 9 + 3]);
-        scalar ssf_yy = (w * (gradUPtr[owner * 9 + 4] - gradUPtr[neighbor * 9 + 4]) + gradUPtr[neighbor * 9 + 4]);
-        scalar ssf_yz = (w * (gradUPtr[owner * 9 + 5] - gradUPtr[neighbor * 9 + 5]) + gradUPtr[neighbor * 9 + 5]);
-        scalar ssf_zx = (w * (gradUPtr[owner * 9 + 6] - gradUPtr[neighbor * 9 + 6]) + gradUPtr[neighbor * 9 + 6]);
-        scalar ssf_zy = (w * (gradUPtr[owner * 9 + 7] - gradUPtr[neighbor * 9 + 7]) + gradUPtr[neighbor * 9 + 7]);
-        scalar ssf_zz = (w * (gradUPtr[owner * 9 + 8] - gradUPtr[neighbor * 9 + 8]) + gradUPtr[neighbor * 9 + 8]);
-
-        scalar div_x = (Sfx * ssf_xx + Sfy * ssf_yx + Sfz * ssf_zx);
-        scalar div_y = (Sfx * ssf_xy + Sfy * ssf_yy + Sfz * ssf_zy);
-        scalar div_z = (Sfx * ssf_xz + Sfy * ssf_yz + Sfz * ssf_zz);
-
-        sourcePtr[owner * 3] += div_x;
-        sourcePtr[owner * 3 + 1] += div_y;
-        sourcePtr[owner * 3 + 2] += div_z;
-        
-        sourcePtr[neighbor * 3] -= div_x;
-        sourcePtr[neighbor * 3 + 1] -= div_y;
-        sourcePtr[neighbor * 3 + 2] -= div_z;
-
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar w = weightsPtr[f];
+            label owner = l[f];
+            label neighbor = u[f];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar ssf_xx = (w * (gradUPtr[owner * 9] - gradUPtr[neighbor * 9]) + gradUPtr[neighbor * 9]);
+            scalar ssf_xy = (w * (gradUPtr[owner * 9 + 1] - gradUPtr[neighbor * 9 + 1]) + gradUPtr[neighbor * 9 + 1]);
+            scalar ssf_xz = (w * (gradUPtr[owner * 9 + 2] - gradUPtr[neighbor * 9 + 2]) + gradUPtr[neighbor * 9 + 2]);
+            scalar ssf_yx = (w * (gradUPtr[owner * 9 + 3] - gradUPtr[neighbor * 9 + 3]) + gradUPtr[neighbor * 9 + 3]);
+            scalar ssf_yy = (w * (gradUPtr[owner * 9 + 4] - gradUPtr[neighbor * 9 + 4]) + gradUPtr[neighbor * 9 + 4]);
+            scalar ssf_yz = (w * (gradUPtr[owner * 9 + 5] - gradUPtr[neighbor * 9 + 5]) + gradUPtr[neighbor * 9 + 5]);
+            scalar ssf_zx = (w * (gradUPtr[owner * 9 + 6] - gradUPtr[neighbor * 9 + 6]) + gradUPtr[neighbor * 9 + 6]);
+            scalar ssf_zy = (w * (gradUPtr[owner * 9 + 7] - gradUPtr[neighbor * 9 + 7]) + gradUPtr[neighbor * 9 + 7]);
+            scalar ssf_zz = (w * (gradUPtr[owner * 9 + 8] - gradUPtr[neighbor * 9 + 8]) + gradUPtr[neighbor * 9 + 8]);
+            scalar div_x = (Sfx * ssf_xx + Sfy * ssf_yx + Sfz * ssf_zx);
+            scalar div_y = (Sfx * ssf_xy + Sfy * ssf_yy + Sfz * ssf_zy);
+            scalar div_z = (Sfx * ssf_xz + Sfy * ssf_yz + Sfz * ssf_zz);
+            sourcePtr[owner * 3] += div_x;
+            sourcePtr[owner * 3 + 1] += div_y;
+            sourcePtr[owner * 3 + 2] += div_z;
+            sourcePtr[neighbor * 3] -= div_x;
+            sourcePtr[neighbor * 3 + 1] -= div_y;
+            sourcePtr[neighbor * 3 + 2] -= div_z;
+        }
     }
-
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-    for(label patchi = 0; patchi < nPatches; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
-        if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
-            /* fvc_div_cell_tensor_boundary_zeroGradient */
-            for(label s = 0; s < patchSizes[patchi] ; ++s){
+     for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar w = weightsPtr[f];
+            label owner = l[f];
+            label neighbor = u[f];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar ssf_xx = (w * (gradUPtr[owner * 9] - gradUPtr[neighbor * 9]) + gradUPtr[neighbor * 9]);
+            scalar ssf_xy = (w * (gradUPtr[owner * 9 + 1] - gradUPtr[neighbor * 9 + 1]) + gradUPtr[neighbor * 9 + 1]);
+            scalar ssf_xz = (w * (gradUPtr[owner * 9 + 2] - gradUPtr[neighbor * 9 + 2]) + gradUPtr[neighbor * 9 + 2]);
+            scalar ssf_yx = (w * (gradUPtr[owner * 9 + 3] - gradUPtr[neighbor * 9 + 3]) + gradUPtr[neighbor * 9 + 3]);
+            scalar ssf_yy = (w * (gradUPtr[owner * 9 + 4] - gradUPtr[neighbor * 9 + 4]) + gradUPtr[neighbor * 9 + 4]);
+            scalar ssf_yz = (w * (gradUPtr[owner * 9 + 5] - gradUPtr[neighbor * 9 + 5]) + gradUPtr[neighbor * 9 + 5]);
+            scalar ssf_zx = (w * (gradUPtr[owner * 9 + 6] - gradUPtr[neighbor * 9 + 6]) + gradUPtr[neighbor * 9 + 6]);
+            scalar ssf_zy = (w * (gradUPtr[owner * 9 + 7] - gradUPtr[neighbor * 9 + 7]) + gradUPtr[neighbor * 9 + 7]);
+            scalar ssf_zz = (w * (gradUPtr[owner * 9 + 8] - gradUPtr[neighbor * 9 + 8]) + gradUPtr[neighbor * 9 + 8]);
+            scalar div_x = (Sfx * ssf_xx + Sfy * ssf_yx + Sfz * ssf_zx);
+            scalar div_y = (Sfx * ssf_xy + Sfy * ssf_yy + Sfz * ssf_zy);
+            scalar div_z = (Sfx * ssf_xz + Sfy * ssf_yz + Sfz * ssf_zz);
+            sourcePtr[owner * 3] += div_x;
+            sourcePtr[owner * 3 + 1] += div_y;
+            sourcePtr[owner * 3 + 2] += div_z;
+            sourcePtr[neighbor * 3] -= div_x;
+            sourcePtr[neighbor * 3 + 1] -= div_y;
+            sourcePtr[neighbor * 3 + 2] -= div_z;
+        }
+     }
 
+    for(label patchi = 0; patchi < nPatches; ++patchi){
+        if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for(label s = 0; s < patchSizes[patchi] ; ++s){
                 scalar bouSfx = boundarySf[patchi][s * 3 + 0];
                 scalar bouSfy = boundarySf[patchi][s * 3 + 1];
                 scalar bouSfz = boundarySf[patchi][s * 3 + 2];
-
                 scalar boussf_xx = boundaryGradU[patchi][s * 9 + 0];
                 scalar boussf_xy = boundaryGradU[patchi][s * 9 + 1];
                 scalar boussf_xz = boundaryGradU[patchi][s * 9 + 2];
@@ -719,26 +782,32 @@ GenMatrix_U(
                 scalar boussf_zx = boundaryGradU[patchi][s * 9 + 6];
                 scalar boussf_zy = boundaryGradU[patchi][s * 9 + 7];
                 scalar boussf_zz = boundaryGradU[patchi][s * 9 + 8];
-
                 scalar bouDiv_x = (bouSfx * boussf_xx + bouSfy * boussf_yx + bouSfz * boussf_zx);
                 scalar bouDiv_y = (bouSfx * boussf_xy + bouSfy * boussf_yy + bouSfz * boussf_zy);
                 scalar bouDiv_z = (bouSfx * boussf_xz + bouSfy * boussf_yz + bouSfz * boussf_zz);
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3] += bouDiv_x;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 1] += bouDiv_y;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 2] += bouDiv_z;
 
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
-            /* fvc_div_cell_tensor_boundary_processor */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label s = 0; s < patchSizes[patchi]; ++s){
-
                 scalar bouWeight = boundaryWeight[patchi][s];
-
                 scalar bouSfx = boundarySf[patchi][s * 3 + 0];
                 scalar bouSfy = boundarySf[patchi][s * 3 + 1];
                 scalar bouSfz = boundarySf[patchi][s * 3 + 2];
-
                 scalar boussf_xx = (1 - bouWeight) * boundaryGradU[patchi][s * 9 + 0] + bouWeight * boundaryGradU_internal[patchi][s * 9 + 0];
                 scalar boussf_xy = (1 - bouWeight) * boundaryGradU[patchi][s * 9 + 1] + bouWeight * boundaryGradU_internal[patchi][s * 9 + 1];
                 scalar boussf_xz = (1 - bouWeight) * boundaryGradU[patchi][s * 9 + 2] + bouWeight * boundaryGradU_internal[patchi][s * 9 + 2];
@@ -748,15 +817,21 @@ GenMatrix_U(
                 scalar boussf_zx = (1 - bouWeight) * boundaryGradU[patchi][s * 9 + 6] + bouWeight * boundaryGradU_internal[patchi][s * 9 + 6];
                 scalar boussf_zy = (1 - bouWeight) * boundaryGradU[patchi][s * 9 + 7] + bouWeight * boundaryGradU_internal[patchi][s * 9 + 7];
                 scalar boussf_zz = (1 - bouWeight) * boundaryGradU[patchi][s * 9 + 8] + bouWeight * boundaryGradU_internal[patchi][s * 9 + 8];
-
                 scalar bouDiv_x = (bouSfx * boussf_xx + bouSfy * boussf_yx + bouSfz * boussf_zx);
                 scalar bouDiv_y = (bouSfx * boussf_xy + bouSfy * boussf_yy + bouSfz * boussf_zy);
                 scalar bouDiv_z = (bouSfx * boussf_xz + bouSfy * boussf_yz + bouSfz * boussf_zz);
-
                 label cellIndex = faceCells[patchi][s];
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[cellIndex * 3] += bouDiv_x;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[cellIndex * 3 + 1] += bouDiv_y;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[cellIndex * 3 + 2] += bouDiv_z;
             }
         }else{
@@ -764,6 +839,8 @@ GenMatrix_U(
             std::exit(-1);        
         }
     }
+
+    Info << "GenMatrix_U fvc div : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
@@ -773,74 +850,107 @@ GenMatrix_U(
 
     /* fvc_grad_scalar_internal */
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-    for (label f = 0; f < nFaces; ++f){
-
-        scalar w = weightsPtr[f];
-        label owner = l[f];
-        label neighbor = u[f];
-
-        scalar Sfx = meshSfPtr[3 * f];
-        scalar Sfy = meshSfPtr[3 * f + 1];
-        scalar Sfz = meshSfPtr[3 * f + 2];
-
-        scalar ssf = (w * (pPtr[owner] - pPtr[neighbor]) + pPtr[neighbor]);
-
-        scalar grad_x = -Sfx * ssf;
-        scalar grad_y = -Sfy * ssf;
-        scalar grad_z = -Sfz * ssf;
-
-        sourcePtr[owner * 3] += grad_x;
-        sourcePtr[owner * 3 + 1] += grad_y;
-        sourcePtr[owner * 3 + 2] += grad_z;
-
-        sourcePtr[neighbor * 3] -= grad_x;
-        sourcePtr[neighbor * 3 + 1] -= grad_y;
-        sourcePtr[neighbor * 3 + 2] -= grad_z;
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar w = weightsPtr[f];
+            label owner = l[f];
+            label neighbor = u[f];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar ssf = (w * (pPtr[owner] - pPtr[neighbor]) + pPtr[neighbor]);
+            scalar grad_x = -Sfx * ssf;
+            scalar grad_y = -Sfy * ssf;
+            scalar grad_z = -Sfz * ssf;
+            sourcePtr[owner * 3] += grad_x;
+            sourcePtr[owner * 3 + 1] += grad_y;
+            sourcePtr[owner * 3 + 2] += grad_z;
+            sourcePtr[neighbor * 3] -= grad_x;
+            sourcePtr[neighbor * 3 + 1] -= grad_y;
+            sourcePtr[neighbor * 3 + 2] -= grad_z;
+        }
     }
 
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar w = weightsPtr[f];
+            label owner = l[f];
+            label neighbor = u[f];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar ssf = (w * (pPtr[owner] - pPtr[neighbor]) + pPtr[neighbor]);
+            scalar grad_x = -Sfx * ssf;
+            scalar grad_y = -Sfy * ssf;
+            scalar grad_z = -Sfz * ssf;
+            sourcePtr[owner * 3] += grad_x;
+            sourcePtr[owner * 3 + 1] += grad_y;
+            sourcePtr[owner * 3 + 2] += grad_z;
+            sourcePtr[neighbor * 3] -= grad_x;
+            sourcePtr[neighbor * 3 + 1] -= grad_y;
+            sourcePtr[neighbor * 3 + 2] -= grad_z;
+        }
+    }
+
     for(label patchi = 0; patchi < nPatches; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
         if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
-            /* fvc_grad_scalar_boundary_zeroGradient */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label s = 0; s < patchSizes[patchi]; ++s){
-
                 scalar bouvf = boundaryP[patchi][s];
-
                 scalar bouSfx = boundarySf[patchi][s * 3 + 0];
                 scalar bouSfy = boundarySf[patchi][s * 3 + 1];
                 scalar bouSfz = boundarySf[patchi][s * 3 + 2];
-
                 scalar grad_x = bouSfx * bouvf;
                 scalar grad_y = bouSfy * bouvf;
                 scalar grad_z = bouSfz * bouvf;
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3] -= grad_x;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 1] -= grad_y;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 2] -= grad_z;
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
-            /* fvc_grad_scalar_boundary_processor */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label s = 0; s < patchSizes[patchi]; ++s){
-
                 scalar bouWeight = boundaryWeight[patchi][s];
-
                 scalar bouSfx = boundarySf[patchi][s * 3 + 0];
                 scalar bouSfy = boundarySf[patchi][s * 3 + 1];
                 scalar bouSfz = boundarySf[patchi][s * 3 + 2];
-
                 scalar bouvf = (1 - bouWeight) * boundaryP[patchi][s] + bouWeight * boundaryP_internal[patchi][s];
-
                 scalar grad_x = bouSfx * bouvf;
                 scalar grad_y = bouSfy * bouvf;
                 scalar grad_z = bouSfz * bouvf;
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3] -= grad_x;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 1] -= grad_y;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 2] -= grad_z;
 
             }
@@ -850,10 +960,14 @@ GenMatrix_U(
         }
     }
 
+    Info << "GenMatrix_U grad : " << clock.timeIncrement() << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
     
     for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (label s = 0; s < patchSizes[patchi]; ++s){
             fvm.internalCoeffs()[patchi][s][0] = internalCoeffsPtr[patchi][s * 3 + 0];
             fvm.internalCoeffs()[patchi][s][1] = internalCoeffsPtr[patchi][s * 3 + 1];
@@ -863,6 +977,51 @@ GenMatrix_U(
             fvm.boundaryCoeffs()[patchi][s][2] = boundaryCoeffsPtr[patchi][s * 3 + 2];
         }
     }
+
+    Info << "GenMatrix_U fvm coeffs : " << clock.timeIncrement() << endl;
+
+    // free ptrs
+    delete[] gradUPtr;
+
+    for(label i = 0; i < nPatches; ++i){
+        if (boundaryU_internal[i] != nullptr){
+            delete[] boundaryU_internal[i];
+            delete[] bouTurbRho_internal[i];
+            delete[] bouTurbNuEff_internal[i];
+            delete[] boundaryGradU_internal[i];
+            delete[] boundaryP_internal[i];
+        }
+        delete[] internalCoeffsPtr[i];
+        delete[] boundaryCoeffsPtr[i];
+        delete[] valueInternalCoeffs[i];
+        delete[] valueBoundaryCoeffs[i];
+        delete[] gradientInternalCoeffs[i];
+        delete[] gradientBoundaryCoeffs[i];
+        delete[] boundaryGradU[i];
+    }
+    delete[] boundaryU_internal;
+    delete[] bouTurbRho_internal;
+    delete[] bouTurbNuEff_internal;
+    delete[] boundaryGradU_internal;
+    delete[] boundaryP_internal;
+    delete[] internalCoeffsPtr;
+    delete[] boundaryCoeffsPtr;
+    delete[] valueInternalCoeffs;
+    delete[] valueBoundaryCoeffs;
+    delete[] gradientInternalCoeffs;
+    delete[] gradientBoundaryCoeffs;
+    delete[] boundaryGradU;
+    delete[] boundaryWeight;
+    delete[] boundarySf;
+    delete[] boundaryMagSf;
+    delete[] boundaryP;
+    delete[] bouTurbRho;
+    delete[] bouTurbNuEff;
+    delete[] faceCells;
+    delete[] boundaryU;
+
+    Info << "GenMatrix_U free : " << clock.timeIncrement() << endl;
+    Info << "GenMatrix_U total : " << clock.elapsedTime() << endl;
 
     return tfvm;
 }
