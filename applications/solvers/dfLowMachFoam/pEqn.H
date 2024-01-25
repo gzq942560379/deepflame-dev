@@ -19,60 +19,49 @@ if (!pimple.simpleRho())
 // pressure solution
 const volScalarField psip0(psi*p);
 
-// #ifdef OPT_GenMatrix_p
-//     tmp<volScalarField> trAU = rAUConstructor(UEqn);
-//     volScalarField& rAU = trAU.ref();
-// #else
-    volScalarField rAU(1.0/UEqn.A());
-// #endif
+#ifdef OPT_GenMatrix_p
+// - get rAU
+// getrAU(rAU)
+// - get HbyA
+// getHbyA(HbyA)
+#endif
 
-tmp<volScalarField> tmp_rhoRau = rho*rAU;
+rAU = 1.0/UEqn.A(); // TODO: optimize
+HbyA = constrainHbyA(rAU*UEqn.H(), U, p); // TODO: optimize
+#ifndef OPT_GenMatrix_p
+rhorAUf = fvc::interpolate(rho*rAU);
+#endif
 
-// #ifdef OPT_GenMatrix_p // FIXME: write intepolation introduce small err
-//     tmp<surfaceScalarField> trhorAUf = rhorAUfConstructor(tmp_rhoRau, linear_weights);
-//     surfaceScalarField rhorAUf = trhorAUf();
-// #else
-surfaceScalarField rhorAUf("rhorAUf", fvc::interpolate(tmp_rhoRau));
-// #endif
-
-// #ifdef OPT_GenMatrix_p
-//     tmp<volVectorField> tUEqnH = UEqn_H(UEqn);
-// #else
-    tmp<volVectorField> tUEqnH = UEqn.H();
-// #endif
-
-volVectorField HbyA(constrainHbyA(rAU*tUEqnH, U, p));
+#ifdef OPT_GenMatrix_p_check
+volScalarField rAUref = 1.0/UEqn.A();
+volVectorField HbyAref = constrainHbyA(rAUref*UEqn.H(), U, p);
+surfaceScalarField rhorAUfref = fvc::interpolate(rho*rAUref);
+check_field_boundary_equal(rAUref, rAU, "rAU");
+check_field_boundary_equal(HbyAref, HbyA, "HbyA");
+#endif
 
 if (pimple.nCorrPiso() <= 1)
 {
     tUEqn.clear();
 }
-rho.oldTime();
-// #ifdef OPT_GenMatrix_p
-//     tmp<surfaceScalarField> tddtCorr = EulerDdtSchemeFvcDdtCorr(rho, U, phi, rhoUf);
-//     surfaceScalarField ddtCorr = tddtCorr();
-// #else
-    tmp<surfaceScalarField> tddtCorr = EulerDdtSchemeFvcDdtCorr(rho, U, phi, rhoUf);
-    surfaceScalarField ddtCorr = tddtCorr();
-// #endif
 
-// check_field_equal(ddtCorrTest, ddtCorrRef);
-
-// #ifdef OPT_GenMatrix_p
-//     tmp<surfaceScalarField> tphiHby_test = phiHbyAConstructor(rho, HbyA, rhorAUf, tddtCorr, linear_weights);
-//     surfaceScalarField phiHby_test = tphiHby_test.ref();
-// #else
+#ifndef OPT_GenMatrix_p
 surfaceScalarField phiHbyA
 (
     "phiHbyA",
     fvc::interpolate(rho)*fvc::flux(HbyA)
-    + rhorAUf*tddtCorr
+    + rhorAUf*fvc::ddtCorr(rho, U, phi, rhoUf)
 );
-// #endif
-// construct phiHbyA directly
+#endif
 
-// Update the pressure BCs to ensure flux consistency
-constrainPressure(p, rho, U, phiHbyA, rhorAUf);
+#ifdef OPT_GenMatrix_p_check
+surfaceScalarField phiHbyARef
+(
+    "phiHbyARef",
+    fvc::interpolate(rho)*fvc::flux(HbyAref)
+    + rhorAUfref*fvc::ddtCorr(rho, U, phi, rhoUf)
+);
+#endif
 
 p_pre_time += clock.timeIncrement();
 
@@ -81,11 +70,7 @@ p_pre_time += clock.timeIncrement();
 
 #ifdef OPT_GenMatrix_p
     p_build_opt_start = MPI_Wtime();
-    surfaceScalarField phiHbyATest = phiHbyA;
-    surfaceScalarField rhorAUfTest = rhorAUf;
-    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phi, rAU, U, HbyA, psi, rhorAUfTest, phiHbyATest);
-    check_field_boundary_equal(rhorAUf, rhorAUfTest, "rhorAUf");
-    check_field_boundary_equal(phiHbyA, phiHbyATest, "phiHbyA");
+    tmp<fvScalarMatrix> tpDDtEqn = GenMatrix_p(rho, p, phi, rAU, U, HbyA, psi, rhorAUf, phiHbyA);
 
     fvScalarMatrix pDDtEqn = tpDDtEqn.ref();
     p_build_opt_end = MPI_Wtime();
@@ -108,8 +93,8 @@ p_pre_time += clock.timeIncrement();
     fvScalarMatrix pDDtEqn_answer
     (
         fvc::ddt(rho) + psi * correction(fvm::ddt(p))
-      + fvc::div(phiHbyA)
-      - fvm::laplacian(rhorAUf, p)
+      + fvc::div(phiHbyARef)
+      - fvm::laplacian(rhorAUfref, p)
     );
     p_build_org_end = MPI_Wtime();
     p_build_org_time += p_build_org_end - p_build_org_start;
@@ -118,11 +103,6 @@ p_pre_time += clock.timeIncrement();
 #endif
 
     p_build_time += clock.timeIncrement();
-    
-    volVectorField Uref = U;
-    surfaceScalarField phiref = phi;
-    volScalarField Kref = K;
-    volScalarField dpdtref = dpdt;
 
     while (pimple.correctNonOrthogonal())
     {
@@ -181,12 +161,15 @@ p_pre_time += clock.timeIncrement();
 #endif
         p_solve_time += clock.timeIncrement();
 
-        postProcess_P(p, pEqn, phiref, Uref, rAU, HbyA, Kref, dpdtref, phiHbyA);
+        postProcess_P(p, pEqn, phi, U, rAU, HbyA, K, dpdt, phiHbyA);
 
+#ifdef OPT_GenMatrix_p_check
         if (pimple.finalNonOrthogonalIter())
         {
-            phi = phiHbyA + pEqn.flux();
+            surfaceScalarField phiref = phiHbyARef + pEqn.flux();
+            check_field_boundary_equal(phiref, phi, "phi");
         }
+#endif
         p_post_time += clock.timeIncrement();
     }
 // }
@@ -207,33 +190,32 @@ if (limitedp)
 // Explicitly relax pressure for momentum corrector
 p.relax();
 
-U = HbyA - rAU*fvc::grad(p);
-U.correctBoundaryConditions();
-K = 0.5*magSqr(U);
+#ifdef OPT_GenMatrix_p_check
+volVectorField Uref = HbyAref - rAUref*fvc::grad(p);
+Uref.correctBoundaryConditions();
+volScalarField Kref = 0.5*magSqr(Uref);
+#endif
 
 if (pimple.simpleRho())
 {
     rho = thermo.rho();
 }
 
-// Correct rhoUf if the mesh is moving
-fvc::correctRhoUf(rhoUf, rho, U, phi);
-
+#ifdef OPT_GenMatrix_p_check
 if (thermo.dpdt())
 {
-    dpdt = fvc::ddt(p);
+    volScalarField dpdtref = fvc::ddt(p);
 
     if (mesh.moving())
     {
-        dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
+        dpdtref -= fvc::div(fvc::meshPhi(rho, U), p);
     }
+
+    check_field_equal(dpdtref, dpdt, "dpdt");
 }
-
-check_field_boundary_equal(U, Uref, "U");
-check_field_boundary_equal(phi, phiref, "phi");
-check_field_boundary_equal(K, Kref, "K");
-check_field_equal(dpdt, dpdtref, "dpdt");
-
+check_field_boundary_equal(Uref, U, "U");
+check_field_boundary_equal(Kref, K, "K");
+#endif
 
 p_post_time += clock.timeIncrement();
 
