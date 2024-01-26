@@ -108,9 +108,6 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
     scalarField rA(nCells);
     scalar* __restrict__ rAPtr = rA.begin();
 
-    scalarField tmp(nCells);
-    scalar* __restrict__ tmpPtr = tmp.begin();
-
     // --- Calculate A.psi
     matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
     
@@ -141,26 +138,14 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
     scalar gPsiAvg = gPsiSum / gNCells;
 
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        pAPtr[c] *= gPsiAvg;
-    }
-    
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        tmpPtr[c] = std::abs(yAPtr[c] - pAPtr[c]) + std::abs(sourcePtr[c] - pAPtr[c]);
-    }
-
     scalar gTmpSum = 0.;
+
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:gTmpSum)
 #endif
     for(label c = 0; c < nCells; ++c){
-        gTmpSum += tmpPtr[c];
+        pAPtr[c] *= gPsiAvg;
+        gTmpSum += std::abs(yAPtr[c] - pAPtr[c]) + std::abs(sourcePtr[c] - pAPtr[c]);
     }
 
     reduce(gTmpSum, sumOp<scalar>());

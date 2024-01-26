@@ -33,9 +33,12 @@ rhorAUf = fvc::interpolate(rho*rAU);
 #endif
 
 #ifdef OPT_GenMatrix_p_check
-volScalarField rAUref = 1.0/UEqn.A();
-volVectorField HbyAref = constrainHbyA(rAUref*UEqn.H(), U, p);
-surfaceScalarField rhorAUfref = fvc::interpolate(rho*rAUref);
+tmp<volScalarField> trAUref = 1.0/UEqn.A();
+volScalarField& rAUref = trAUref.ref();
+tmp<volVectorField> tHbyAref = constrainHbyA(rAUref*UEqn.H(), U, p);
+volVectorField& HbyAref = tHbyAref.ref();
+tmp<surfaceScalarField> trhorAUfref = fvc::interpolate(rho*rAUref);
+surfaceScalarField& rhorAUfref = trhorAUfref.ref();
 check_field_boundary_equal(rAUref, rAU, "rAU");
 check_field_boundary_equal(HbyAref, HbyA, "HbyA");
 #endif
@@ -166,7 +169,8 @@ p_pre_time += clock.timeIncrement();
 #ifdef OPT_GenMatrix_p_check
         if (pimple.finalNonOrthogonalIter())
         {
-            surfaceScalarField phiref = phiHbyARef + pEqn.flux();
+            tmp<surfaceScalarField> tphiref = phiHbyARef + pEqn.flux();
+            surfaceScalarField& phiref = tphiref.ref();
             check_field_boundary_equal(phiref, phi, "phi");
         }
 #endif
@@ -191,9 +195,11 @@ if (limitedp)
 p.relax();
 
 #ifdef OPT_GenMatrix_p_check
-volVectorField Uref = HbyAref - rAUref*fvc::grad(p);
+tmp<volVectorField> tUref = HbyAref - rAUref*fvc::grad(p);
+volVectorField& Uref = tUref.ref();
 Uref.correctBoundaryConditions();
-volScalarField Kref = 0.5*magSqr(Uref);
+tmp<volScalarField> tKref = 0.5*magSqr(Uref);
+volScalarField& Kref = tKref.ref();
 #endif
 
 if (pimple.simpleRho())
@@ -204,7 +210,8 @@ if (pimple.simpleRho())
 #ifdef OPT_GenMatrix_p_check
 if (thermo.dpdt())
 {
-    volScalarField dpdtref = fvc::ddt(p);
+    tmp<volScalarField> tdpdtref = fvc::ddt(p);
+    volScalarField& dpdtref = tdpdtref.ref();
 
     if (mesh.moving())
     {
