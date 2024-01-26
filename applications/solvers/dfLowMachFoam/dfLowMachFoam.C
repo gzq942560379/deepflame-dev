@@ -74,9 +74,9 @@ Description
 // #define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
 #define OPT_GenMatrix_U
-// #define OPT_GenMatrix_p
+#define OPT_GenMatrix_p
 // #define OPT_thermo
-#define OPT_GenMatrix_U_check
+// #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
 // #define OPT_GenMatrix_p_check
@@ -317,6 +317,62 @@ int main(int argc, char *argv[])
         IOobject
         (
             "phiUc",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimensionSet(1,0,-1,0,0,0,0), 0)
+    );
+
+    surfaceScalarField rhorAUf
+    (
+        IOobject
+        (
+            "rhorAUf",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimensionSet(0,0,1,0,0,0,0), 0)
+    );
+
+    volVectorField HbyA
+    (
+        IOobject
+        (
+            "HbyA",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedVector(dimensionSet(0,1,-1,0,0,0,0), Zero)
+    );
+
+    volScalarField rAU
+    (
+        IOobject
+        (
+            "rAU",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimensionSet(-1,3,1,0,0,0,0), 0)
+    );
+
+    surfaceScalarField phiHbyA
+    (
+        IOobject
+        (
+            "phiHbyA",
             runTime.timeName(),
             mesh,
             IOobject::NO_READ,
