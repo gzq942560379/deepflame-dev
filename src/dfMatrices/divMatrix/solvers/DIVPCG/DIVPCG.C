@@ -1,5 +1,6 @@
 #include "DIVPCG.H"
 #include <mpi.h>
+#include "common_kernel.H"
 
 namespace Foam
 {
@@ -77,8 +78,6 @@ Foam::solverPerformance Foam::DIVPCG::solve
     scalarField rA(nCells);
     scalar* __restrict__ rAPtr = rA.begin();
 
-    scalarField tmp(nCells);
-    scalar* __restrict__ tmpPtr = tmp.begin();
 
     scalar wArA = solverPerf.great_;
     scalar wArAold = wArA;
@@ -91,50 +90,19 @@ Foam::solverPerformance Foam::DIVPCG::solve
     PCG_spmv_time += clock.timeIncrement();
 
     // --- Calculate initial residual field
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        rAPtr[c] = sourcePtr[c] - wAPtr[c];
-    }
+    df_triad(rAPtr, 1., sourcePtr, -1., wAPtr, 0., nCells);
 
     PCG_localUpdate_time += clock.timeIncrement();
     
     matrix_.sumA(pA, interfaceBouCoeffs_, interfaces_);
 
-    scalar gPsiSum = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gPsiSum)
-#endif
-    for(label c = 0; c < nCells; ++c){
-        gPsiSum += psi[c];
-    }
+    scalar gPsiSum = df_sum(psiPtr, nCells);
 
     reduce(gPsiSum, sumOp<scalar>());
 
     scalar gPsiAvg = gPsiSum / gNCells;
 
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        pAPtr[c] *= gPsiAvg;
-    }
-    
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        tmpPtr[c] = std::abs(wAPtr[c] - pAPtr[c]) + std::abs(sourcePtr[c] - pAPtr[c]);
-    }
-
-    scalar gTmpSum = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gTmpSum)
-#endif
-    for(label c = 0; c < nCells; ++c){
-        gTmpSum += tmpPtr[c];
-    }
+    scalar gTmpSum = df_norm_factor_local(pAPtr, gPsiAvg, wAPtr, sourcePtr, nCells);
 
     reduce(gTmpSum, sumOp<scalar>());
     
@@ -142,19 +110,12 @@ Foam::solverPerformance Foam::DIVPCG::solve
 
     PCG_normFactor_time += clock.timeIncrement();
 
-    scalar gRASumMag = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:gRASumMag)
-#endif
-    for(label c = 0; c < nCells; ++c){
-        gRASumMag += std::abs(rAPtr[c]);
-    }
+    scalar gRASumMag = df_sum_mag(rAPtr, nCells);
 
     reduce(gRASumMag, sumOp<scalar>());
 
     solverPerf.initialResidual() = gRASumMag / normFactor;
 
-    
     PCG_gSumMag_time += clock.timeIncrement();
 
     solverPerf.finalResidual() = solverPerf.initialResidual();
@@ -175,13 +136,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
             preconPtr_->precondition(wA, rA, cmpt);
             PCG_precondition_time += clock.timeIncrement();
 
-            wArA = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:wArA)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                wArA += wAPtr[c] * rAPtr[c];
-            }
+            wArA = df_sum_prod(wAPtr, rAPtr, nCells);
 
             reduce(wArA, sumOp<scalar>());
 
@@ -190,13 +145,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
 
             if (solverPerf.nIterations() == 0)
             {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-                for (label cell=0; cell<nCells; cell++)
-                {
-                    pAPtr[cell] = wAPtr[cell];
-                }
+                df_copy(pAPtr, wAPtr, nCells);
             }
             else
             {
@@ -208,6 +157,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 {
                     pAPtr[cell] = wAPtr[cell] + beta * pAPtr[cell];
                 }
+                df_axpy(pAPtr, 1.0, wAPtr, beta, nCells);
             }
             PCG_localUpdate_time += clock.timeIncrement();
 
@@ -216,17 +166,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
             
             PCG_spmv_time += clock.timeIncrement();
 
-            // scalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
-
-            // scalar wApA = sumProd(wA, pA);
-
-            scalar wApA = 0.;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:wApA)
-#endif
-            for(label c = 0; c < nCells; ++c){
-                wApA += wAPtr[c] * pAPtr[c];
-            }
+            scalar wApA = df_sum_prod(wAPtr, pAPtr, nCells);
 
             reduce(wApA, sumOp<scalar>());
 

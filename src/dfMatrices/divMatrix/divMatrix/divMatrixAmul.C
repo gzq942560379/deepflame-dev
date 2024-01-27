@@ -170,6 +170,22 @@ void Foam::divMatrix::sumA
     const scalar* const __restrict__ diagPtr = diag().begin();
     const scalar* const __restrict__ off_diag_value_Ptr = off_diag_value_.begin();
     
+#ifdef __sw_64__
+
+    divMatrix_sumA_param_t para;
+    para.sumAPtr = sumA.begin();
+    para.diagPtr = diag().begin();
+    para.off_diag_value_Ptr = off_diag_value_.begin();
+    para.row_block_bit_ = row_block_bit_;
+    para.row_block_size_ = row_block_size_;
+    para.distance_count_ = distance_count_;
+    para.block_count_ = block_count_;
+    para.row_ = row_;
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(divMatrix_sumA_naive)), &para);
+    CRTS_athread_join();
+
+#else
+
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
@@ -190,6 +206,8 @@ void Foam::divMatrix::sumA
             }
         }
     }
+
+#endif
 
     // Add the interface internal coefficients to diagonal
     // and the interface boundary coefficients to the sum-off-diagonal

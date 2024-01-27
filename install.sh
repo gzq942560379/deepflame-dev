@@ -39,7 +39,7 @@ if [ ! -z "$USE_BLASDNN" ]; then
     # mkdir -p $DF_ROOT/lib/
     # cp ./libDNNInferencer_blas.a $DF_ROOT/lib/
     ln -sf make.inc.sw make.inc
-    make clean
+    # make clean
     make -j4
     cp ./libDNNInferencer_blas.a $DF_ROOT/lib/
 

@@ -120,6 +120,9 @@ Description
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#ifdef __sw_64__
+#include <crts.h>
+#endif
 
 #ifdef FOAM_USE_ZOLTAN
     #include "zoltanRenumber.H"
@@ -196,6 +199,10 @@ int main(int argc, char *argv[])
 
     // MPI init here
     #include "setRootCase2.H"
+
+#ifdef __sw_64__
+    CRTS_init();
+#endif
     
     env_show();
 

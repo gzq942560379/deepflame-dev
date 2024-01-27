@@ -24,6 +24,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "divNoPreconditioner.H"
+#include "common_kernel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -67,10 +68,12 @@ void Foam::divNoPreconditioner::precondition
 
     label nCells = wA.size();
 
-    for (label cell=0; cell<nCells; cell++)
-    {
-        wAPtr[cell] = rAPtr[cell];
-    }
+    // for (label cell=0; cell<nCells; cell++)
+    // {
+    //     wAPtr[cell] = rAPtr[cell];
+    // }
+
+    df_copy(wAPtr, rAPtr, nCells);
 }
 
 

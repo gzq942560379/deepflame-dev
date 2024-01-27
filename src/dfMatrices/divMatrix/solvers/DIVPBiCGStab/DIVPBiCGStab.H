@@ -121,6 +121,7 @@ public:
     mutable double PBiCGStab_gSumSqr_time = 0.;
     mutable double PBiCGStab_localUpdate_time = 0.;
     mutable double PBiCGStab_precondition_time = 0.;
+    mutable double PBiCGStab_allreduce_time = 0.;
     mutable double PBiCGStab_misc_time = 0.;
 
     void print_time() const {

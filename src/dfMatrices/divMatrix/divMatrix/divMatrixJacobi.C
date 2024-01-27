@@ -45,6 +45,29 @@ void Foam::divMatrix::Jacobi
 ) const
 {
     double start = MPI_Wtime();
+#ifdef __sw_64__
+
+    scalarField psiCopy(row_);
+    // scalarField psiCopy = psi;
+
+    divMatrix_Jacobi_param_t para;
+    para.psiPtr = psi.begin();
+    para.psiCopyPtr = psiCopy.begin();
+    para.bPrimePtr = bPrime.begin();
+    para.diagPtr = diag_value_.begin();
+    para.off_diag_value_Ptr = off_diag_value_.begin(); 
+    para.distance_list_ = distance_list_.begin(); 
+    para.row_block_bit_ = row_block_bit_;
+    para.row_block_size_ = row_block_size_;
+    para.distance_count_ = distance_count_;
+    para.block_count_ = block_count_;
+    para.row_ = row_;
+
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(divMatrix_Jacobi_naive)), &para);
+    CRTS_athread_join();
+
+#else
+
     if(block_count_ > 1){
         if(row_block_size_ == 32){
 #ifdef __ARM_FEATURE_SVE
@@ -58,6 +81,9 @@ void Foam::divMatrix::Jacobi
     }else{
         Jacobi_naive(psi, bPrime);
     }
+
+
+#endif
     double end = MPI_Wtime();
     Jacobi_time_ += end - start;
 }
@@ -424,7 +450,7 @@ void Foam::divMatrix::Jacobi_split
                 }else{
                     for(label br = 0; br < rbl; ++br){
                         label col = distance + rbs + br;
-                        col = std::max(col, static_cast<label>(0));
+                        col = max(col, static_cast<label>(0));
                         psiPtr_offset[br] -= off_diag_value_Ptr[index_divcol_start + br] * psiCopyPtr[col];
                     }
                 }
@@ -482,7 +508,7 @@ void Foam::divMatrix::Jacobi_split
                 }else{
                     for(label br = 0; br < rbl; ++br){
                         label col = distance + rbs + br;
-                        col = std::min(col, row_ - 1);
+                        col = min(col, row_ - 1);
                         psiPtr_offset[br] -= off_diag_value_Ptr[index_divcol_start + br] * psiCopyPtr[col];
                     }
                 }

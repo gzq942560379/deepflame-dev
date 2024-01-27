@@ -8,10 +8,10 @@ extern "C" {
 
 typedef struct{
     scalar* ApsiPtr;
-    scalar* psiPtr;
-    scalar* diagPtr;
-    scalar* off_diag_value_Ptr;
-    label* distance_list_;
+    const scalar* psiPtr;
+    const scalar* diagPtr;
+    const scalar* off_diag_value_Ptr;
+    const label* distance_list_;
     label row_block_bit_;
     label row_block_size_;
     label distance_count_;
@@ -19,6 +19,30 @@ typedef struct{
     label row_;
 } divMatrix_SpMV_param_t;
 
+typedef struct{
+    scalar* psiPtr;
+    scalar* psiCopyPtr;
+    const scalar* bPrimePtr;
+    const scalar* diagPtr;
+    const scalar* off_diag_value_Ptr;
+    const label* distance_list_;
+    label row_block_bit_;
+    label row_block_size_;
+    label distance_count_;
+    label block_count_;
+    label row_;
+} divMatrix_Jacobi_param_t;
+
+typedef struct{
+    scalar* sumAPtr;
+    const scalar* diagPtr;
+    const scalar* off_diag_value_Ptr;
+    label row_block_bit_;
+    label row_block_size_;
+    label distance_count_;
+    label block_count_;
+    label row_;
+} divMatrix_sumA_param_t;
 
 #ifdef __cplusplus
 }

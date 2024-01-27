@@ -1,4 +1,21 @@
 /*
+ * common kernel
+ */ 
+
+common=commonKernel
+$(common)/common_kernel.C
+$(common)/copy_naive.c
+$(common)/axpy_naive.c
+$(common)/triad_naive.c
+$(common)/triad_naive.c
+$(common)/reduce_rma.c
+$(common)/norm_factor_local_naive.c
+$(common)/sum_naive.c
+$(common)/sum_mag_naive.c
+$(common)/sum_sqr_naive.c
+$(common)/sum_prod_naive.c
+
+/*
  * dfMatrix/dfMatrix.C
  */
 csrMatrix=csrMatrix
@@ -195,5 +212,7 @@ $(divMatrix)/smoothers/divJacobi/divJacobiSmoother.C
 $(divMatrix)/smoothers/divSymGaussSeidel/divSymGaussSeidelSmoother.C
 
 $(divMatrix)/divMatrix/divMatrixSpMV_slave_naive.c
+$(divMatrix)/divMatrix/divMatrixJacobi_slave_naive.c
+$(divMatrix)/divMatrix/divMatrixSumA_slave_naive.c
 
 LIB = $(DF_LIBBIN)/libdfMatrices

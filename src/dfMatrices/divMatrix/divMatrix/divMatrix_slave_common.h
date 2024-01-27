@@ -1,9 +1,6 @@
 #pragma once
 
-#include <stdint.h>
-
-typedef double scalar;
-typedef int64_t label;
+#include "slave_utils.h"
 
 #define DIV_BLOCK_MASK ((1 << (row_block_bit_)) - 1)
 #define DIV_BLOCK_MASK_INVERSE (~DIV_BLOCK_MASK)
@@ -21,7 +18,3 @@ typedef int64_t label;
 #define DIV_INDEX_BLOCK_START(rbs) ((rbs) * (distance_count_))
 #define DIV_COL_OFFSET(divcol) ((divcol) << (row_block_bit_))
 #define DIV_INDEX(row,divcol) (((row) & (DIV_BLOCK_MASK_INVERSE)) * (distance_count_) + DIV_COL_OFFSET(divcol) + DIV_BLOCK_ROW(row))
-
-
-#define slave_min(x,y) ((x)<(y)?(x):(y))
-#define slave_max(x,y) ((x)<(y)?(y):(x))

@@ -37,7 +37,9 @@ Description
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h> 
 #endif
+#ifdef __sw_64__
 #include "divMatrix_slave_kernel.h"
+#endif
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 void Foam::divMatrix::SpMV
@@ -46,12 +48,36 @@ void Foam::divMatrix::SpMV
     const scalarField& psi
 ) const
 {
+
+#ifdef __sw_64__
+
+    divMatrix_SpMV_param_t para;
+    para.ApsiPtr = Apsi.begin();
+    para.psiPtr = psi.begin();
+    para.diagPtr = diag_value_.begin();
+    para.off_diag_value_Ptr = off_diag_value_.begin(); 
+    para.distance_list_ = distance_list_.begin(); 
+    para.row_block_bit_ = row_block_bit_;
+    para.row_block_size_ = row_block_size_;
+    para.distance_count_ = distance_count_;
+    para.block_count_ = block_count_;
+    para.row_ = row_;
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(divMatrix_SpMV_naive)), &para);
+    CRTS_athread_join();
+
+    //     if(row_block_size_ == 32){
+    //     }else{
+    //         SpMV_naive(Apsi, psi);
+    //     }
+
+#else
+
 #ifdef __ARM_FEATURE_SVE
     assert(svcntd() == 8);
 #endif
     if(block_count_ > 1){
         if(row_block_size_ == 32){
-#ifdef __ARM_FEATURE_SVE
+#if defined(__ARM_FEATURE_SVE)
             SpMV_split_unroll32_sve(Apsi, psi);
 #else
             SpMV_split(Apsi, psi);
@@ -62,6 +88,8 @@ void Foam::divMatrix::SpMV
     }else{
         SpMV_naive(Apsi, psi);
     }
+
+#endif
 }
 
 
