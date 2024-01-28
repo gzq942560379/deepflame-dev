@@ -230,6 +230,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
     }
     PCG_time += clock.elapsedTime();
 
+    matrix_.flops_ += (6 * solverPerf.nIterations() + 2) * 2 * nCells;
     return solverPerf;
 }
 

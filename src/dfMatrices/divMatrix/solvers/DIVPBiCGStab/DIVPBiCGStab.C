@@ -371,6 +371,8 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
     }
 
     PBiCGStab_time += clock.elapsedTime();
+
+    matrix_.flops_ += (12 * solverPerf.nIterations() + 2) * 2. * nCells;
     return solverPerf;
 }
 

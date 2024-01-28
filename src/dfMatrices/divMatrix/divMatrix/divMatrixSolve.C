@@ -142,6 +142,7 @@ SolverPerformance<Type> divMatrix::solve(
 
 #ifdef _PROFILING_
     Info << "divMatrix solve<Type> profiling ----------------------------" << solve_time << endl;
+    Info << "Total solve flops : " << flops_ << endl;
     Info << "Total solve time : " << total_solve_time << endl;
     Info << "addBoundaryDiag_time : " << addBoundaryDiag_time << ", " << addBoundaryDiag_time / total_solve_time * 100 << "%" << endl;
     Info << "addBoundarySource_time : " << addBoundarySource_time << ", " << addBoundarySource_time / total_solve_time * 100 << "%" << endl;

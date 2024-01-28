@@ -81,6 +81,8 @@ void Foam::DIVGAMGSolver::interpolate
     {
         psiPtr[celli] = -ApsiPtr[celli]/(diagPtr[celli]);
     }
+
+    m.flops_ += nCells;
 }
 
 
