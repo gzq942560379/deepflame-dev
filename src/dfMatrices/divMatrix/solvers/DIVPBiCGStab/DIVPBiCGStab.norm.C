@@ -92,8 +92,9 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
     const label nCells = psi.size();
 
-    // label gNCells = nCells;
-    // reduce(gNCells, sumOp<label>());
+    label gNCells = nCells;
+    reduce(gNCells, sumOp<label>());
+    PBiCGStab_allreduce_time += clock.timeIncrement();
 
     const scalar* __restrict__ sourcePtr = source.begin();
 
@@ -107,6 +108,8 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
     scalarField rA(nCells);
     scalar* __restrict__ rAPtr = rA.begin();
+
+    PBiCGStab_misc_time += clock.timeIncrement();
 
     // --- Calculate A.psi
     matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
@@ -123,6 +126,45 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
     PBiCGStab_axpy_time += clock.timeIncrement();
 
+    // --- Calculate normalisation factor
+    matrix_.sumA(pA, interfaceBouCoeffs_, interfaces_);
+
+    PBiCGStab_sumA_time += clock.timeIncrement();
+
+    scalar gPsiSum = 0.;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:gPsiSum)
+#endif
+    for(label c = 0; c < nCells; ++c){
+        gPsiSum += psi[c];
+    }
+
+    PBiCGStab_reduce_local_time += clock.timeIncrement();
+
+    reduce(gPsiSum, sumOp<scalar>());
+
+    PBiCGStab_allreduce_time += clock.timeIncrement();
+
+    scalar gPsiAvg = gPsiSum / gNCells;
+
+    scalar gTmpSum = 0.;
+
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:gTmpSum)
+#endif
+    for(label c = 0; c < nCells; ++c){
+        pAPtr[c] *= gPsiAvg;
+        gTmpSum += std::abs(yAPtr[c] - pAPtr[c]) + std::abs(sourcePtr[c] - pAPtr[c]);
+    }
+
+    PBiCGStab_norm_local_time += clock.timeIncrement();
+
+    reduce(gTmpSum, sumOp<scalar>());
+
+    PBiCGStab_allreduce_time += clock.timeIncrement();
+    
+    scalar normFactor = gTmpSum + solverPerformance::small_;
+
     // --- Calculate normalised residual norm
     scalar gRASumMag = 0.;
 #ifdef _OPENMP
@@ -138,7 +180,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
     PBiCGStab_allreduce_time += clock.timeIncrement();
     
-    solverPerf.initialResidual() = gRASumMag;
+    solverPerf.initialResidual() = gRASumMag / normFactor;
     solverPerf.finalResidual() = solverPerf.initialResidual();
 
     // --- Check convergence, solve if not converged
@@ -272,7 +314,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
             PBiCGStab_allreduce_time += clock.timeIncrement();
 
-            solverPerf.finalResidual() = gSASumMag;
+            solverPerf.finalResidual() = gSASumMag / normFactor;
 
             if (solverPerf.checkConvergence(tolerance_, relTol_))
             {
@@ -358,7 +400,7 @@ Foam::solverPerformance Foam::DIVPBiCGStab::solve
 
             PBiCGStab_allreduce_time += clock.timeIncrement();
             
-            solverPerf.finalResidual() = gRASumMag;
+            solverPerf.finalResidual() = gRASumMag / normFactor;
 
         } while
         (
