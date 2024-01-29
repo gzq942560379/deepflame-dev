@@ -1050,7 +1050,7 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
     const labelList& patchSizes = meshSchedule.patchSizes();
 
     const scalar* const __restrict__ meshVPtr = &mesh.V()[0];
-    const scalar* const __restrict__ UOldTimePtr = &U.oldTime()[0][0];
+    const scalar* const __restrict__ UPtr = &U[0][0];
 
     scalarPtr* internalCoeffsPtr = new scalarPtr[nPatches];
     scalarPtr* boundaryCoeffsPtr = new scalarPtr[nPatches];
@@ -1178,26 +1178,26 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
 
             label cellIndex = faceCells[patchi][s];
 
-            HbyA[cellIndex * 3 + 0] += ( -(internal_x + ave_internal) * UOldTimePtr[cellIndex * 3 + 0]);
-            HbyA[cellIndex * 3 + 1] += ( -(internal_y + ave_internal) * UOldTimePtr[cellIndex * 3 + 1]);
-            HbyA[cellIndex * 3 + 2] += ( -(internal_z + ave_internal) * UOldTimePtr[cellIndex * 3 + 2]);
+            HbyA[cellIndex * 3 + 0] += ( (-internal_x + ave_internal) * UPtr[cellIndex * 3 + 0]);
+            HbyA[cellIndex * 3 + 1] += ( (-internal_y + ave_internal) * UPtr[cellIndex * 3 + 1]);
+            HbyA[cellIndex * 3 + 2] += ( (-internal_z + ave_internal) * UPtr[cellIndex * 3 + 2]);
         }
     }
 
     /* ueqn_lduMatrix_H */
     for (label f = 0; f < nFaces; ++f){
 
-        HbyA[u[f] * 3 + 0] += ( -lowerPtr[f] * UOldTimePtr[l[f] + 0]);
-        HbyA[u[f] * 3 + 1] += ( -lowerPtr[f] * UOldTimePtr[l[f] + 1]);
-        HbyA[u[f] * 3 + 2] += ( -lowerPtr[f] * UOldTimePtr[l[f] + 2]);
-        HbyA[l[f] * 3 + 0] += ( -upperPtr[f] * UOldTimePtr[u[f] + 0]);
-        HbyA[l[f] * 3 + 1] += ( -upperPtr[f] * UOldTimePtr[u[f] + 1]);
-        HbyA[l[f] * 3 + 2] += ( -upperPtr[f] * UOldTimePtr[u[f] + 2]);
+        HbyA[u[f] * 3 + 0] += ( -lowerPtr[f] * UPtr[l[f] + 0]);
+        HbyA[u[f] * 3 + 1] += ( -lowerPtr[f] * UPtr[l[f] + 1]);
+        HbyA[u[f] * 3 + 2] += ( -lowerPtr[f] * UPtr[l[f] + 2]);
+        HbyA[l[f] * 3 + 0] += ( -upperPtr[f] * UPtr[u[f] + 0]);
+        HbyA[l[f] * 3 + 1] += ( -upperPtr[f] * UPtr[u[f] + 1]);
+        HbyA[l[f] * 3 + 2] += ( -upperPtr[f] * UPtr[u[f] + 2]);
     }
 
     for(label patchi = 0; patchi < nPatches; ++patchi){
         if(patchSizes[patchi] == 0) continue;
-        if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
+        if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
             /* ueqn_addBoundarySrc_unCoupled */
 
             for (label s = 0; s < patchSizes[patchi]; ++s){
@@ -1299,14 +1299,7 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
             boundaryHbyA[patchi][s * 3 + 0] = boundaryrAU[patchi][s] * boundaryHbyA[patchi][s * 3 + 0];
             boundaryHbyA[patchi][s * 3 + 1] = boundaryrAU[patchi][s] * boundaryHbyA[patchi][s * 3 + 1];
             boundaryHbyA[patchi][s * 3 + 2] = boundaryrAU[patchi][s] * boundaryHbyA[patchi][s * 3 + 2];
-
-            if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
-
-                boundaryHbyA_internal[patchi][s * 3 + 0] = boundaryrAU_internal[patchi][s] * boundaryHbyA_internal[patchi][s * 3 + 0];
-                boundaryHbyA_internal[patchi][s * 3 + 1] = boundaryrAU_internal[patchi][s] * boundaryHbyA_internal[patchi][s * 3 + 1];
-                boundaryHbyA_internal[patchi][s * 3 + 2] = boundaryrAU_internal[patchi][s] * boundaryHbyA_internal[patchi][s * 3 + 2];
-
-            }
+            
         }
     }
 
