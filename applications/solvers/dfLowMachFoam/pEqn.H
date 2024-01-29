@@ -39,8 +39,6 @@ volVectorField HbyAref = constrainHbyA(rAUref*UEqn.H(), U, p);
 surfaceScalarField rhorAUfref = fvc::interpolate(rho*rAUref);
 check_field_boundary_equal(rAUref, rAU, "rAU");
 check_field_boundary_equal(HbyAref, HbyA, "HbyA");
-Info << "rAU and HbyA check pass !"<< endl;
-exit(0);
 #endif
 
 if (pimple.nCorrPiso() <= 1)
