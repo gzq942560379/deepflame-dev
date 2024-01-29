@@ -24,6 +24,7 @@ const volScalarField psip0(psi*p);
 // getrAU(rAU)
 // - get HbyA
 // getHbyA(HbyA)
+getrAUandHbyA(rAU, HbyA, UEqn, U);
 #endif
 
 rAU = 1.0/UEqn.A(); // TODO: optimize
@@ -38,6 +39,8 @@ volVectorField HbyAref = constrainHbyA(rAUref*UEqn.H(), U, p);
 surfaceScalarField rhorAUfref = fvc::interpolate(rho*rAUref);
 check_field_boundary_equal(rAUref, rAU, "rAU");
 check_field_boundary_equal(HbyAref, HbyA, "HbyA");
+Info << "rAU and HbyA check pass !"<< endl;
+exit(0);
 #endif
 
 if (pimple.nCorrPiso() <= 1)
