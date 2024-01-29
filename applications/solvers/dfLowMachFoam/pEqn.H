@@ -24,6 +24,7 @@ const volScalarField psip0(psi*p);
 // getrAU(rAU)
 // - get HbyA
 // getHbyA(HbyA)
+getrAUandHbyA(rAU, HbyA, UEqn, U);
 #endif
 
 rAU = 1.0/UEqn.A(); // TODO: optimize
