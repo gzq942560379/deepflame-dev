@@ -20,16 +20,12 @@ if (!pimple.simpleRho())
 const volScalarField psip0(psi*p);
 
 #ifdef OPT_GenMatrix_p
-// - get rAU
-// getrAU(rAU)
-// - get HbyA
-// getHbyA(HbyA)
 getrAUandHbyA(rAU, HbyA, UEqn, U);
 #endif
 
-rAU = 1.0/UEqn.A(); // TODO: optimize
-HbyA = constrainHbyA(rAU*UEqn.H(), U, p); // TODO: optimize
 #ifndef OPT_GenMatrix_p
+rAU = 1.0/UEqn.A();
+HbyA = constrainHbyA(rAU*UEqn.H(), U, p);
 rhorAUf = fvc::interpolate(rho*rAU);
 #endif
 
