@@ -1028,9 +1028,11 @@ GenMatrix_U(
 
 void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatrix& UEqn, volVectorField& U){
     
-
+    clockTime clock;
     scalar* __restrict__ lowerPtr = &UEqn.lower()[0];
     scalar* __restrict__ upperPtr = &UEqn.upper()[0];
+    scalar* __restrict__ diagPtr = &UEqn.diag()[0];
+    scalar* __restrict__ sourcePtr = &UEqn.source()[0][0];
 
     const label *l = &UEqn.lduAddr().lowerAddr()[0];
     const label *u = &UEqn.lduAddr().upperAddr()[0];
@@ -1043,6 +1045,7 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
     typedef const label* constLabelPtr;
 
     const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const labelList& face_scheduling = meshSchedule.face_scheduling();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -1057,6 +1060,9 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
 
     constScalarPtr* boundaryU = new constScalarPtr[nPatches];
     constLabelPtr* faceCells = new constLabelPtr[nPatches];
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label patchi = 0; patchi < nPatches; ++patchi){
 
         const fvPatchVectorField& patchU = U.boundaryField()[patchi];
@@ -1068,16 +1074,25 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
         faceCells[patchi] = mesh.boundary()[patchi].faceCells().begin(); // patchSize
     }
 
-    scalarPtr rAU = &rAUout[0];
+    scalarPtr rAU = rAUout.begin();
     scalarPtr* boundaryrAU = new scalarPtr[nPatches];
     scalarPtr* boundaryrAU_internal = new scalarPtr[nPatches];
 
-    scalarPtr HbyA = &HbyAout[0][0];
+    scalarPtr HbyA = (scalar*)HbyAout.begin();
     scalarPtr* boundaryHbyA = new scalarPtr[nPatches];
     scalarPtr* boundaryHbyA_internal = new scalarPtr[nPatches];
 
-    memcpy(rAU, &UEqn.diag()[0], sizeof(scalar) * nCells);
-    memcpy(HbyA, &UEqn.source()[0][0], sizeof(scalar) * nCells * 3);
+    // memcpy(rAU, &UEqn.diag()[0], sizeof(scalar) * nCells);
+    // memcpy(HbyA, &UEqn.source()[0][0], sizeof(scalar) * nCells * 3);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (label c = 0; c < nCells; ++c) {
+        rAU[c] = diagPtr[c];
+        HbyA[3 * c] = sourcePtr[3 * c];
+        HbyA[3 * c + 1] = sourcePtr[3 * c + 1];
+        HbyA[3 * c + 2] = sourcePtr[3 * c + 2];
+    }
     for (label patchi = 0; patchi < nPatches; ++patchi){
         label patchSize = patchSizes[patchi];
         boundaryrAU[patchi] = (scalar*)rAUout.boundaryField()[patchi].begin();
@@ -1094,215 +1109,261 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
         }
 
     }
+    Info << "prepreprocess_p init : " << clock.timeIncrement() << endl;
 
     /* addAveInternaltoDiagUeqn */
     for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (label s = 0; s < patchSizes[patchi]; ++s){
-
             label cellIndex = faceCells[patchi][s];
-
             scalar internal_x = internalCoeffsPtr[patchi][s * 3 + 0];
             scalar internal_y = internalCoeffsPtr[patchi][s * 3 + 1];
             scalar internal_z = internalCoeffsPtr[patchi][s * 3 + 2];
-
             scalar ave_internal = (internal_x + internal_y + internal_z)/3;
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
             rAU[cellIndex] += ave_internal;
-
         }
     }
+    Info << "prepreprocess_p addAveInternaltoDiagUeqn : " << clock.timeIncrement() << endl;
 
     /* divide_cell_volume_scalar_reverse */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label c = 0; c < nCells; ++c){
-
         scalar vol = meshVPtr[c];
-
-        rAU[c] = 1/ (rAU[c]/vol);
+        rAU[c] = 1/ rAU[c] * vol;
     }
+
+    Info << "prepreprocess_p divide_cell_volume_scalar_reverse : " << clock.timeIncrement() << endl;
 
     /* correct_boundary_conditions_scalar */
     for(label patchi = 0; patchi < nPatches; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
         if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
             /* correct_boundary_conditions_zeroGradient_scalar */
-
             for (label s = 0; s < patchSizes[patchi]; ++s){
-
                 label cellIndex = faceCells[patchi][s];
-
                 boundaryrAU[patchi][s] = rAU[cellIndex];
-
             }
 
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
             /* correct_boundary_conditions_processor_scalar */
-
             /* correct_internal_boundary_field_scalar */
-
             for (label s = 0; s < patchSizes[patchi]; ++s){
-
                 label cellIndex = faceCells[patchi][s];
-
                 boundaryrAU_internal[patchi][s] = rAU[cellIndex];
             }
-
-            // Info << " /* before mpi */ " << endl;
-            // MPI_Send(&boundaryrAU_internal[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, MPI_COMM_WORLD);
-            // Info << " /* mpi send end */ " << endl;
-            // MPI_Recv(&boundaryrAU[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            // Info << " /* mpi recv end */ " << endl;
-
-
-        }else{
-            Info << "patch type not supported" << endl;
-            std::exit(-1);        
         }
-
+        for (label patchi = 0; patchi < nPatches; ++patchi) {
+            if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+                MPI_Sendrecv(
+                    &boundaryrAU_internal[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, 
+                    &boundaryrAU[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, 
+                    MPI_COMM_WORLD, MPI_STATUS_IGNORE
+                );
+            }
+        }
     }
+    Info << "prepreprocess_p correct_boundary_conditions_scalar : " << clock.timeIncrement() << endl;
 
 /* --------------------------------------------------------------------------------------------------------------------------------------------- */
-
 /**
  *  getHbyA
 */
-
     /* ueqn_addBoundaryDiag */
     for (label patchi = 0; patchi < nPatches; ++patchi){
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (label s = 0; s < patchSizes[patchi]; ++s){
-
             scalar internal_x = internalCoeffsPtr[patchi][s * 3 + 0];
             scalar internal_y = internalCoeffsPtr[patchi][s * 3 + 1];
             scalar internal_z = internalCoeffsPtr[patchi][s * 3 + 2];
-
             scalar ave_internal = (internal_x + internal_y + internal_z)/3;
-
             label cellIndex = faceCells[patchi][s];
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
             HbyA[cellIndex * 3 + 0] += ( (-internal_x + ave_internal) * UPtr[cellIndex * 3 + 0]);
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
             HbyA[cellIndex * 3 + 1] += ( (-internal_y + ave_internal) * UPtr[cellIndex * 3 + 1]);
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
             HbyA[cellIndex * 3 + 2] += ( (-internal_z + ave_internal) * UPtr[cellIndex * 3 + 2]);
         }
     }
+    Info << "prepreprocess_p ueqn_addBoundaryDiag : " << clock.timeIncrement() << endl;
 
     /* ueqn_lduMatrix_H */
-    for (label f = 0; f < nFaces; ++f){
-
-        HbyA[u[f] * 3 + 0] += ( -lowerPtr[f] * UPtr[l[f] + 0]);
-        HbyA[u[f] * 3 + 1] += ( -lowerPtr[f] * UPtr[l[f] + 1]);
-        HbyA[u[f] * 3 + 2] += ( -lowerPtr[f] * UPtr[l[f] + 2]);
-        HbyA[l[f] * 3 + 0] += ( -upperPtr[f] * UPtr[u[f] + 0]);
-        HbyA[l[f] * 3 + 1] += ( -upperPtr[f] * UPtr[u[f] + 1]);
-        HbyA[l[f] * 3 + 2] += ( -upperPtr[f] * UPtr[u[f] + 2]);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            HbyA[u[f] * 3 + 0] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 0]);
+            HbyA[u[f] * 3 + 1] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 1]);
+            HbyA[u[f] * 3 + 2] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 2]);
+            HbyA[l[f] * 3 + 0] += ( -upperPtr[f] * UPtr[u[f] * 3 + 0]);
+            HbyA[l[f] * 3 + 1] += ( -upperPtr[f] * UPtr[u[f] * 3 + 1]);
+            HbyA[l[f] * 3 + 2] += ( -upperPtr[f] * UPtr[u[f] * 3 + 2]);
+        }
     }
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            HbyA[u[f] * 3 + 0] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 0]);
+            HbyA[u[f] * 3 + 1] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 1]);
+            HbyA[u[f] * 3 + 2] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 2]);
+            HbyA[l[f] * 3 + 0] += ( -upperPtr[f] * UPtr[u[f] * 3 + 0]);
+            HbyA[l[f] * 3 + 1] += ( -upperPtr[f] * UPtr[u[f] * 3 + 1]);
+            HbyA[l[f] * 3 + 2] += ( -upperPtr[f] * UPtr[u[f] * 3 + 2]);
+        }
+    }
+    // for (label f = 0; f < nFaces; ++f){
+    //     HbyA[u[f] * 3 + 0] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 0]);
+    //     HbyA[u[f] * 3 + 1] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 1]);
+    //     HbyA[u[f] * 3 + 2] += ( -lowerPtr[f] * UPtr[l[f] * 3 + 2]);
+    //     HbyA[l[f] * 3 + 0] += ( -upperPtr[f] * UPtr[u[f] * 3 + 0]);
+    //     HbyA[l[f] * 3 + 1] += ( -upperPtr[f] * UPtr[u[f] * 3 + 1]);
+    //     HbyA[l[f] * 3 + 2] += ( -upperPtr[f] * UPtr[u[f] * 3 + 2]);
+    // }
+    Info << "prepreprocess_p ueqn_lduMatrix_H : " << clock.timeIncrement() << endl;
 
     for(label patchi = 0; patchi < nPatches; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
         if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
             /* ueqn_addBoundarySrc_unCoupled */
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label s = 0; s < patchSizes[patchi]; ++s){
-                
                 scalar boundary_x = boundaryCoeffsPtr[patchi][s * 3 + 0];
                 scalar boundary_y = boundaryCoeffsPtr[patchi][s * 3 + 1];
                 scalar boundary_z = boundaryCoeffsPtr[patchi][s * 3 + 2];
-
                 label cellIndex = faceCells[patchi][s];
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 HbyA[cellIndex * 3 + 0] += boundary_x;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 HbyA[cellIndex * 3 + 1] += boundary_y;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 HbyA[cellIndex * 3 + 2] += boundary_z;
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
             /* ueqn_addBoundarySrc_processor */
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
             for (label s = 0; s < patchSizes[patchi]; ++s){
-
                 scalar boundary_x = boundaryCoeffsPtr[patchi][s * 3 + 0];
                 scalar boundary_y = boundaryCoeffsPtr[patchi][s * 3 + 1];
                 scalar boundary_z = boundaryCoeffsPtr[patchi][s * 3 + 2];
                 scalar boundary_vf_x = boundaryU[patchi][s * 3 + 0];
                 scalar boundary_vf_y = boundaryU[patchi][s * 3 + 1];
                 scalar boundary_vf_z = boundaryU[patchi][s * 3 + 2];
-
                 label cellIndex = faceCells[patchi][s];
-
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 HbyA[cellIndex * 3 + 0] += boundary_x * boundary_vf_x;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 HbyA[cellIndex * 3 + 1] += boundary_y * boundary_vf_y;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
                 HbyA[cellIndex * 3 + 2] += boundary_z * boundary_vf_z;
             }
         }
     }
+    Info << "prepreprocess_p ueqn_addBoundarySrc : " << clock.timeIncrement() << endl;
 
     /* ueqn_divide_cell_volume_vec */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label c = 0; c < nCells; ++c){
-
-        scalar vol = meshVPtr[c];
-
-        HbyA[c * 3 + 0] = HbyA[c * 3 + 0] / vol;
-        HbyA[c * 3 + 1] = HbyA[c * 3 + 1] / vol;
-        HbyA[c * 3 + 2] = HbyA[c * 3 + 2] / vol;
+        scalar meshVRTmp = 1. / meshVPtr[c];
+        HbyA[c * 3 + 0] *= meshVRTmp;
+        HbyA[c * 3 + 1] *= meshVRTmp;
+        HbyA[c * 3 + 2] *= meshVRTmp;
     }
+
+    Info << "prepreprocess_p ueqn_divide_cell_volume_vec : " << clock.timeIncrement() << endl;
 
     /* correct_boundary_conditions_vector */
     for(label patchi = 0; patchi < nPatches; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
         if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
             /* correct_boundary_conditions_zeroGradient_vector */
-
             for (label s = 0; s < patchSizes[patchi]; ++s){
-                
                 label cellIndex = faceCells[patchi][s];
-
                 boundaryHbyA[patchi][s * 3 + 0] = HbyA[cellIndex * 3 + 0];
                 boundaryHbyA[patchi][s * 3 + 1] = HbyA[cellIndex * 3 + 1];
                 boundaryHbyA[patchi][s * 3 + 2] = HbyA[cellIndex * 3 + 2];
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
             /* correct_boundary_conditions_processor_vector */
-
             for (label s = 0; s < patchSizes[patchi]; ++s){
                 /* coorect_internal_boundary_field_vector */
-
                 label cellIndex = faceCells[patchi][s];
-
                 boundaryHbyA_internal[patchi][s * 3 + 0] = HbyA[cellIndex * 3 + 0];
                 boundaryHbyA_internal[patchi][s * 3 + 1] = HbyA[cellIndex * 3 + 1];
                 boundaryHbyA_internal[patchi][s * 3 + 2] = HbyA[cellIndex * 3 + 2];
             }
-            
-            // Info << "before mpi" << endl;
-            // MPI_Send(&boundaryHbyA_internal[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0, MPI_COMM_WORLD);
-            // Info << "mid mpi" << endl;
-            // MPI_Recv(&boundaryHbyA[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            // Info << "after mpi" << endl;
-
-        }else{
-            Info << "patch type not supported" << endl;
-            std::exit(-1);        
+        }
+        for (label patchi = 0; patchi < nPatches; ++patchi) {
+            if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+                MPI_Sendrecv(
+                    &boundaryHbyA_internal[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0,
+                    &boundaryHbyA[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0,
+                    MPI_COMM_WORLD, MPI_STATUS_IGNORE
+                );
+            }
         }
     }
+    Info << "prepreprocess_p correct_boundary_conditions_vector : " << clock.timeIncrement() << endl;
 
     /* scalar_field_multiply_vector_field */
 
     /* scalar_multiply_vector_kernel */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (label c = 0; c < nCells; ++c){
-
         HbyA[c * 3 + 0] = rAU[c] * HbyA[c * 3 + 0];
         HbyA[c * 3 + 1] = rAU[c] * HbyA[c * 3 + 1];
         HbyA[c * 3 + 2] = rAU[c] * HbyA[c * 3 + 2];
     }
 
     for(label patchi = 0; patchi < nPatches; ++patchi){
-        if(patchSizes[patchi] == 0) continue;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (label s = 0; s < patchSizes[patchi]; ++s){
-
             boundaryHbyA[patchi][s * 3 + 0] = boundaryrAU[patchi][s] * boundaryHbyA[patchi][s * 3 + 0];
             boundaryHbyA[patchi][s * 3 + 1] = boundaryrAU[patchi][s] * boundaryHbyA[patchi][s * 3 + 1];
             boundaryHbyA[patchi][s * 3 + 2] = boundaryrAU[patchi][s] * boundaryHbyA[patchi][s * 3 + 2];
-            
         }
     }
-
+    Info << "prepreprocess_p scalar_field_multiply_vector_field : " << clock.timeIncrement() << endl;
+    Info << "prepreprocess_p total : " << clock.elapsedTime() << endl;
 }
-
 }
