@@ -62,7 +62,8 @@ SourceFiles
 #include "scalarField.H"
 #include "volFields.H"
 #include "hashedWordList.H"
-#include "psiThermo.H"
+// #include "psiThermo.H"
+#include "rhoThermo.H"
 #include "physicoChemicalConstants.H" // for R
 #include "ChemistryProblem.H"
 #include "ChemistrySolution.H"
@@ -125,13 +126,15 @@ public IOdictionary
         volScalarField& alpha_;
         volScalarField& T_;
         const volScalarField& p_;
-        const volScalarField& rho_;
+        volScalarField& rho_;
+        volScalarField mixfrac_;
         volScalarField& mu_;
         volScalarField& psi_;
         // heat release rate, [J/m^3/s]
         volScalarField Qdot_;
         // DNN selection fields
         volScalarField selectDNN_;
+        bool useThermoTranNN;
 
 #if defined(USE_BLASDNN)
         std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
@@ -188,6 +191,7 @@ public IOdictionary
         double time_python_;
         double time_python_import_module_;
         double time_python_inference_;
+        pybind11::module_ call_ThermoTranNN;
 #endif
 
         // Load balancing object

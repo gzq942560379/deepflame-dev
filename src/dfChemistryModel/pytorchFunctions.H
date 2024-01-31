@@ -114,8 +114,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             double start8 = MPI_Wtime();
 
             pybind11::array_t<double> vec0 = pybind11::array_t<double>({DNNinputs[0].size()}, {8}, &DNNinputs[0][0]); // cast vector to np.array
-            pybind11::array_t<double> vec1 = pybind11::array_t<double>({DNNinputs[1].size()}, {8}, &DNNinputs[1][0]);
-            pybind11::array_t<double> vec2 = pybind11::array_t<double>({DNNinputs[2].size()}, {8}, &DNNinputs[2][0]);
+            // pybind11::array_t<double> vec1 = pybind11::array_t<double>({DNNinputs[1].size()}, {8}, &DNNinputs[1][0]);
+            // pybind11::array_t<double> vec2 = pybind11::array_t<double>({DNNinputs[2].size()}, {8}, &DNNinputs[2][0]);
 
             double end8 = MPI_Wtime();
             // std::cout << "vec2ndarrayTime = " << end8 - start8 << std::endl;
@@ -125,7 +125,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
 
             double start9 = MPI_Wtime();
 
-            pybind11::object result = call_torch.attr("inference")(vec0, vec1, vec2); // call python function
+            pybind11::object result = call_torch.attr("inference")(vec0); // call python function
             const double* star = result.cast<pybind11::array_t<double>>().data();
 
             double end9 = MPI_Wtime();
@@ -138,10 +138,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
 
             /*=============================construct solutions=============================*/
             double start6 = MPI_Wtime();
-            std::vector<double> outputsVec0(star, star+outputLength[0] * 7); //the float number is sample_length*sample_number
-            std::vector<double> outputsVec1(star+outputLength[0] * 7, star+outputLength[1] * 7);
-            std::vector<double> outputsVec2(star+outputLength[1] * 7, star+outputLength[2] * 7);
-            std::vector<std::vector<double>> results = {outputsVec0, outputsVec1, outputsVec2};
+            std::vector<double> outputsVec0(star, star+outputLength[0] * mixture_.nSpecies()); //the float number is sample_length*sample_number
+            std::vector<std::vector<double>> results = {outputsVec0};
             updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
             double end6 = MPI_Wtime();
             // std::cout << "updateSolutionBufferTime = " << end6 - start6 << std::endl;
@@ -268,8 +266,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         /*==============================vector to ndarray==============================*/
         double start3 = MPI_Wtime();
         pybind11::array_t<double> vec0 = pybind11::array_t<double>({DNNinputs[0].size()}, {8}, &DNNinputs[0][0]); // cast vector to np.array
-        pybind11::array_t<double> vec1 = pybind11::array_t<double>({DNNinputs[1].size()}, {8}, &DNNinputs[1][0]);
-        pybind11::array_t<double> vec2 = pybind11::array_t<double>({DNNinputs[2].size()}, {8}, &DNNinputs[2][0]);
+        // pybind11::array_t<double> vec1 = pybind11::array_t<double>({DNNinputs[1].size()}, {8}, &DNNinputs[1][0]);
+        // pybind11::array_t<double> vec2 = pybind11::array_t<double>({DNNinputs[2].size()}, {8}, &DNNinputs[2][0]);
         double end3 = MPI_Wtime();
         time_vec2ndarray_ = end3 - start3;
         
@@ -281,17 +279,15 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         
         /*==============================call python function==============================*/
         double start5 = MPI_Wtime();
-        pybind11::object result = call_torch.attr("inference")(vec0, vec1, vec2); // call python function
+        pybind11::object result = call_torch.attr("inference")(vec0); // call python function
         double end5 = MPI_Wtime();
         time_python_inference_ = end5 - start5;
 
         /*=============================construct solutions=============================*/
         double start6 = MPI_Wtime();
         const double* star = result.cast<pybind11::array_t<double>>().data();
-        std::vector<double> outputsVec0(star, star+outputLength[0] * 7); //the float number is sample_length*sample_number
-        std::vector<double> outputsVec1(star+outputLength[0] * 7, star+outputLength[1] * 7);
-        std::vector<double> outputsVec2(star+outputLength[1] * 7, star+outputLength[2] * 7);
-        std::vector<std::vector<double>> results = {outputsVec0, outputsVec1, outputsVec2};
+        std::vector<double> outputsVec0(star, star+outputLength[0] * mixture_.nSpecies()); //the float number is sample_length*sample_number
+        std::vector<std::vector<double>> results = {outputsVec0};
         updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
         double end6 = MPI_Wtime();
         time_updateSolutionBuffer_ = end6 - start6;

@@ -62,26 +62,26 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
         } 
     }
 
-    nasa_coeffs_size = 15 * nSpecies;
-    viscosity_coeffs_size = 5 * nSpecies;
-    conductivity_coeffs_size = 5 * nSpecies;
-    binary_diffusion_coeffs_size = 5 * nSpecies * nSpecies;
-    molecular_weights_size = nSpecies;
-    viscosity_constant1_size = nSpecies * nSpecies;
-    viscosity_constant2_size = nSpecies * nSpecies;
+    // nasa_coeffs_size = 15 * nSpecies;
+    // viscosity_coeffs_size = 5 * nSpecies;
+    // conductivity_coeffs_size = 5 * nSpecies;
+    // binary_diffusion_coeffs_size = 5 * nSpecies * nSpecies;
+    // molecular_weights_size = nSpecies;
+    // viscosity_constant1_size = nSpecies * nSpecies;
+    // viscosity_constant2_size = nSpecies * nSpecies;
 
-    total_buffer_size = nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size \
-        + binary_diffusion_coeffs_size + molecular_weights_size + viscosity_constant1_size + viscosity_constant2_size;
+    // total_buffer_size = nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size \
+    //     + binary_diffusion_coeffs_size + molecular_weights_size + viscosity_constant1_size + viscosity_constant2_size;
 
-    total_buffer = new Foam::scalar[total_buffer_size];
+    // total_buffer = new Foam::scalar[total_buffer_size];
 
-    nasa_coeffs = total_buffer;
-    viscosity_coeffs = nasa_coeffs + nasa_coeffs_size;
-    conductivity_coeffs = viscosity_coeffs + viscosity_coeffs_size;
-    binary_diffusion_coeffs = conductivity_coeffs + conductivity_coeffs_size;
-    molecular_weights = binary_diffusion_coeffs + binary_diffusion_coeffs_size;
-    viscosity_constant1 = molecular_weights + molecular_weights_size;
-    viscosity_constant2 = viscosity_constant1 + viscosity_constant1_size;
+    // nasa_coeffs = total_buffer;
+    // viscosity_coeffs = nasa_coeffs + nasa_coeffs_size;
+    // conductivity_coeffs = viscosity_coeffs + viscosity_coeffs_size;
+    // binary_diffusion_coeffs = conductivity_coeffs + conductivity_coeffs_size;
+    // molecular_weights = binary_diffusion_coeffs + binary_diffusion_coeffs_size;
+    // viscosity_constant1 = molecular_weights + molecular_weights_size;
+    // viscosity_constant2 = viscosity_constant1 + viscosity_constant1_size;
 
     // nasa_coeffs = new Foam::scalar[15 * nSpecies];
     // viscosity_coeffs = new Foam::scalar[5 * nSpecies];
@@ -93,47 +93,47 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
 
     if(mpirank == 0){
         // read coeffs from file
-        std::string prefix = "thermo_";
-        std::string suffix = ".txt";
-        std::string baseName = get_filename(mechanism_file);
-        std::string thermo_coeff_file = prefix + baseName + suffix;
+        // std::string prefix = "thermo_";
+        // std::string suffix = ".txt";
+        // std::string baseName = get_filename(mechanism_file);
+        // std::string thermo_coeff_file = prefix + baseName + suffix;
 
-        // read binary file
-        FILE *fp = NULL;
-        const char* c_thermo_file = thermo_coeff_file.c_str();
+        // // read binary file
+        // FILE *fp = NULL;
+        // const char* c_thermo_file = thermo_coeff_file.c_str();
 
-        fp = fopen(c_thermo_file, "rb+");
-        if (fp == NULL) {
-            fprintf(stderr, "Failed to open input file: %s!\n", c_thermo_file);
-            exit(EXIT_FAILURE);
-        }
+        // fp = fopen(c_thermo_file, "rb+");
+        // if (fp == NULL) {
+        //     fprintf(stderr, "Failed to open input file: %s!\n", c_thermo_file);
+        //     exit(EXIT_FAILURE);
+        // }
 
-        int nSpecies_read;
-        fread(&nSpecies_read, sizeof(int), 1, fp);
+        // int nSpecies_read;
+        // // fread(&nSpecies_read, sizeof(int), 1, fp);
 
-        assert(nSpecies_read == nSpecies);
+        // assert(nSpecies_read == nSpecies);
 
-        fread(molecular_weights, sizeof(Foam::scalar), nSpecies, fp);
-        fread(nasa_coeffs, sizeof(Foam::scalar), 15 * nSpecies, fp);
-        fread(viscosity_coeffs, sizeof(Foam::scalar), 5 * nSpecies, fp);
-        fread(conductivity_coeffs, sizeof(Foam::scalar), 5 * nSpecies, fp);
-        fread(binary_diffusion_coeffs, sizeof(Foam::scalar), 5 * nSpecies * nSpecies, fp);
+        // fread(molecular_weights, sizeof(Foam::scalar), nSpecies, fp);
+        // fread(nasa_coeffs, sizeof(Foam::scalar), 15 * nSpecies, fp);
+        // fread(viscosity_coeffs, sizeof(Foam::scalar), 5 * nSpecies, fp);
+        // fread(conductivity_coeffs, sizeof(Foam::scalar), 5 * nSpecies, fp);
+        // fread(binary_diffusion_coeffs, sizeof(Foam::scalar), 5 * nSpecies * nSpecies, fp);
 
-        fclose(fp);
+        // fclose(fp);
     }
 
-    size_t bcast_size = molecular_weights_size + nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size + binary_diffusion_coeffs_size;
-    if(flag_mpi_init){
-        MPI_Bcast(total_buffer, bcast_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
+    // size_t bcast_size = molecular_weights_size + nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size + binary_diffusion_coeffs_size;
+    // if(flag_mpi_init){
+    //     MPI_Bcast(total_buffer, bcast_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // }
 
     // calculate constant
-    for (int i = 0; i < nSpecies; ++i) {
-        for (int j = 0; j < nSpecies; ++j) {
-            viscosity_constant1[i * nSpecies + j] = pow((1 + molecular_weights[i] / molecular_weights[j]), -0.5);
-            viscosity_constant2[i * nSpecies + j] = pow(molecular_weights[j] / molecular_weights[i], 0.25);
-        }
-    }
+    // for (int i = 0; i < nSpecies; ++i) {
+    //     for (int j = 0; j < nSpecies; ++j) {
+    //         viscosity_constant1[i * nSpecies + j] = pow((1 + molecular_weights[i] / molecular_weights[j]), -0.5);
+    //         viscosity_constant2[i * nSpecies + j] = pow(molecular_weights[j] / molecular_weights[i], 0.25);
+    //     }
+    // }
 }
 
 namespace Foam

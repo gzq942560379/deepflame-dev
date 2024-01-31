@@ -35,8 +35,8 @@ Description
 
 #include "dfChemistryModel.H"
 #include "CanteraMixture.H"
-#include "hePsiThermo.H"
-
+// #include "hePsiThermo.H"
+#include "heRhoThermo.H"
 #ifdef USE_PYTORCH
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -71,7 +71,7 @@ Description
 // #define _ELL_
 #define _DIV_
 // #define _LDU_
-// #define OPT_GenMatrix_Y
+#define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
 #define OPT_GenMatrix_U
 #define OPT_GenMatrix_p

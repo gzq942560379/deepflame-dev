@@ -117,9 +117,35 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+            // const Cantera::AnyMap& map = CanteraGas_->input();
+            // if(map["thermo"].asString()=="Peng-Robinson" || map["thermo"].asString()=="Redlich-Kwong")
+            // {
+            //     // for non-ideal EoS, psi = \partial rho/ \partial p at constant enthalpy
+            //     // Currently, Peng-Robinson and Redlich-Kwong are available in Cantera
+            //     // The partial derivative was approximated using backward difference with a step size dx
+            //     double h0 = CanteraGas_->enthalpy_mass();
+            //     double dx = 0.0001;
+            //     double rho1 = CanteraGas_->density();
+            //     CanteraGas_->setState_HP(h0,p*(1-dx));
+            //     double rho2 = CanteraGas_->density();
+            //     return (rho1-rho2)/(dx*p);
+            // }
+            // else
+            // {
+                // for ideal gas, psi = W/RT
+                return CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+            // }
         }
-
+        
+        scalar rho
+        (
+            const scalar& p,
+            const scalar& T
+        ) const
+        {
+            return CanteraGas_->density();
+        }
+        
         scalar mu
         (
             const scalar& p,

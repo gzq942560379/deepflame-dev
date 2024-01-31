@@ -71,9 +71,26 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     alpha_(const_cast<volScalarField&>(thermo.alpha())),
     T_(thermo.T()),
     p_(thermo.p()),
-    rho_(mesh_.objectRegistry::lookupObject<volScalarField>("rho")),
-    mu_(const_cast<volScalarField&>(dynamic_cast<psiThermo&>(thermo).mu()())),
-    psi_(const_cast<volScalarField&>(dynamic_cast<psiThermo&>(thermo).psi())),
+    // rho_(mesh_.objectRegistry::lookupObject<volScalarField>("rho")),
+    rho_(const_cast<volScalarField&>(dynamic_cast<rhoThermo&>(thermo).rho())),
+    // mu_(const_cast<volScalarField&>(dynamic_cast<psiThermo&>(thermo).mu()())),
+    // psi_(const_cast<volScalarField&>(dynamic_cast<psiThermo&>(thermo).psi())),
+    mu_(const_cast<volScalarField&>(dynamic_cast<rhoThermo&>(thermo).mu()())),
+    psi_(const_cast<volScalarField&>(dynamic_cast<rhoThermo&>(thermo).psi())),
+    useThermoTranNN(false),
+    mixfrac_
+    (
+        IOobject
+        (
+            "mixfrac",
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh_,
+        dimensionedScalar(dimless, -1)
+    ),
     Qdot_
     (
         IOobject
@@ -117,10 +134,10 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 {
 #if defined USE_LIBTORCH || defined USE_PYTORCH
     useDNN = true;
-    if (!Qdot_.typeHeaderOk<volScalarField>())
-    {
-        useDNN = false;
-    }
+    // if (!Qdot_.typeHeaderOk<volScalarField>())
+    // {
+    //     useDNN = false;
+    // }
 
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     gpu_ = this->subDict("TorchSettings").lookupOrDefault("GPU", false),
@@ -185,6 +202,13 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     time_python_ = 0;
     time_python_import_module_ = 0;
     time_python_inference_ = 0;
+
+    useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
+    if(useThermoTranNN)
+        {
+            call_ThermoTranNN = pybind11::module_::import("ThermoTranNN");
+            Info << nl << "ThermoTranNN.py was loaded." << nl << endl;
+        } 
 #endif
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
@@ -542,87 +566,110 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     double correctThermo_part1_6_time = 0.;
     double correctThermo_part1_7_time = 0.;
     double correctThermo_part1_8_time = 0.;
-
+    // Info << "energy before correctThermo" << thermo_.he() << endl;
     correctThermo_start = MPI_Wtime();
 
     psi_.oldTime();
+    mixfrac_ = (16*(2*(Y_[8]/15+Y_[9]/16+Y_[10]/28+Y_[11]/44+Y_[12]/29+Y_[13]/30+Y_[14]/31+Y_[15]/15+Y_[16]/47)+0.5*(Y_[0]+Y_[1]+Y_[4]/17+Y_[5]/9+Y_[6]/33+Y_[7]/17+Y_[8]/5+Y_[9]/4+Y_[13]/15+3*Y_[14]/31+Y_[15]/5+3*Y_[16]/47)-(Y_[2]/16+Y_[3]/16+Y_[4]/17+Y_[5]/18+2*Y_[6]/33+Y_[7]/17+Y_[10]/28+Y_[11]/22+Y_[12]/29+Y_[13]/30+Y_[14]/31+2*Y_[16]/47))+1)/5;
 
+    // Info << "pressure before correctThermo" << p_ << endl; 
+    // Info << "Z before correctThermo" << mixfrac_ << endl;
     correctThermo_part1_start = MPI_Wtime();
+    if(useThermoTranNN)
+    {   
+        #ifdef USE_PYTORCH
+        Info << "================using ThermoTranDNN=============" << endl;
+        // psi_.oldTime();
+        const scalarField& inputH = thermo_.he().primitiveField();
+        const scalarField& inputP = p_.primitiveField();
+        scalarField inputZ = mixfrac_.primitiveField();
 
-    forAll(T_, celli)
-    {
-        double tick0 = MPI_Wtime();
-        scalarList yTemp(mixture_.nSpecies());
-        scalarList dTemp(mixture_.nSpecies());
-        scalarList hrtTemp(mixture_.nSpecies());
-        forAll(Y_, i)
+        pybind11::array_t<double> vec6 = pybind11::array_t<double>({inputH.size()}, {8}, &inputH[0]); // cast vector to np.array
+        pybind11::array_t<double> vec7 = pybind11::array_t<double>({inputP.size()}, {8}, &inputP[0]);
+        pybind11::array_t<double> vec8 = pybind11::array_t<double>({inputZ.size()}, {8}, &inputZ[0]);
+        
+        Info <<  "vectors have all been constructed \n" << endl;
+        // pybind11::object result1 = call_ThermoTranNN.attr("useNet1")(vec0, vec1, vec2, vec3, vec4, vec5, vec6, vec7); // for rho only
+        pybind11::object result1 = call_ThermoTranNN.attr("useNet")(vec8, vec6, vec7);
+        pybind11::array_t<double> result_array1(result1); 
+        double* data_ptr1 = result_array1.mutable_data();
+        forAll(T_, celli)  
         {
-            yTemp[i] = Y_[i][celli];
+                rho_[celli] = data_ptr1[5*celli];
+                T_[celli] = data_ptr1[5*celli+1];
+                psi_[celli] = data_ptr1[5*celli+2];
+                mu_[celli] = data_ptr1[5*celli+3];
+                alpha_[celli] = data_ptr1[5*celli+4];
+                forAll(rhoD_, i)
+                {
+                    rhoD_[i][celli] = alpha_[celli];
+                }
         }
-        double tick1 = MPI_Wtime();
-        correctThermo_part1_1_time += tick1 - tick0;
-
-        CanteraGas_->setState_PY(p_[celli], yTemp.begin());
-        double tick2 = MPI_Wtime();
-        correctThermo_part1_2_time += tick2 - tick1;
-
-        // cost
-        CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
-        double tick3 = MPI_Wtime();
-        correctThermo_part1_3_time += tick3 - tick2;
-
-        T_[celli] = CanteraGas_->temperature();
-        double tick4 = MPI_Wtime();
-        correctThermo_part1_4_time += tick4 - tick3;
-
-        // meanMolecularWeight() kg/kmol    RT() Joules/kmol
-        psi_[celli] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
-        double tick5 = MPI_Wtime();
-        correctThermo_part1_5_time += tick5 - tick4;
-
-        // cost
-        mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
-        double tick6 = MPI_Wtime();
-        correctThermo_part1_6_time += tick6 - tick5;
-
-        alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass()); // kg/(m*s)
-        double tick7 = MPI_Wtime();
-        correctThermo_part1_7_time += tick7 - tick6;
-        // thermalConductivity() W/m/K
-        // cp_mass()   J/kg/K
-
-        if (mixture_.transportModelName() == "UnityLewis")
-        {
-            forAll(rhoD_, i)
-            {
-                rhoD_[i][celli] = alpha_[celli];
-            }
-        }
-        else
-        {
-            mixture_.CanteraTransport()->getMixDiffCoeffsMass(dTemp.begin()); // m2/s
-
-            CanteraGas_->getEnthalpy_RT(hrtTemp.begin()); //hrtTemp_=m_h0_RT non-dimension
-            // constant::physicoChemical::R.value()   J/(mol·k)
-            const scalar RT = constant::physicoChemical::R.value()*1e3*T_[celli]; // J/kmol/K
-            forAll(rhoD_, i)
-            {
-                rhoD_[i][celli] = rho_[celli]*dTemp[i];
-
-                // CanteraGas_->molecularWeight(i)    kg/kmol
-                hai_[i][celli] = hrtTemp[i]*RT/CanteraGas_->molecularWeight(i);
-            }
-        }
-        double tick8 = MPI_Wtime();
-        correctThermo_part1_8_time += tick8 - tick7;
+        #endif 
     }
+   
+    else
+    {
+        forAll(T_, celli)
+        {
+            double tick0 = MPI_Wtime();
+            scalarList yTemp(mixture_.nSpecies());
+            scalarList dTemp(mixture_.nSpecies());
+            scalarList hrtTemp(mixture_.nSpecies());
+            forAll(Y_, i)
+            {
+                yTemp[i] = Y_[i][celli];
+            }
+            double tick1 = MPI_Wtime();
+            correctThermo_part1_1_time += tick1 - tick0;
 
+            CanteraGas_->setState_PY(p_[celli], yTemp.begin());
+            double tick2 = MPI_Wtime();
+            correctThermo_part1_2_time += tick2 - tick1;
+
+            // cost
+            CanteraGas_->setState_HP(thermo_.he()[celli], p_[celli]); // setState_HP needs (J/kg)
+            double tick3 = MPI_Wtime();
+            correctThermo_part1_3_time += tick3 - tick2;
+
+            T_[celli] = CanteraGas_->temperature();
+            double tick4 = MPI_Wtime();
+            correctThermo_part1_4_time += tick4 - tick3;
+            rho_[celli] = mixture_.rho(p_[celli],T_[celli]);
+            // meanMolecularWeight() kg/kmol    RT() Joules/kmol
+             psi_[celli] = mixture_.psi(p_[celli],T_[celli]);
+            double tick5 = MPI_Wtime();
+            correctThermo_part1_5_time += tick5 - tick4;
+
+            // cost
+            mu_[celli] = mixture_.CanteraTransport()->viscosity(); // Pa-s
+            double tick6 = MPI_Wtime();
+            correctThermo_part1_6_time += tick6 - tick5;
+
+            alpha_[celli] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass()); // kg/(m*s)
+            double tick7 = MPI_Wtime();
+            correctThermo_part1_7_time += tick7 - tick6;
+            // thermalConductivity() W/m/K
+            // cp_mass()   J/kg/K
+
+            // if (mixture_.transportModelName() == "UnityLewis")
+            // {
+                forAll(rhoD_, i)
+                {
+                    rhoD_[i][celli] = alpha_[celli];
+                }
+            // }
+            double tick8 = MPI_Wtime();
+            correctThermo_part1_8_time += tick8 - tick7;
+        }
+    }
     correctThermo_part1_end = MPI_Wtime();
     correctThermo_part1_time += correctThermo_part1_end - correctThermo_part1_start;
 
     const volScalarField::Boundary& pBf = p_.boundaryField();
 
-    const volScalarField::Boundary& rhoBf = rho_.boundaryField();
+    // const volScalarField::Boundary& rhoBf = rho_.boundaryField();
+    volScalarField::Boundary& rhoBf = rho_.boundaryFieldRef();
 
     volScalarField::Boundary& TBf = T_.boundaryFieldRef();
 
@@ -634,20 +681,25 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 
     volScalarField::Boundary& alphaBf = alpha_.boundaryFieldRef();
 
+    volScalarField::Boundary mixfracBf = mixfrac_.boundaryField();  
+
     correctThermo_part2_start = MPI_Wtime();
 
     forAll(T_.boundaryField(), patchi)
     {
         const fvPatchScalarField& pp = pBf[patchi];
-        const fvPatchScalarField& prho = rhoBf[patchi];
+        // const fvPatchScalarField& prho = rhoBf[patchi];
+        fvPatchScalarField& prho = rhoBf[patchi];
         fvPatchScalarField& pT = TBf[patchi];
         fvPatchScalarField& ppsi = psiBf[patchi];
         fvPatchScalarField& ph = hBf[patchi];
         fvPatchScalarField& pmu = muBf[patchi];
         fvPatchScalarField& palpha = alphaBf[patchi];
+        fvPatchScalarField pmixfrac = mixfracBf[patchi];
 
         if (pT.fixesValue())
         {
+            Info << "==== pT.fixesValue() ===="<<endl;
             forAll(pT, facei)
             {
                 forAll(Y_, i)
@@ -656,79 +708,89 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
                 }
                 CanteraGas_->setState_TPY(pT[facei], pp[facei], yTemp_.begin());
 
+                // prho[facei] = mixture_.rho(pp[facei],pT[facei]);
+
                 ph[facei] = CanteraGas_->enthalpy_mass();
 
                 ppsi[facei] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+                prho[facei] = mixture_.rho(pp[facei],pT[facei]);
 
                 pmu[facei] = mixture_.CanteraTransport()->viscosity();
 
                 palpha[facei] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass());
 
-                if (mixture_.transportModelName() == "UnityLewis")
-                {
+                // if (mixture_.transportModelName() == "UnityLewis")
+                // {
                     forAll(rhoD_, i)
                     {
                         rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
                     }
-                }
-                else
-                {
-                    mixture_.CanteraTransport()->getMixDiffCoeffsMass(dTemp_.begin());
-
-                    CanteraGas_->getEnthalpy_RT(hrtTemp_.begin());
-                    const scalar RT = constant::physicoChemical::R.value()*1e3*pT[facei];
-                    forAll(rhoD_, i)
-                    {
-                        rhoD_[i].boundaryFieldRef()[patchi][facei] = prho[facei]*dTemp_[i];
-
-                        hai_[i].boundaryFieldRef()[patchi][facei] = hrtTemp_[i]*RT/CanteraGas_->molecularWeight(i);
-                    }
-                }
+                // }
             }
         }
         else
         {
-            forAll(pT, facei)
+            if(useThermoTranNN)
             {
-                forAll(Y_, i)
+                #ifdef USE_PYTORCH
+                Info << "==== patch using Thermo DNN ===="<<endl;
+                // scalarField inputZ = mixfrac_.primitiveField();
+                pybind11::array_t<double> pvec8 = pybind11::array_t<double>({pmixfrac.size()}, {8}, &pmixfrac[0]);
+                pybind11::array_t<double> pvec6 = pybind11::array_t<double>({ph.size()}, {8}, &ph[0]);
+                pybind11::array_t<double> pvec7 = pybind11::array_t<double>({pp.size()}, {8}, &pp[0]);
+                pybind11::object presult1 = call_ThermoTranNN.attr("useNet")(pvec8, pvec6, pvec7); // for density only
+                pybind11::array_t<double> presult_array1(presult1);
+                double* pdata_ptr1 = presult_array1.mutable_data();
+                forAll(pT, facei) 
                 {
-                    yTemp_[i] = Y_[i].boundaryField()[patchi][facei];
-                }
-                CanteraGas_->setState_PY(pp[facei], yTemp_.begin());
-                CanteraGas_->setState_HP(ph[facei], pp[facei]);
-
-                pT[facei] = CanteraGas_->temperature();
-
-                ppsi[facei] = CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
-
-                pmu[facei] = mixture_.CanteraTransport()->viscosity();
-
-                palpha[facei] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass());
-
-                if (mixture_.transportModelName() == "UnityLewis")
-                {
+                    prho[facei] = pdata_ptr1[5*facei];
+                    pT[facei] = pdata_ptr1[5*facei+1];
+                    ppsi[facei] = pdata_ptr1[5*facei+2];
+                    pmu[facei] = pdata_ptr1[5*facei+3];
+                    palpha[facei] = pdata_ptr1[5*facei+4];
                     forAll(rhoD_, i)
                     {
                         rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
                     }
                 }
-                else
+                #endif
+            }
+            else
+            {
+                forAll(pT, facei)
                 {
-                    mixture_.CanteraTransport()->getMixDiffCoeffsMass(dTemp_.begin());
-
-                    CanteraGas_->getEnthalpy_RT(hrtTemp_.begin());
-                    const scalar RT = constant::physicoChemical::R.value()*1e3*pT[facei];
-                    forAll(rhoD_, i)
+                    forAll(Y_, i)
                     {
-                        rhoD_[i].boundaryFieldRef()[patchi][facei] = prho[facei]*dTemp_[i];
-
-                        hai_[i].boundaryFieldRef()[patchi][facei] = hrtTemp_[i]*RT/CanteraGas_->molecularWeight(i);
+                        yTemp_[i] = Y_[i].boundaryField()[patchi][facei];
                     }
+                    CanteraGas_->setState_PY(pp[facei], yTemp_.begin());
+                    CanteraGas_->setState_HP(ph[facei], pp[facei]);
+
+                    pT[facei] = CanteraGas_->temperature();
+                    prho[facei] = mixture_.rho(pp[facei],pT[facei]);
+
+                    ppsi[facei] = mixture_.psi(pp[facei],pT[facei]);
+
+                    pmu[facei] = mixture_.CanteraTransport()->viscosity();
+
+                    palpha[facei] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass());
+
+                    // if (mixture_.transportModelName() == "UnityLewis")
+                    // {
+                        forAll(rhoD_, i)
+                        {
+                            rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
+                        }
+                    // }
                 }
             }
         }
     }
-
+    // Info << "rho after correctThermo is " << rho_ << endl;
+    // Info << "T after correctThermo is " << T_ << endl;
+    // Info << "psi after correctThermo is " << psi_ << endl;
+    // Info << "mu after correctThermo is " << mu_ << endl;
+    // Info << "alpha after correctThermo is " << alpha_ << endl;
     correctThermo_part2_end = MPI_Wtime();
     correctThermo_part2_time += correctThermo_part2_end - correctThermo_part2_start;
     
