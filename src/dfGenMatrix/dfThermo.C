@@ -62,8 +62,6 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
         } 
     }
 
-    }
-
 }
 
 namespace Foam
