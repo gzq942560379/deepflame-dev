@@ -64,18 +64,6 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
 
     }
 
-    // size_t bcast_size = molecular_weights_size + nasa_coeffs_size + viscosity_coeffs_size + conductivity_coeffs_size + binary_diffusion_coeffs_size;
-    // if(flag_mpi_init){
-    //     MPI_Bcast(total_buffer, bcast_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    // }
-
-    // calculate constant
-    // for (int i = 0; i < nSpecies; ++i) {
-    //     for (int j = 0; j < nSpecies; ++j) {
-    //         viscosity_constant1[i * nSpecies + j] = pow((1 + molecular_weights[i] / molecular_weights[j]), -0.5);
-    //         viscosity_constant2[i * nSpecies + j] = pow(molecular_weights[j] / molecular_weights[i], 0.25);
-    //     }
-    // }
 }
 
 namespace Foam
