@@ -119,7 +119,16 @@ public:
         {
             return CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
         }
-
+        
+        scalar rho
+        (
+            const scalar& p,
+            const scalar& T
+        ) const
+        {
+            return CanteraGas_->density();
+        }
+        
         scalar mu
         (
             const scalar& p,

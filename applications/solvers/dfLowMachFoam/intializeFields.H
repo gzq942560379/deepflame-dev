@@ -3,7 +3,7 @@ Info<< "Reading data from file\n" << endl;
 const string filePath = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("filePath", string(""));
 const label girdSize = CanteraTorchProperties.subDict("RefineSettings").lookupOrDefault("girdSize", 0);
 
-label row = Y.size() + 2;
+label row = Y.size() + 7;
 label col = girdSize;
 double* filedata = new double[row * col];
 
@@ -28,6 +28,7 @@ if(mpirank == 0){
             ss >> tmp;
             filedata[r * col + j] = std::stod(tmp); 
         }
+        // Info <<"Done Reading Row #" << r << endl;
     }
 }
 
@@ -37,7 +38,12 @@ if(flag_mpi_init){
 
 const double* filedata_x = filedata;
 const double* filedata_T = filedata + col;
-const double* filedata_Y = filedata + 2 * col;
+const double* filedata_ha = filedata + 2 * col;
+const double* filedata_psi = filedata + 3*col;
+const double* filedata_rho = filedata + 4 * col;
+const double* filedata_mu = filedata + 5 * col;
+const double* filedata_alpha = filedata + 6 * col;
+const double* filedata_Y = filedata + 7 * col;
 
 scalar x, y, z;
 label index;
@@ -48,31 +54,34 @@ forAll(mesh.C(), celli)
     z = mesh.C()[celli][2];
 
     // set scalar fields
-    index = round((x/0.001) / filedata_x[1]);
-    
+    index = round((x/0.00003) / filedata_x[1]); 
     T[celli] = filedata_T[index]; 
+    rho[celli] = filedata_rho[index];
 }
 T.correctBoundaryConditions();
+rho.correctBoundaryConditions();
+
 
 forAll(mesh.C(), celli)
 {
-    // vector c = mesh.C()[celli];
     x = mesh.C()[celli][0];
     y = mesh.C()[celli][1];
     z = mesh.C()[celli][2];
-
     // set filed U
-    U[celli] = vector(4*std::sin(x/0.001)*std::cos(y/0.001)*std::cos(z/0.001),-4*std::cos(x/0.001)*std::sin(y/0.001)*std::cos(z/0.001),0.0); 
+    U[celli] = vector(4*std::sin(x/0.00003)*std::cos(y/0.00003)*std::cos(z/0.00003),-4*std::cos(x/0.00003)*std::sin(y/0.00003)*std::cos(z/0.00003),0.0); 
 }
+
 U.correctBoundaryConditions();
 
+phi = linearInterpolate(rho*U) & mesh.Sf();
+
 forAll(mesh.C(), celli)
 {
     x = mesh.C()[celli][0];
     y = mesh.C()[celli][1];
     z = mesh.C()[celli][2];
 
-    index = round((x/0.001) / filedata_x[1]);
+    index = round((x/0.00003) / filedata_x[1]);
 
     for (int speciI = 0; speciI < Y.size(); speciI++)
     {
@@ -84,9 +93,20 @@ for (int speciI = 0; speciI < Y.size(); speciI++)
     Y[speciI].correctBoundaryConditions();
 }
 
-chemistry->correctEnthalpy();
+
+forAll(mesh.C(), celli)
+{
+    x = mesh.C()[celli][0];
+    y = mesh.C()[celli][1];
+    z = mesh.C()[celli][2];
+
+    // set scalar fields
+    index = round((x/0.00003) / filedata_x[1]);
+    thermo.he()[celli] = filedata_ha[index];
+}
+thermo.he().correctBoundaryConditions();
+
 chemistry->correctThermo();
-rho = p * psi;
-rho.correctBoundaryConditions();
+rho = thermo.rho();
 
 initialized = true;
