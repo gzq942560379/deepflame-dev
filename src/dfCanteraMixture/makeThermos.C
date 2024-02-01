@@ -73,7 +73,6 @@ namespace Foam
     addThermoPhysicsThermo(fluidThermo, CThermo##Mixture##ThermoPhys)
 
 
-// makeThermoPhysicsThermos(hePsiThermo, CanteraMixture, psiThermo);
 makeThermoPhysicsThermos(heRhoThermo, CanteraMixture, rhoThermo);
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

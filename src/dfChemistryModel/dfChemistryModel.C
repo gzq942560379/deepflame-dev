@@ -566,14 +566,12 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     double correctThermo_part1_6_time = 0.;
     double correctThermo_part1_7_time = 0.;
     double correctThermo_part1_8_time = 0.;
-    // Info << "energy before correctThermo" << thermo_.he() << endl;
+    
     correctThermo_start = MPI_Wtime();
 
     psi_.oldTime();
     mixfrac_ = (16*(2*(Y_[8]/15+Y_[9]/16+Y_[10]/28+Y_[11]/44+Y_[12]/29+Y_[13]/30+Y_[14]/31+Y_[15]/15+Y_[16]/47)+0.5*(Y_[0]+Y_[1]+Y_[4]/17+Y_[5]/9+Y_[6]/33+Y_[7]/17+Y_[8]/5+Y_[9]/4+Y_[13]/15+3*Y_[14]/31+Y_[15]/5+3*Y_[16]/47)-(Y_[2]/16+Y_[3]/16+Y_[4]/17+Y_[5]/18+2*Y_[6]/33+Y_[7]/17+Y_[10]/28+Y_[11]/22+Y_[12]/29+Y_[13]/30+Y_[14]/31+2*Y_[16]/47))+1)/5;
 
-    // Info << "pressure before correctThermo" << p_ << endl; 
-    // Info << "Z before correctThermo" << mixfrac_ << endl;
     correctThermo_part1_start = MPI_Wtime();
     if(useThermoTranNN)
     {   
@@ -589,7 +587,6 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         pybind11::array_t<double> vec8 = pybind11::array_t<double>({inputZ.size()}, {8}, &inputZ[0]);
         
         Info <<  "vectors have all been constructed \n" << endl;
-        // pybind11::object result1 = call_ThermoTranNN.attr("useNet1")(vec0, vec1, vec2, vec3, vec4, vec5, vec6, vec7); // for rho only
         pybind11::object result1 = call_ThermoTranNN.attr("useNet")(vec8, vec6, vec7);
         pybind11::array_t<double> result_array1(result1); 
         double* data_ptr1 = result_array1.mutable_data();
@@ -668,7 +665,6 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 
     const volScalarField::Boundary& pBf = p_.boundaryField();
 
-    // const volScalarField::Boundary& rhoBf = rho_.boundaryField();
     volScalarField::Boundary& rhoBf = rho_.boundaryFieldRef();
 
     volScalarField::Boundary& TBf = T_.boundaryFieldRef();
@@ -688,7 +684,6 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
     forAll(T_.boundaryField(), patchi)
     {
         const fvPatchScalarField& pp = pBf[patchi];
-        // const fvPatchScalarField& prho = rhoBf[patchi];
         fvPatchScalarField& prho = rhoBf[patchi];
         fvPatchScalarField& pT = TBf[patchi];
         fvPatchScalarField& ppsi = psiBf[patchi];
@@ -719,13 +714,11 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 
                 palpha[facei] = mixture_.CanteraTransport()->thermalConductivity()/(CanteraGas_->cp_mass());
 
-                // if (mixture_.transportModelName() == "UnityLewis")
-                // {
-                    forAll(rhoD_, i)
-                    {
-                        rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
-                    }
-                // }
+                forAll(rhoD_, i)
+                {
+                    rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
+                }
+
             }
         }
         else
@@ -786,11 +779,7 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
             }
         }
     }
-    // Info << "rho after correctThermo is " << rho_ << endl;
-    // Info << "T after correctThermo is " << T_ << endl;
-    // Info << "psi after correctThermo is " << psi_ << endl;
-    // Info << "mu after correctThermo is " << mu_ << endl;
-    // Info << "alpha after correctThermo is " << alpha_ << endl;
+
     correctThermo_part2_end = MPI_Wtime();
     correctThermo_part2_time += correctThermo_part2_end - correctThermo_part2_start;
     

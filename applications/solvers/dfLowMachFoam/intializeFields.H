@@ -60,9 +60,7 @@ forAll(mesh.C(), celli)
 }
 T.correctBoundaryConditions();
 rho.correctBoundaryConditions();
-// Info << T.boundaryField() << endl;
 
-// Info << "Boundary of U before calculating U is " << U.boundaryField() << endl;
 
 forAll(mesh.C(), celli)
 {
