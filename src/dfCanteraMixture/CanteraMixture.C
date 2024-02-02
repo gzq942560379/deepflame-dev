@@ -60,22 +60,22 @@ Foam::CanteraMixture::CanteraMixture
         )
     ),
     CanteraMechanismFile_(CanteraTorchProperties_.lookup("CanteraMechanismFile")),
-    CanteraSolution_(Cantera::newSolution(CanteraMechanismFile_, "")),
-    CanteraGas_(CanteraSolution_->thermo()),
+    // CanteraSolution_(Cantera::newSolution(CanteraMechanismFile_, "")),
+    // CanteraGas_(CanteraSolution_->thermo()),
     transportModelName_(CanteraTorchProperties_.lookup("transportModel")),
-    CanteraTransport_(newTransportMgr(transportModelName_, CanteraGas_.get())),
-    Y_(nSpecies()),
+    // CanteraTransport_(newTransportMgr(transportModelName_, CanteraGas_.get())),
+    // Y_(nSpecies()),
     Tref_(mesh.objectRegistry::lookupObject<volScalarField>("T")),
-    pref_(mesh.objectRegistry::lookupObject<volScalarField>("p")),
-    yTemp_(nSpecies()),
-    HaTemp_(nSpecies()),
-    CpTemp_(nSpecies()),
-    CvTemp_(nSpecies()),
-    muTemp_(nSpecies())
+    pref_(mesh.objectRegistry::lookupObject<volScalarField>("p"))
+    // yTemp_(nSpecies()),
+    // HaTemp_(nSpecies()),
+    // CpTemp_(nSpecies()),
+    // CvTemp_(nSpecies()),
+    // muTemp_(nSpecies())
 {
     clockTime clock;
 
-    // buildCanteraSolution();
+    buildCanteraSolution();
 
     Info << "Foam::CanteraMixture::CanteraMixture time0 : " << clock.timeIncrement() << endl;
 
@@ -219,7 +219,7 @@ void Foam::CanteraMixture::buildCanteraSolution(){
         MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
     }
 
-    if(mpirank == 0){
+    if(mpirank == 0 || !flag_mpi_init){
         std::ifstream fin(CanteraMechanismFile_);
         if (!fin) {
             SeriousError << "open CanteraMechanismFile_ error , CanteraMechanismFile_ : " << CanteraMechanismFile_ << endl;
@@ -242,7 +242,7 @@ void Foam::CanteraMixture::buildCanteraSolution(){
 
     Info << "Foam::CanteraMixture::buildCanteraSolution time 1 : " << clock.timeIncrement() << endl;
 
-    if(mpirank != 0){
+    if(flag_mpi_init && mpirank != 0){
         buffer = new char[count];
     }
     if(flag_mpi_init){
@@ -251,7 +251,7 @@ void Foam::CanteraMixture::buildCanteraSolution(){
 
     Info << "Foam::CanteraMixture::buildCanteraSolution time 2 : " << clock.timeIncrement() << endl;
 
-    if(mpirank != 0){
+    if(flag_mpi_init && mpirank != 0){
         CanteraMechanism = string(buffer, count);
     }
 
