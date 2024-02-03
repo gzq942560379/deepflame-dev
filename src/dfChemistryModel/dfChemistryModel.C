@@ -326,6 +326,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 #ifdef USE_BLASDNN
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     useDNN = true;
+    useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
     // if (!Qdot_.typeHeaderOk<volScalarField>())
     // {
     //     useDNN = false;
@@ -335,15 +336,27 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         DNNInferencer_blas_.load_models(BLASDNNModelPath_);
     }
 
-    int mpisize, mpirank;
-    MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
-    MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    if(useThermoTranNN)
+    {
+        thermoDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("thermoDNNModelPath", string(""));
+        DNNThermo_blas_.load_models(thermoDNNModelPath_);
+        Info << "ThermoDNN was loaded." << endl;
+    } 
 
-    int count;
-    std::string norm_str;
+    int mpisize, mpirank;
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+
+    if(flag_mpi_init){
+        MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+        MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    }
+
+    int* count = new int[2];
+    std::string norm_str, thermo_norm_str;
     char* buffer;
 
-    if (mpirank == 0){
+    if (mpirank == 0 || !flag_mpi_init){
         std::ifstream fin(BLASDNNModelPath_ + "/norm.yaml");
         if (!fin) {
             SeriousError << "open norm error , norm path : " << BLASDNNModelPath_ + "/norm.yaml" << endl;
@@ -352,25 +365,49 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         std::ostringstream oss;
         oss << fin.rdbuf();
         norm_str = oss.str();
-        count = norm_str.size();
+        count[0] = norm_str.size();
         fin.close();
-        buffer = new char[count];
+
+        // thermo norm
+        fin = std::ifstream(thermoDNNModelPath_ + "/norm.yaml");
+        if (!fin) {
+            SeriousError << "open norm error , norm path : " << thermoDNNModelPath_ + "/norm.yaml" << endl;
+            MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+        }
+        oss.str("");
+        oss << fin.rdbuf();
+        thermo_norm_str = oss.str();
+        count[1] = thermo_norm_str.size();
+        fin.close();
+
+        buffer = new char[count[0] + count[1]];
         std::copy(norm_str.begin(), norm_str.end(), buffer);
+        std::copy(thermo_norm_str.begin(), thermo_norm_str.end(), buffer + count[0]);
     }
 
-    MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
-
-    if (mpirank != 0){
-        buffer = new char[count];
+    if(flag_mpi_init){
+        MPI_Bcast(count, 2, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+        if (mpirank != 0)   buffer = new char[count[0] + count[1]];
+        MPI_Bcast(buffer, count[0] + count[1], MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
+        if (mpirank != 0) {
+            norm_str = std::string(buffer, count[0]);
+            thermo_norm_str = std::string(buffer + count[0], count[1]);
+        }
+        delete[] buffer;
     }
 
-    MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
-
-    if (mpirank != 0){
-        norm_str = std::string(buffer, count);
+    // thermo norm
+    YAML::Node thermoNorm = YAML::Load(thermo_norm_str);
+    YAML::Node thermoMuNode = thermoNorm["mean"];
+    for (size_t i = 0; i < thermoMuNode.size(); i++){
+        thermomu_.push_back(thermoMuNode[i].as<double>());
     }
-    delete[] buffer;
+    YAML::Node thermoStdNode = thermoNorm["std"];
+    for (size_t i = 0; i < thermoStdNode.size(); i++){
+        thermostd_.push_back(thermoStdNode[i].as<double>());
+    }
 
+    // chemistry norm
     YAML::Node norm = YAML::Load(norm_str);
     YAML::Node Xmu0Node = norm["Xmu0"];
     for (size_t i = 0; i < Xmu0Node.size(); i++){
@@ -592,17 +629,24 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         double* data_ptr1 = result_array1.mutable_data();
         forAll(T_, celli)  
         {
-                rho_[celli] = data_ptr1[5*celli];
-                T_[celli] = data_ptr1[5*celli+1];
-                psi_[celli] = data_ptr1[5*celli+2];
-                mu_[celli] = data_ptr1[5*celli+3];
-                alpha_[celli] = data_ptr1[5*celli+4];
-                forAll(rhoD_, i)
-                {
-                    rhoD_[i][celli] = alpha_[celli];
-                }
+            rho_[celli] = data_ptr1[5*celli];
+            T_[celli] = data_ptr1[5*celli+1];
+            psi_[celli] = data_ptr1[5*celli+2];
+            mu_[celli] = data_ptr1[5*celli+3];
+            alpha_[celli] = data_ptr1[5*celli+4];
+            forAll(rhoD_, i)
+            {
+                rhoD_[i][celli] = alpha_[celli];
+            }
         }
         #endif 
+        #ifdef USE_BLASDNN
+        Info << "================using ThermoTranDNN=============" << endl;
+        const scalarField& inputH = thermo_.he().primitiveField();
+        const scalarField& inputP = p_.primitiveField();
+        scalarField inputZ = mixfrac_.primitiveField();
+        thermoDNN_blas(inputH, inputP, inputZ, rho_, T_, psi_, mu_, alpha_, rhoD_);
+        #endif
     }
    
     else
@@ -1059,6 +1103,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_CVODE
 
 #ifdef USE_BLASDNN
 #include "blasdnnFunctions.H"
+#include "thermodnnFunctions.H"
 #endif
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH

@@ -41,20 +41,22 @@ void DNNInferencer_blas<DataType>::load_models(const std::string dir){
     // mpi 
     int flag_mpi_init;
     MPI_Initialized(&flag_mpi_init);
-    if(!flag_mpi_init){
-        std::cerr << "DNNInferencer_blas<DataType>::load_models : MPI is not initialized" << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
+    // if(!flag_mpi_init){
+    //     std::cerr << "DNNInferencer_blas<DataType>::load_models : MPI is not initialized" << std::endl;
+    //     MPI_Abort(MPI_COMM_WORLD, 1);
+    // }
     int mpirank;
     int mpisize;
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
-    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+    if(flag_mpi_init){
+        MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+        MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+    }
 
     int32_t count;
     char* buffer;
     std::string setting0_str;
 
-    if(mpirank == 0){
+    if(mpirank == 0 || !flag_mpi_init){
         std::ifstream fin(dir + "/0/setting.yaml");
         if (!fin) {
             std::cerr << "open setting file error , setting path : " << dir + "/0/setting.yaml" << std::endl;
@@ -68,20 +70,13 @@ void DNNInferencer_blas<DataType>::load_models(const std::string dir){
         buffer = new char[count];
         std::copy(setting0_str.begin(), setting0_str.end(), buffer);
     }
-
-    MPI_Bcast(&count, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    if(mpirank != 0){
-        buffer = new char[count];
+    if(flag_mpi_init){
+        MPI_Bcast(&count, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        if (mpirank != 0)   buffer = new char[count];
+        MPI_Bcast(buffer, count, MPI_CHAR, 0, MPI_COMM_WORLD);
+        if (mpirank != 0)   setting0_str = std::string(buffer, count);
+        delete[] buffer;
     }
-
-    MPI_Bcast(buffer, count, MPI_CHAR, 0, MPI_COMM_WORLD);
-
-    if(mpirank != 0){
-        setting0_str = std::string(buffer, count);
-    }
-
-    delete[] buffer;
 
     // init model
     YAML::Node setting0 = YAML::Load(setting0_str);
@@ -264,9 +259,11 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
     if(sizeof(DataType) == sizeof(double)){
     }else if(sizeof(DataType) == sizeof(float)){
         theoretical_peak *= 2.;
-    }else if(sizeof(DataType) == sizeof(__fp16)){
-        theoretical_peak *= 4.;
-    }else{
+    }
+    // else if(sizeof(DataType) == sizeof(__fp16)){
+    //     theoretical_peak *= 4.;
+    // }
+    else{
         assert(false);
     }
 
@@ -345,8 +342,8 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
             for(size_t i = 0; i < model0_.size(); ++i){
                 model0_[i]->forward(tensor_list[i], tensor_list[i+1]);
             }
-            Tensor<DataType>& last_tensor = tensor_list.back();
-
+            
+            // Tensor<DataType>& last_tensor = tensor_list.back();
             // DataType* __restrict__ output0_ptr = output0 + sample_start * output_dim();
             // const DataType* const __restrict__ last_tensor_ptr = last_tensor.data();
             // for(int i = 0; i < last_tensor.element_num(); ++i){
@@ -417,9 +414,11 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
     if(sizeof(DataType) == sizeof(double)){
     }else if(sizeof(DataType) == sizeof(float)){
         theoretical_peak *= 2.;
-    }else if(sizeof(DataType) == sizeof(__fp16)){
-        theoretical_peak *= 4.;
-    }else{
+    }
+    // else if(sizeof(DataType) == sizeof(__fp16)){
+    //     theoretical_peak *= 4.;
+    // }
+    else{
         assert(false);
     }
 
@@ -466,4 +465,4 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
 
 template class DNNInferencer_blas<float>;
 template class DNNInferencer_blas<double>;
-template class DNNInferencer_blas<__fp16>;
+// template class DNNInferencer_blas<__fp16>;

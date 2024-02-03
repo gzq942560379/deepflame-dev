@@ -43,6 +43,8 @@ public:
     }
 };
 
+#ifdef _FP16_
 template class Tensor<__fp16>;
+#endif
 template class Tensor<float>;
 template class Tensor<double>;

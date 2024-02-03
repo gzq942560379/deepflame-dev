@@ -15,7 +15,7 @@ if(flag_mpi_init){
     MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
 }
 
-if(mpirank == 0){
+if(mpirank == 0 || !flag_mpi_init){
     std::ifstream infile;
     std::string str;
     infile.open(filePath);

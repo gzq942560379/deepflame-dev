@@ -34,8 +34,18 @@ if [ ! -z "$USE_BLASDNN" ]; then
     cd "$DF_SRC/dfChemistryModel/DNNInferencer_blas"
     mkdir build
     cd build
-    cmake .. -DCMAKE_CXX_COMPILER=mpiFCC -DCMAKE_CXX_FLAGS="-Nclang -Ofast -march=armv8.2-a+sve -mcpu=a64fx -g -fopenmp -Nfjomplib -std=c++11"
+    cmake ..
+    if [ $? -ne 0 ]; then
+        echo "Error: CMake configuration failed. Exiting installation."
+        cd $DF_ROOT
+        return 1
+    fi
     make VERBOSE=1
+    if [ $? -ne 0 ]; then
+        echo "Error: Compilation failed. Exiting installation."
+        cd $DF_ROOT
+        return 1
+    fi
     cp ./libDNNInferencer_blas.so $DF_ROOT/lib/
 fi
 cd $DF_ROOT
