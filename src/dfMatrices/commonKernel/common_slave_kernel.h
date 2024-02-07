@@ -24,7 +24,9 @@ extern void SLAVE_FUN(sum_prod_naive)(sum_prod_param_t* para_p);
 
 extern void SLAVE_FUN(copy_naive)(copy_param_t* para_p);
 
+extern void SLAVE_FUN(scaling_factor_naive)(scaling_factor_param_t* para_p);
 
+extern void SLAVE_FUN(scaling_update_naive)(scaling_update_param_t* para_p);
 
 #ifdef __cplusplus
 }

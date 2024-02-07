@@ -86,6 +86,8 @@ void Foam::divMatrix::Jacobi
 #endif
     double end = MPI_Wtime();
     Jacobi_time_ += end - start;
+
+    flops_ += row_ * (distance_count_ + 1) * 2.;
 }
 
 void Foam::divMatrix::Jacobi_naive

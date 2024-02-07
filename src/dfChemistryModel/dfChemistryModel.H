@@ -134,9 +134,9 @@ public IOdictionary
         volScalarField selectDNN_;
 
 #if defined(USE_BLASDNN)
-        std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
-                            Xmu1_, Xstd1_, Ymu1_, Ystd1_,
-                            Xmu2_, Xstd2_, Ymu2_, Ystd2_;
+        std::vector<scalar> Xmu0_, Xstd0_, Ymu0_, Ystd0_, XstdR0_,
+                            Xmu1_, Xstd1_, Ymu1_, Ystd1_, XstdR1_,
+                            Xmu2_, Xstd2_, Ymu2_, Ystd2_, XstdR2_;
 
 #endif
 

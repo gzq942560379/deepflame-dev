@@ -89,6 +89,8 @@ void Foam::divMatrix::SpMV
         SpMV_naive(Apsi, psi);
     }
 
+    flops_ += row_ * (distance_count_ + 1) * 2.;
+
 #endif
 }
 

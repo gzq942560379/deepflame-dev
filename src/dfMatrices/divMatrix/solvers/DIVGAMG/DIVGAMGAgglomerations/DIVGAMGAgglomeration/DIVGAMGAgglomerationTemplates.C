@@ -82,7 +82,6 @@ void Foam::DIVGAMGAgglomeration::restrictField
 ) const
 {
     cf = Zero;
-
     forAll(ff, i)
     {
         cf[fineToCoarse[i]] += ff[i];
@@ -211,6 +210,9 @@ void Foam::DIVGAMGAgglomeration::prolongField
     }
     else
     {
+#ifdef _OPENMP
+        #pragma omp parallel for
+#endif
         forAll(fineToCoarse, i)
         {
             ff[i] = cf[fineToCoarse[i]];

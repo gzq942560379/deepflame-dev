@@ -182,8 +182,9 @@ divMatrix::divMatrix(const lduMesh& mesh):row_block_bit_(row_block_bit), row_blo
 }
 
 void divMatrix::copy_value_from_fvMatrix(const lduMatrix& lduMatrix){
-    lduMatrix_ = &lduMatrix;
+    flops_ = 0.;
 
+    lduMatrix_ = &lduMatrix;
 
     diagonal_ = lduMatrix.diagonal();
     symmetric_ = lduMatrix.symmetric();

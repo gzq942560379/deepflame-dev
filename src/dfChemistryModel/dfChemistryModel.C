@@ -359,6 +359,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     YAML::Node Xstd0Node = norm["Xstd0"];
     for (size_t i = 0; i < Xstd0Node.size(); i++){
         Xstd0_.push_back(Xstd0Node[i].as<double>());
+        XstdR0_.push_back(1./Xstd0Node[i].as<double>());
     }
     YAML::Node Ymu0Node = norm["Ymu0"];
     for (size_t i = 0; i < Ymu0Node.size(); i++){
@@ -375,6 +376,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     YAML::Node Xstd1Node = norm["Xstd1"];
     for (size_t i = 0; i < Xstd1Node.size(); i++){
         Xstd1_.push_back(Xstd1Node[i].as<double>());
+        XstdR1_.push_back(1./Xstd1Node[i].as<double>());
     }
     YAML::Node Ymu1Node = norm["Ymu1"];
     for (size_t i = 0; i < Ymu1Node.size(); i++){
@@ -391,6 +393,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     YAML::Node Xstd2Node = norm["Xstd2"];
     for (size_t i = 0; i < Xstd2Node.size(); i++){
         Xstd2_.push_back(Xstd2Node[i].as<double>());
+        XstdR2_.push_back(1./Xstd2Node[i].as<double>());
     }
     YAML::Node Ymu2Node = norm["Ymu2"];
     for (size_t i = 0; i < Ymu2Node.size(); i++){

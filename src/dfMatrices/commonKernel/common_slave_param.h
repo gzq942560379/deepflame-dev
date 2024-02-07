@@ -15,7 +15,6 @@ typedef struct{
     label len;
 } axpy_param_t;
 
-
 typedef struct{
     scalar* z;
     const scalar* x;
@@ -25,7 +24,6 @@ typedef struct{
     scalar gamma;
     label len;
 } triad_param_t;
-
 
 typedef struct{
     double *ret_p;
@@ -67,7 +65,23 @@ typedef struct{
     label len;
 } copy_param_t;
 
+typedef struct{
+    scalar* scalingFactorNum_p;
+    scalar* scalingFactorDenom_p;
+    const scalar* sourcePtr;
+    const scalar* AcfPtr;
+    const scalar* fieldPtr;
+    label nCells;
+} scaling_factor_param_t;
 
+typedef struct{
+    scalar* fieldPtr;
+    scalar sf;
+    const scalar* sourcePtr;
+    const scalar* AcfPtr;
+    const scalar* diagPtr;
+    label nCells;
+} scaling_update_param_t;
 
 #ifdef __cplusplus
 }

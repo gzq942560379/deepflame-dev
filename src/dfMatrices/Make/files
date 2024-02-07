@@ -9,11 +9,13 @@ $(common)/axpy_naive.c
 $(common)/triad_naive.c
 $(common)/triad_naive.c
 $(common)/reduce_rma.c
-$(common)/norm_factor_local_naive.c
 $(common)/sum_naive.c
 $(common)/sum_mag_naive.c
 $(common)/sum_sqr_naive.c
 $(common)/sum_prod_naive.c
+$(common)/norm_factor_local_naive.c
+$(common)/scaling_factor_naive.c
+$(common)/scaling_update_naive.c
 
 /*
  * dfMatrix/dfMatrix.C

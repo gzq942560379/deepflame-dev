@@ -63,6 +63,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
 
     label gNCells = nCells;
     reduce(gNCells, sumOp<label>());
+    PCG_allreduce_time += clock.timeIncrement();
 
     const scalar* __restrict__ sourcePtr = source.begin();
 
@@ -76,9 +77,6 @@ Foam::solverPerformance Foam::DIVPCG::solve
 
     scalarField rA(nCells);
     scalar* __restrict__ rAPtr = rA.begin();
-
-    scalarField tmp(nCells);
-    scalar* __restrict__ tmpPtr = tmp.begin();
 
     scalar wArA = solverPerf.great_;
     scalar wArAold = wArA;
@@ -98,9 +96,11 @@ Foam::solverPerformance Foam::DIVPCG::solve
         rAPtr[c] = sourcePtr[c] - wAPtr[c];
     }
 
-    PCG_localUpdate_time += clock.timeIncrement();
+    PCG_axpy_time += clock.timeIncrement();
     
     matrix_.sumA(pA, interfaceBouCoeffs_, interfaces_);
+
+    PCG_sumA_time += clock.timeIncrement();
 
     scalar gPsiSum = 0.;
 #ifdef _OPENMP
@@ -110,37 +110,31 @@ Foam::solverPerformance Foam::DIVPCG::solve
         gPsiSum += psi[c];
     }
 
+    PCG_reduce_local_time += clock.timeIncrement();
+
     reduce(gPsiSum, sumOp<scalar>());
+
+    PCG_allreduce_time += clock.timeIncrement();
 
     scalar gPsiAvg = gPsiSum / gNCells;
 
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        pAPtr[c] *= gPsiAvg;
-    }
-    
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label c = 0; c < nCells; ++c){
-        tmpPtr[c] = std::abs(wAPtr[c] - pAPtr[c]) + std::abs(sourcePtr[c] - pAPtr[c]);
-    }
-
     scalar gTmpSum = 0.;
+
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:gTmpSum)
 #endif
     for(label c = 0; c < nCells; ++c){
-        gTmpSum += tmpPtr[c];
+        double tmp = pAPtr[c] * gPsiAvg;
+        gTmpSum += std::abs(wAPtr[c] - tmp) + std::abs(sourcePtr[c] - tmp);
     }
 
+    PCG_norm_local_time += clock.timeIncrement();
+
     reduce(gTmpSum, sumOp<scalar>());
+
+    PCG_allreduce_time += clock.timeIncrement();
     
     scalar normFactor = gTmpSum + solverPerformance::small_;
-
-    PCG_normFactor_time += clock.timeIncrement();
 
     scalar gRASumMag = 0.;
 #ifdef _OPENMP
@@ -150,13 +144,13 @@ Foam::solverPerformance Foam::DIVPCG::solve
         gRASumMag += std::abs(rAPtr[c]);
     }
 
+    PCG_reduce_local_time += clock.timeIncrement();
+
     reduce(gRASumMag, sumOp<scalar>());
 
+    PCG_allreduce_time += clock.timeIncrement();
+
     solverPerf.initialResidual() = gRASumMag / normFactor;
-
-    
-    PCG_gSumMag_time += clock.timeIncrement();
-
     solverPerf.finalResidual() = solverPerf.initialResidual();
     // --- Check convergence, solve if not converged
     if
@@ -168,11 +162,13 @@ Foam::solverPerformance Foam::DIVPCG::solve
         // --- Solver iteration
         do
         {
+            PCG_misc_time += clock.timeIncrement();
             // --- Store previous wArA
             wArAold = wArA;
 
             // --- Precondition residual
             preconPtr_->precondition(wA, rA, cmpt);
+
             PCG_precondition_time += clock.timeIncrement();
 
             wArA = 0.;
@@ -183,10 +179,11 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 wArA += wAPtr[c] * rAPtr[c];
             }
 
+            PCG_reduce_local_time += clock.timeIncrement();
+
             reduce(wArA, sumOp<scalar>());
 
-            PCG_gSumProd_time += clock.timeIncrement();
-
+            PCG_allreduce_time += clock.timeIncrement();
 
             if (solverPerf.nIterations() == 0)
             {
@@ -197,6 +194,7 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 {
                     pAPtr[cell] = wAPtr[cell];
                 }
+                PCG_axpy_time += clock.timeIncrement();
             }
             else
             {
@@ -208,17 +206,14 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 {
                     pAPtr[cell] = wAPtr[cell] + beta * pAPtr[cell];
                 }
+
+                PCG_axpy_time += clock.timeIncrement();
             }
-            PCG_localUpdate_time += clock.timeIncrement();
 
             // --- Update preconditioned residual
             matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt);
             
             PCG_spmv_time += clock.timeIncrement();
-
-            // scalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
-
-            // scalar wApA = sumProd(wA, pA);
 
             scalar wApA = 0.;
 #ifdef _OPENMP
@@ -228,9 +223,11 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 wApA += wAPtr[c] * pAPtr[c];
             }
 
+            PCG_reduce_local_time += clock.timeIncrement();
+
             reduce(wApA, sumOp<scalar>());
 
-            PCG_gSumProd_time += clock.timeIncrement();
+            PCG_allreduce_time += clock.timeIncrement();
 
             // --- Update solution and residual:
 
@@ -244,7 +241,8 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 psiPtr[cell] += alpha * pAPtr[cell];
                 rAPtr[cell]  -= alpha * wAPtr[cell];
             }
-            PCG_localUpdate_time += clock.timeIncrement();
+
+            PCG_axpy_time += clock.timeIncrement();
 
             gRASumMag = 0.;
 #ifdef _OPENMP
@@ -254,11 +252,13 @@ Foam::solverPerformance Foam::DIVPCG::solve
                 gRASumMag += std::abs(rAPtr[c]);
             }
 
+            PCG_reduce_local_time += clock.timeIncrement();
+
             reduce(gRASumMag, sumOp<scalar>());
 
-            solverPerf.finalResidual() = gRASumMag / normFactor;
+            PCG_allreduce_time += clock.timeIncrement();
 
-            PCG_gSumMag_time += clock.timeIncrement();
+            solverPerf.finalResidual() = gRASumMag / normFactor;
         } while
         (
             (

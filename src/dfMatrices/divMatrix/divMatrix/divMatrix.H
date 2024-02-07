@@ -16,6 +16,7 @@
 #include "className.H"
 
 #include "lduMatrix.H"
+#include "clockTime.H"
 #include "divMatrix_slave_kernel.h"
 
 
@@ -72,8 +73,11 @@ private:
     bool diagonal_;
     bool symmetric_;
     bool asymmetric_;
-    
+
 public:
+
+    mutable scalar flops_ = 0.;
+
     // Static data
     // Declare name of the class and its debug switch
     ClassName("divMatrix");

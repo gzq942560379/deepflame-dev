@@ -11,8 +11,6 @@ void triad_naive_slave(scalar* z, scalar alpha, const scalar* x, scalar beta, co
 
 void copy_naive_slave(scalar* dst, const scalar* src, label len);
 
-void norm_factor_local_naive_slave(scalar* ret_p, const scalar* pAPtr, scalar gPsiAvg, const scalar* yAPtr, const scalar* sourcePtr, label nCells);
-
 void sum_naive_slave(scalar* ret_p, const scalar* input, label len);
 
 void sum_mag_naive_slave(scalar* ret_p, const scalar* input, label len);
@@ -21,6 +19,14 @@ void sum_sqr_naive_slave(scalar* ret_p, const scalar* input, label len);
 
 void sum_prod_naive_slave(scalar* ret_p, const scalar* a, const scalar* b, label len);
 
+void norm_factor_local_naive_slave(scalar* ret_p, const scalar* pAPtr, scalar gPsiAvg, const scalar* yAPtr, const scalar* sourcePtr, label nCells);
+
+void scaling_factor_slave(scalar* scalingFactorNum_p, scalar* scalingFactorDenom_p, const scalar* sourcePtr, const scalar* AcfPtr, const scalar* fieldPtr, label nCells);
+
+void scaling_update_slave(scalar* fieldPtr, scalar sf, const scalar* sourcePtr, const scalar* AcfPtr, const scalar* diagPtr, label nCells);
+
+
+// --------------------------------------------------------------
 
 inline void df_axpy(scalar* y, scalar alpha, const scalar* x, scalar beta, label len){
 
@@ -163,5 +169,39 @@ inline void df_copy(scalar* dst, const scalar* src, label len){
     
 #endif
 
+}
+
+inline void df_scaling_factor(scalar* scalingFactorNum_p, scalar* scalingFactorDenom_p, const scalar* sourcePtr, const scalar* AcfPtr, const scalar* fieldPtr, label nCells){
+    scalar scalingFactorNum = 0.0;
+    scalar scalingFactorDenom = 0.0;
+
+#ifdef __sw_64__
+
+    scaling_factor_slave(&scalingFactorNum, &scalingFactorDenom, sourcePtr, AcfPtr, fieldPtr, nCells);
+
+#else
+
+    for(label i = 0; i < nCells; ++i){
+        scalingFactorNum += sourcePtr[i] * fieldPtr[i];
+        scalingFactorDenom += AcfPtr[i] * fieldPtr[i];
+    }
+    
+#endif
+    *scalingFactorNum_p = scalingFactorNum;
+    *scalingFactorDenom_p = scalingFactorDenom;
+}
+
+inline void df_scaling_update(scalar* fieldPtr, scalar sf, const scalar* sourcePtr, const scalar* AcfPtr, const scalar* diagPtr, label nCells){
+#ifdef __sw_64__
+    
+    scaling_update_slave(fieldPtr, sf, sourcePtr, AcfPtr, diagPtr, nCells);
+
+#else
+
+    for(label i = 0; i < nCells; ++i){
+        fieldPtr[i] = sf * fieldPtr[i] + (sourcePtr[i] - sf * AcfPtr[i]) / diagPtr[i];
+    }
+
+#endif
 }
 

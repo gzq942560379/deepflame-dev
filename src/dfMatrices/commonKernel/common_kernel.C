@@ -83,3 +83,27 @@ void copy_naive_slave(scalar* dst, const scalar* src, label len){
     CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(copy_naive)), &para);
     CRTS_athread_join();
 }
+
+void scaling_factor_slave(scalar* scalingFactorNum_p, scalar* scalingFactorDenom_p, const scalar* sourcePtr, const scalar* AcfPtr, const scalar* fieldPtr, label nCells){
+    scaling_factor_param_t para;
+    para.scalingFactorNum_p = scalingFactorNum_p;
+    para.scalingFactorDenom_p = scalingFactorDenom_p;
+    para.sourcePtr = sourcePtr;
+    para.AcfPtr = AcfPtr;
+    para.fieldPtr = fieldPtr;
+    para.nCells = nCells;
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(scaling_factor_naive)), &para);
+    CRTS_athread_join();
+}
+
+void scaling_update_slave(scalar* fieldPtr, scalar sf, const scalar* sourcePtr, const scalar* AcfPtr, const scalar* diagPtr, label nCells){
+    scaling_update_param_t para;
+    para.fieldPtr = fieldPtr;
+    para.sf = sf;
+    para.sourcePtr = sourcePtr;
+    para.AcfPtr = AcfPtr;
+    para.diagPtr = diagPtr;
+    para.nCells = nCells;
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(scaling_update_naive)), &para);
+    CRTS_athread_join();
+}

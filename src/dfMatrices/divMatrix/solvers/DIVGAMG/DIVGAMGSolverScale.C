@@ -27,6 +27,7 @@ License
 #include "vector2D.H"
 #include <mpi.h>
 #include "clockTime.H"
+#include "common_kernel.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -41,6 +42,13 @@ void Foam::DIVGAMGSolver::scale
     const direction cmpt
 ) const
 {
+    scalar* fieldPtr = field.begin();
+    scalar* AcfPtr = Acf.begin();
+    const scalar* sourcePtr = source.begin();
+    const scalar* diagPtr = A.diag().begin();
+
+    const label nCells = source.size();
+
     clockTime clock;
 
     A.Amul
@@ -57,19 +65,21 @@ void Foam::DIVGAMGSolver::scale
     scalar scalingFactorNum = 0.0;
     scalar scalingFactorDenom = 0.0;
 
-#ifdef _OPENMP
-    #pragma omp parallel for reduction(+:scalingFactorNum) reduction(+:scalingFactorDenom)
-#endif
-    for(label i = 0; i < field.size(); ++i){
-        scalingFactorNum += source[i] * field[i];
-        scalingFactorDenom += Acf[i] * field[i];
-    }
+// #ifdef _OPENMP
+//     #pragma omp parallel for reduction(+:scalingFactorNum) reduction(+:scalingFactorDenom)
+// #endif
+//     for(label i = 0; i < nCells; ++i){
+//         scalingFactorNum += sourcePtr[i] * fieldPtr[i];
+//         scalingFactorDenom += AcfPtr[i] * fieldPtr[i];
+//     }
+
+    df_scaling_factor(&scalingFactorNum, &scalingFactorDenom, sourcePtr, AcfPtr,fieldPtr, nCells);
 
     scale_norm_time += clock.timeIncrement();
 
     vector2D scalingVector(scalingFactorNum, scalingFactorDenom);
 
-    A.mesh().reduce(scalingVector, sumOp<vector2D>());
+    reduce(scalingVector, sumOp<vector2D>());
 
     scale_vector2D_reduce_time += clock.timeIncrement();
 
@@ -82,17 +92,12 @@ void Foam::DIVGAMGSolver::scale
 
     scale_sf_time += clock.timeIncrement();
 
-    const scalarField& D = A.diag();
-
-#ifdef _OPENMP
-    #pragma omp parallel for
-#endif
-    for(label i = 0; i < field.size(); ++i){
-        field[i] = sf * field[i] + (source[i] - sf * Acf[i]) / D[i];
-    }
+    df_scaling_update(fieldPtr, sf, sourcePtr, AcfPtr, diagPtr, nCells);
 
     scale_field_time += clock.timeIncrement();
     scale_total_time += clock.elapsedTime();
+
+    A.flops_ += nCells * (2 + 9);
 }
 
 
