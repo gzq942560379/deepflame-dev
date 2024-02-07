@@ -179,6 +179,17 @@ divMatrix::divMatrix(const lduMesh& mesh):row_block_bit_(row_block_bit), row_blo
         // off_diag_value_[index] = lduUpper[i];
         face2upper_[i] = index;
     }
+
+    Info << "divMatrix info : ----------------------------------" << endl;
+    Info << "row_ : " << row_ << endl;
+    Info << "block_count_ : " << block_count_ << endl;
+    Info << "distance_count_ : " << distance_count_ << endl;
+    Info << "distance_list_ : " << endl << "\t";
+    for(label i = 0; i < distance_count_; ++i){
+        Info << distance_list_[i] << ", ";
+    }
+    Info << endl;
+    Info << "---------------------------------------------------" << endl;
 }
 
 void divMatrix::copy_value_from_fvMatrix(const lduMatrix& lduMatrix){

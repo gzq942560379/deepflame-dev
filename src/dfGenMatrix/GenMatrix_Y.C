@@ -6,8 +6,6 @@
 #include "orthogonalSnGrad.H"
 #include "clockTime.H"
 
-#define _OPENMP
-
 namespace Foam{
 
 // pre process
@@ -31,7 +29,7 @@ void preProcess_Y(
     const fvMesh& mesh = Y[0].mesh(); 
     assert(mesh.moving() == false);
 
-    const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -153,6 +151,9 @@ void preProcess_Y(
     for (label i = 0; i < nSpecies; ++i) {
         const scalar *Yi = YiPtr[i];
         scalar *gradY_Species = &gradY[i * nCells * 3];
+
+#if defined(OPT_FACE2CELL_OMP_ATOMIC)
+
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -164,7 +165,6 @@ void preProcess_Y(
 
         gardY_init_time += clock.timeIncrement();
 
-#ifdef OPT_OMP_ATOMIC
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -200,54 +200,365 @@ void preProcess_Y(
 #endif
             gradY_Species[neighbor * 3 + 2] -= grad_z;
         }
+
+#elif defined(DOPT_FACE2CELL_COLORING_SCHEDULE)
+
+        {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+            for(label c = 0; c < nCells; ++c){
+                gradY_Species[c * 3 + 0] = 0.;
+                gradY_Species[c * 3 + 1] = 0.;
+                gradY_Species[c * 3 + 2] = 0.;
+            }
+
+            gardY_init_time += clock.timeIncrement();
+
+            const MeshSchedule& schedule = MeshSchedule::getMeshSchedule();
+            const labelList& face_scheduling = schedule.face_scheduling();
+
+            #pragma omp parallel for
+            for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+                label face_start = face_scheduling[face_scheduling_i]; 
+                label face_end = face_scheduling[face_scheduling_i+1];
+                for (label j = face_start; j < face_end; ++j) {
+                    label owner = own[j];
+                    label neighbor = nei[j];
+                    scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
+                    scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
+                    scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
+                    scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
+                    gradY_Species[owner * 3 + 0] += grad_x;
+                    gradY_Species[owner * 3 + 1] += grad_y;
+                    gradY_Species[owner * 3 + 2] += grad_z;
+                    gradY_Species[neighbor * 3 + 0] -= grad_x;
+                    gradY_Species[neighbor * 3 + 1] -= grad_y;
+                    gradY_Species[neighbor * 3 + 2] -= grad_z;
+                }
+            }
+            #pragma omp parallel for
+            for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+                label face_start = face_scheduling[face_scheduling_i]; 
+                label face_end = face_scheduling[face_scheduling_i+1];
+                for (label j = face_start; j < face_end; ++j) {
+                    label owner = own[j];
+                    label neighbor = nei[j];
+                    scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
+                    scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
+                    scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
+                    scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
+                    gradY_Species[owner * 3 + 0] += grad_x;
+                    gradY_Species[owner * 3 + 1] += grad_y;
+                    gradY_Species[owner * 3 + 2] += grad_z;
+                    gradY_Species[neighbor * 3 + 0] -= grad_x;
+                    gradY_Species[neighbor * 3 + 1] -= grad_y;
+                    gradY_Species[neighbor * 3 + 2] -= grad_z;
+                }
+            }
+        }
+        
+#elif defined(OPT_FACE2CELL_CELL_CENTERED)
+        const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
+        const labelUList& facePtr = meshSchedule.facePtr();
+        const labelUList& reverseFacePtr = meshSchedule.reverseFacePtr();
+        const labelUList& reverseOwner = meshSchedule.reverseOwner();
+        const labelUList& reverseNeighbour = meshSchedule.reverseNeighbour();
+        const labelUList& faceIndexMapping = meshSchedule.faceIndexMapping();
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for (label c = 0; c < nCells; ++c){
+            scalar gradY_x = 0.;
+            scalar gradY_y = 0.;
+            scalar gradY_z = 0.;
+            scalar ownerYi = Yi[c];
+            for (label f = facePtr[c]; f < facePtr[c+1]; ++f) {
+                label neighbor = nei[f];
+                scalar ssf = (weightsPtr[f] * (ownerYi - Yi[neighbor]) + Yi[neighbor]);
+                scalar grad_x = meshSfPtr[3 * f + 0] * ssf;
+                scalar grad_y = meshSfPtr[3 * f + 1] * ssf;
+                scalar grad_z = meshSfPtr[3 * f + 2] * ssf;
+                gradY_x += grad_x;
+                gradY_y += grad_y;
+                gradY_z += grad_z;
+            }
+            for (label rf = reverseFacePtr[c]; rf < reverseFacePtr[c+1]; ++rf) {
+                label f = faceIndexMapping[rf];
+                label rneighbor = reverseNeighbour[rf];
+                scalar ssf = (weightsPtr[f] * (Yi[rneighbor] - ownerYi) + ownerYi);
+                scalar grad_x = meshSfPtr[3 * f + 0] * ssf;
+                scalar grad_y = meshSfPtr[3 * f + 1] * ssf;
+                scalar grad_z = meshSfPtr[3 * f + 2] * ssf;
+                gradY_x -= grad_x;
+                gradY_y -= grad_y;
+                gradY_z -= grad_z;
+            }
+            gradY_Species[c * 3 + 0] = gradY_x;
+            gradY_Species[c * 3 + 1] = gradY_y;
+            gradY_Species[c * 3 + 2] = gradY_z;
+        }
+#elif defined(OPT_FACE2CELL_PARTITION)
+
+// #ifdef _OPENMP
+// #pragma omp parallel
+// #endif
+        // for(label c = 0; c < nCells; ++c){
+        //     gradY_Species[c * 3 + 0] = 0.;
+        //     gradY_Species[c * 3 + 1] = 0.;
+        //     gradY_Species[c * 3 + 2] = 0.;
+        // }
+        const XBlock2DPartitionStructuredMeshSchedule& schedule = XBlock2DPartitionStructuredMeshSchedule::getXBlock2DPartitionStructuredMeshSchedule();
+
+        // alloc
+        scalar* localCellsBuffer[12];
+        scalar* localPatch[12 * 4];
+        for(int thread_rank = 0; thread_rank < 12; ++thread_rank){
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+            localCellsBuffer[thread_rank] = new scalar[subMesh.nAllCells() * 3];
+            localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::LEFT) * 3];
+            localPatch[thread_rank * 4 + SubMesh::PatchDirection::RIGHT] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::RIGHT) * 3];
+            localPatch[thread_rank * 4 + SubMesh::PatchDirection::UPPER] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::UPPER) * 3];
+            localPatch[thread_rank * 4 + SubMesh::PatchDirection::DOWN] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::DOWN) * 3];        
+        }
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        // for(int thread_rank = 0; thread_rank < 12; ++thread_rank)
+        {
+            int thread_rank = omp_get_thread_num();
+            int thread_size = omp_get_num_threads();
+            assert(thread_size == 12);
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+
+            scalar* local_gradY_Species = localCellsBuffer[thread_rank];
+            scalar** local_gradY_Species_Patch = localPatch + thread_rank * 4;
+
+            // init localCellsBuffer
+            memset(local_gradY_Species, '\0', sizeof(scalar) * subMesh.nAllCells() * 3);
+
+            for(label lz = 0; lz < subMesh.localZLen(); ++lz){
+                label gz = subMesh.globalZ(lz);
+                for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+                    label gy = subMesh.globalY(ly);
+                    for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+                        label gx = subMesh.globalX(lx);
+                        label lc = subMesh.localIndex(lx, ly, lz);
+                        label gc = subMesh.globalIndex(gx, gy, gz);
+                        label lhi = subMesh.localHaloIndex(lx, ly, lz);
+                        label gfp = subMesh.localGlabalFacePtr()[lc];
+
+                        scalar ownerYi = Yi[gc];
+                        if(gx + 1 < subMesh.globalXLen()){
+                            label lhni = subMesh.localHaloIndex(lx + 1, ly, lz);;
+                            label gnc = subMesh.globalIndex(gx + 1, gy, gz);
+                            label gf = subMesh.localGlabalFace()[gfp];
+                            scalar neighbourYi = Yi[gnc];
+                            scalar ssf = (weightsPtr[gf] * (ownerYi - neighbourYi) + neighbourYi);
+                            scalar grad_x = meshSfPtr[3 * gf + 0] * ssf;
+                            scalar grad_y = meshSfPtr[3 * gf + 1] * ssf;
+                            scalar grad_z = meshSfPtr[3 * gf + 2] * ssf;
+                            local_gradY_Species[lhi * 3 + 0] += grad_x;
+                            local_gradY_Species[lhi * 3 + 1] += grad_y;
+                            local_gradY_Species[lhi * 3 + 2] += grad_z;
+                            local_gradY_Species[lhni * 3 + 0] -= grad_x;
+                            local_gradY_Species[lhni * 3 + 1] -= grad_y;
+                            local_gradY_Species[lhni * 3 + 2] -= grad_z;                
+                            gfp += 1;
+                        }
+
+                        // 
+                        if(gy + 1 < subMesh.globalYLen()){
+                            label lhni = subMesh.localHaloIndex(lx, ly + 1, lz);;
+                            label gnc = subMesh.globalIndex(gx, gy + 1, gz);
+                            label gf = subMesh.localGlabalFace()[gfp];
+                            scalar neighbourYi = Yi[gnc];
+                            scalar ssf = (weightsPtr[gf] * (ownerYi - neighbourYi) + neighbourYi);
+                            scalar grad_x = meshSfPtr[3 * gf + 0] * ssf;
+                            scalar grad_y = meshSfPtr[3 * gf + 1] * ssf;
+                            scalar grad_z = meshSfPtr[3 * gf + 2] * ssf;
+                            local_gradY_Species[lhi * 3 + 0] += grad_x;
+                            local_gradY_Species[lhi * 3 + 1] += grad_y;
+                            local_gradY_Species[lhi * 3 + 2] += grad_z;
+                            local_gradY_Species[lhni * 3 + 0] -= grad_x;
+                            local_gradY_Species[lhni * 3 + 1] -= grad_y;
+                            local_gradY_Species[lhni * 3 + 2] -= grad_z;  
+                            gfp += 1;
+                        }
+
+                        if(gz + 1 < subMesh.globalZLen()){
+                            label lhni = subMesh.localHaloIndex(lx, ly, lz + 1);;
+                            label gnc = subMesh.globalIndex(gx, gy, gz + 1);
+                            label gf = subMesh.localGlabalFace()[gfp];
+                            scalar neighbourYi = Yi[gnc];
+                            scalar ssf = (weightsPtr[gf] * (ownerYi - neighbourYi) + neighbourYi);
+                            scalar grad_x = meshSfPtr[3 * gf + 0] * ssf;
+                            scalar grad_y = meshSfPtr[3 * gf + 1] * ssf;
+                            scalar grad_z = meshSfPtr[3 * gf + 2] * ssf;
+                            local_gradY_Species[lhi * 3 + 0] += grad_x;
+                            local_gradY_Species[lhi * 3 + 1] += grad_y;
+                            local_gradY_Species[lhi * 3 + 2] += grad_z;
+                            local_gradY_Species[lhni * 3 + 0] -= grad_x;
+                            local_gradY_Species[lhni * 3 + 1] -= grad_y;
+                            local_gradY_Species[lhni * 3 + 2] -= grad_z;  
+                            gfp += 1;
+                        }
+                    }
+                }
+            }
+
+            // update right halo
+            
+            if(subMesh.hasRightHalo()){
+                label ly = subMesh.localYLen();
+                scalar* local_gradY_Species_Patch_right = local_gradY_Species_Patch[SubMesh::PatchDirection::RIGHT];
+                for(label lz = 0; lz < subMesh.localZLen(); ++lz){
+                    for(label lx =0; lx < subMesh.localXLen(); ++lx){
+                        label lhi = subMesh.localHaloIndex(lx, ly, lz);
+                        label hi = lx + lz * subMesh.localXLen();
+                        local_gradY_Species_Patch_right[hi * 3 + 0] = local_gradY_Species[lhi * 3 + 0];
+                        local_gradY_Species_Patch_right[hi * 3 + 1] = local_gradY_Species[lhi * 3 + 1];
+                        local_gradY_Species_Patch_right[hi * 3 + 2] = local_gradY_Species[lhi * 3 + 2];
+                    }
+                }
+            }
+
+
+            // update down halo
+            if(subMesh.hasDownHalo()){
+                label lz = subMesh.localZLen();
+                scalar* local_gradY_Species_Patch_down = local_gradY_Species_Patch[SubMesh::PatchDirection::DOWN];
+                for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+                    for(label lx =0; lx < subMesh.localXLen(); ++lx){
+                        label lhi = subMesh.localHaloIndex(lx, ly, lz);
+                        label hi = lx + ly * subMesh.localXLen();
+                        local_gradY_Species_Patch_down[hi * 3 + 0] = local_gradY_Species[lhi * 3 + 0];
+                        local_gradY_Species_Patch_down[hi * 3 + 1] = local_gradY_Species[lhi * 3 + 1];
+                        local_gradY_Species_Patch_down[hi * 3 + 2] = local_gradY_Species[lhi * 3 + 2];
+                    }
+                }
+            }
+        }
+
+        // comm halo
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        // for(int thread_rank = 0; thread_rank < 12; ++thread_rank)
+        {
+            int thread_rank = omp_get_thread_num();
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+            if(subMesh.hasLeftHalo()){
+                int laft_thread_rank = subMesh.leftThreadRank();
+                std::copy(
+                    localPatch[laft_thread_rank * 4 + SubMesh::PatchDirection::RIGHT], 
+                    localPatch[laft_thread_rank * 4 + SubMesh::PatchDirection::RIGHT] + subMesh.localPatchSize(SubMesh::PatchDirection::LEFT) * 3,
+                    localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT]
+                );
+            }
+            if(subMesh.hasUpperHalo()){
+                int upper_thread_rank = subMesh.upperThreadRank();
+                std::copy(
+                    localPatch[upper_thread_rank * 4 + SubMesh::PatchDirection::DOWN], 
+                    localPatch[upper_thread_rank * 4 + SubMesh::PatchDirection::DOWN] + subMesh.localPatchSize(SubMesh::PatchDirection::UPPER) * 3,
+                    localPatch[thread_rank * 4 + SubMesh::PatchDirection::UPPER]
+                );
+            }
+        }
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        // update halo
+        // for(int thread_rank = 0; thread_rank < 12; ++thread_rank)
+        {
+            int thread_rank = omp_get_thread_num();
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+            scalar* local_gradY_Species = localCellsBuffer[thread_rank];
+            scalar** local_gradY_Species_Patch = localPatch + thread_rank * 4;
+            if(subMesh.hasLeftHalo()){
+                label ly = 0;
+                scalar* local_gradY_Species_Patch_left = local_gradY_Species_Patch[SubMesh::PatchDirection::LEFT];
+                for(label lz = 0; lz < subMesh.localZLen(); ++lz){
+                    for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+                        label lhi = subMesh.localHaloIndex(lx, ly, lz);
+                        label hi = lx + lz * subMesh.localXLen();
+                        local_gradY_Species[lhi * 3 + 0] += local_gradY_Species_Patch_left[hi * 3 + 0];
+                        local_gradY_Species[lhi * 3 + 1] += local_gradY_Species_Patch_left[hi * 3 + 1];
+                        local_gradY_Species[lhi * 3 + 2] += local_gradY_Species_Patch_left[hi * 3 + 2];
+                    }
+                }
+            }
+            if(subMesh.hasUpperHalo()){
+                label lz = 0;
+                scalar* local_gradY_Species_Patch_upper = local_gradY_Species_Patch[SubMesh::PatchDirection::UPPER];
+                for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+                    for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+                        label lhi = subMesh.localHaloIndex(lx, ly, lz);
+                        label hi = lx + ly * subMesh.localXLen();
+                        local_gradY_Species[lhi * 3 + 0] += local_gradY_Species_Patch_upper[hi * 3 + 0];
+                        local_gradY_Species[lhi * 3 + 1] += local_gradY_Species_Patch_upper[hi * 3 + 1];
+                        local_gradY_Species[lhi * 3 + 2] += local_gradY_Species_Patch_upper[hi * 3 + 2];
+                    }
+                }
+            }
+        }
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+        // write to global
+        // for(int thread_rank = 0; thread_rank < 12; ++thread_rank)
+        {
+            int thread_rank = omp_get_thread_num();
+            scalar* local_gradY_Species = localCellsBuffer[thread_rank];
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+            for(label lz = 0; lz < subMesh.localZLen(); ++lz){
+                label gz = subMesh.globalZ(lz);
+                for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+                    label gy = subMesh.globalY(ly);
+                    for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+                        label gx = subMesh.globalX(lx);
+                        label lc = subMesh.localIndex(lx, ly, lz);
+                        label gc = subMesh.globalIndex(gx, gy, gz);
+                        label lhi = subMesh.localHaloIndex(lx, ly, lz);
+                        gradY_Species[gc * 3 + 0] = local_gradY_Species[lhi * 3 + 0];
+                        gradY_Species[gc * 3 + 1] = local_gradY_Species[lhi * 3 + 1];
+                        gradY_Species[gc * 3 + 2] = local_gradY_Species[lhi * 3 + 2];
+                    }
+                }
+            }
+        }      
+
 #else
-
-// OPT_FACE_SCHEDULE
-        const MeshSchedule& schedule = MeshSchedule::getMeshSchedule();
-        const labelList& face_scheduling = schedule.face_scheduling();
-
-        #pragma omp parallel for
-        for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-            label face_start = face_scheduling[face_scheduling_i]; 
-            label face_end = face_scheduling[face_scheduling_i+1];
-            for (label j = face_start; j < face_end; ++j) {
-                label owner = own[j];
-                label neighbor = nei[j];
-                scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
-                scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
-                scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
-                scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
-                gradY_Species[owner * 3 + 0] += grad_x;
-                gradY_Species[owner * 3 + 1] += grad_y;
-                gradY_Species[owner * 3 + 2] += grad_z;
-                gradY_Species[neighbor * 3 + 0] -= grad_x;
-                gradY_Species[neighbor * 3 + 1] -= grad_y;
-                gradY_Species[neighbor * 3 + 2] -= grad_z;
-            }
+        for(label c = 0; c < nCells; ++c){
+            gradY_Species[c * 3 + 0] = 0.;
+            gradY_Species[c * 3 + 1] = 0.;
+            gradY_Species[c * 3 + 2] = 0.;
         }
-        #pragma omp parallel for
-        for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-            label face_start = face_scheduling[face_scheduling_i]; 
-            label face_end = face_scheduling[face_scheduling_i+1];
-            for (label j = face_start; j < face_end; ++j) {
-                label owner = own[j];
-                label neighbor = nei[j];
-                scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
-                scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
-                scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
-                scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
-                gradY_Species[owner * 3 + 0] += grad_x;
-                gradY_Species[owner * 3 + 1] += grad_y;
-                gradY_Species[owner * 3 + 2] += grad_z;
-                gradY_Species[neighbor * 3 + 0] -= grad_x;
-                gradY_Species[neighbor * 3 + 1] -= grad_y;
-                gradY_Species[neighbor * 3 + 2] -= grad_z;
-            }
+
+        gardY_init_time += clock.timeIncrement();
+
+        for (label j = 0; j < nFaces; ++j) {
+            label owner = own[j];
+            label neighbor = nei[j];
+            scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
+            scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
+            scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
+            scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
+            gradY_Species[owner * 3 + 0] += grad_x;
+            gradY_Species[owner * 3 + 1] += grad_y;
+            gradY_Species[owner * 3 + 2] += grad_z;
+            gradY_Species[neighbor * 3 + 0] -= grad_x;
+            gradY_Species[neighbor * 3 + 1] -= grad_y;
+            gradY_Species[neighbor * 3 + 2] -= grad_z;
         }
+
 #endif
 
-
         gardY_face_time += clock.timeIncrement();
+
+#if defined(OPT_BOUNDARY2CELL_OMP_ATOMIC)
 
         for (label j = 0; j < nPatches; ++j) {
             label patchSize = patchSizes[j];
@@ -317,6 +628,56 @@ void preProcess_Y(
                 }
             }
         }
+
+#else
+
+        for (label j = 0; j < nPatches; ++j) {
+            label patchSize = patchSizes[j];
+            const scalar* boundaryYi_patch = boundaryYi[i * nPatches + j];
+            const scalar* boundaryYiInternal_patch = boundaryYiInternal[i * nPatches + j];
+            const scalar* boundarySf_patch = boundarySf[j];
+            const scalar* boundaryWeights_patch = boundaryWeights[j];
+
+            const label* faceCells_patch = faceCells[j];
+
+            if (patchTypes[j] == MeshSchedule::PatchType::wall) {
+                for (label k = 0; k < patchSize; ++k) {
+                    scalar bouvf = boundaryYi_patch[k];
+                    label cellIdx = faceCells_patch[k];
+
+                    scalar bouSfx = boundarySf_patch[k * 3 + 0];
+                    scalar bouSfy = boundarySf_patch[k * 3 + 1];
+                    scalar bouSfz = boundarySf_patch[k * 3 + 2];
+
+                    scalar grad_x = bouSfx * bouvf;
+                    scalar grad_y = bouSfy * bouvf;
+                    scalar grad_z = bouSfz * bouvf;
+                    gradY_Species[cellIdx * 3 + 0] += grad_x;
+                    gradY_Species[cellIdx * 3 + 1] += grad_y;
+                    gradY_Species[cellIdx * 3 + 2] += grad_z;
+                }
+            } else if (patchTypes[j] == MeshSchedule::PatchType::processor) {
+                for (label k = 0; k < patchSize; ++k) {
+                    scalar bouWeight = boundaryWeights_patch[k];
+                    label cellIdx = faceCells_patch[k];
+
+                    scalar bouSfx = boundarySf_patch[k * 3 + 0];
+                    scalar bouSfy = boundarySf_patch[k * 3 + 1];
+                    scalar bouSfz = boundarySf_patch[k * 3 + 2];
+
+                    scalar bouvf = (1 - bouWeight) * boundaryYi_patch[k] + bouWeight * boundaryYiInternal_patch[k];
+                    scalar grad_x = bouSfx * bouvf;
+                    scalar grad_y = bouSfy * bouvf;
+                    scalar grad_z = bouSfz * bouvf;
+                    gradY_Species[cellIdx * 3 + 0] += grad_x;
+                    gradY_Species[cellIdx * 3 + 1] += grad_y;
+                    gradY_Species[cellIdx * 3 + 2] += grad_z;
+                }
+            }
+        }
+
+#endif
+
 
         gardY_boundary_time += clock.timeIncrement();
 
@@ -589,7 +950,7 @@ GenMatrix_Y(
     scalar* __restrict__ lowerPtr = &fvm.lower()[0];
     scalar* __restrict__ upperPtr = &fvm.upper()[0];
 
-    const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
     const labelList& face_scheduling = meshSchedule.face_scheduling();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();

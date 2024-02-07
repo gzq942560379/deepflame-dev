@@ -12,16 +12,17 @@ public:
     enum PatchType {wall, processor};
 
 protected:
+    const fvMesh& mesh_;
+
     label nCells_;
     label nFaces_;
     label nPatches_;
     List<PatchType> patchTypes_; // nPatches_
     labelList patchSizes_; // nPatches_
 
-    labelList cell_scheduling_;
-    labelList face_scheduling_;
-
-    static MeshSchedule* meshSchedulePtr_; // 单例
+    labelList reverseFacePtr_; // nCells + 1
+    labelList reverseNeighbour_; // nFaces
+    labelList faceIndexMapping_; // reverseFaceIndex -> faceIndex; // nFaces
 
     MeshSchedule(const fvMesh& mesh);
 
@@ -35,8 +36,11 @@ public:
     const List<PatchType>& patchTypes() const {return patchTypes_;};
     const labelList& patchSizes() const {return patchSizes_;};
 
-    const labelList& cell_scheduling() const {return cell_scheduling_;};
-    const labelList& face_scheduling() const {return face_scheduling_;};
+    const labelUList& facePtr() const {return mesh_.lduAddr().ownerStartAddr();};
+    const labelUList& neighbour() const {return mesh_.neighbour();};
+    const labelUList& reverseFacePtr() const {return reverseFacePtr_;};
+    const labelUList& reverseNeighbour() const {return reverseNeighbour_;};
+    const labelUList& faceIndexMapping() const {return faceIndexMapping_;};
 
     virtual void show() const {
         Info << "MeshSchedule show ---------------------------" << endl;
@@ -47,11 +51,7 @@ public:
         Info << "---------------------------------------------" << endl;
     };
 
-    // static void buildMeshSchedule(const fvMesh& mesh);
-
-    static const MeshSchedule& getMeshSchedule() {assert(meshSchedulePtr_ != nullptr); return *meshSchedulePtr_;};
 };
-
 
 
 }

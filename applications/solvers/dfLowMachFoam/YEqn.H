@@ -44,7 +44,7 @@ Y_total_time += Y_total_end - Y_total_start;
 end = MPI_Wtime();
 time_monitor_Y += end - start;
 
-int flag_mpi_init;
+int flag_mpi_init = 0;
 MPI_Initialized(&flag_mpi_init);
 if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 

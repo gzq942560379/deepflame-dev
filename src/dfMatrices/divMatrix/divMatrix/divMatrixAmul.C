@@ -52,6 +52,7 @@ void Foam::divMatrix::Amul
     // Initialise the update of interfaced interfaces
 
     Amul_Communication_init_start = MPI_Wtime();
+    
     initMatrixInterfaces
     (
         interfaceBouCoeffs,
@@ -60,6 +61,7 @@ void Foam::divMatrix::Amul
         Apsi,
         cmpt
     );
+
     Amul_Communication_init_end = MPI_Wtime();
     Amul_Communication_init_time_ += Amul_Communication_init_end - Amul_Communication_init_start;
 
@@ -70,6 +72,7 @@ void Foam::divMatrix::Amul
 
     // Update interface interfaces
     Amul_Communication_update_start = MPI_Wtime();
+    
     updateMatrixInterfaces
     (
         interfaceBouCoeffs,
@@ -78,6 +81,7 @@ void Foam::divMatrix::Amul
         Apsi,
         cmpt
     );
+
     Amul_Communication_update_end = MPI_Wtime();
     Amul_Communication_update_time_ += Amul_Communication_update_end - Amul_Communication_update_start;
     Amul_end = MPI_Wtime();
