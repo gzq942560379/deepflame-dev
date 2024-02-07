@@ -314,7 +314,14 @@ void preProcess_Y(
         // alloc
         scalar* localCellsBuffer[12];
         scalar* localPatch[12 * 4];
-        for(int thread_rank = 0; thread_rank < 12; ++thread_rank){
+
+#ifdef _OPENMP
+        int thread_size = omp_get_max_threads();
+#else
+        int thread_size = 1;
+#endif
+
+        for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank){
             const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
             localCellsBuffer[thread_rank] = new scalar[subMesh.nAllCells() * 3];
             localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::LEFT) * 3];
@@ -528,7 +535,16 @@ void preProcess_Y(
                     }
                 }
             }
-        }      
+        }    
+
+        for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank){
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+            delete [] localCellsBuffer[thread_rank];
+            delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT];
+            delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::RIGHT];
+            delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::UPPER];
+            delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::DOWN];
+        }  
 
 #else
         for(label c = 0; c < nCells; ++c){
