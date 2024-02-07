@@ -201,7 +201,7 @@ void preProcess_Y(
             gradY_Species[neighbor * 3 + 2] -= grad_z;
         }
 
-#elif defined(DOPT_FACE2CELL_COLORING_SCHEDULE)
+#elif defined(OPT_FACE2CELL_COLORING_SCHEDULE)
 
         {
 #ifdef _OPENMP
@@ -215,7 +215,7 @@ void preProcess_Y(
 
             gardY_init_time += clock.timeIncrement();
 
-            const MeshSchedule& schedule = MeshSchedule::getMeshSchedule();
+            const XYBlock1DColoringStructuredMeshSchedule& schedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
             const labelList& face_scheduling = schedule.face_scheduling();
 
             #pragma omp parallel for
