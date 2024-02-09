@@ -6,8 +6,6 @@
 
 namespace Foam{
 
-// 3D结构化网格分块图染色
-
 class UnstructuredMeshSchedule : public MeshSchedule{
 protected:
 
@@ -23,15 +21,7 @@ public:
         Info << "---------------------------------------------" << endl;
     };
 
-
-    static void buildUnstructuredMeshSchedule(const fvMesh& mesh);
-    
-    static const UnstructuredMeshSchedule& getUnstructuredMeshSchedule() {
-        assert(meshSchedulePtr_ != nullptr); 
-        return dynamic_cast<UnstructuredMeshSchedule&>(*meshSchedulePtr_);
-    };
 };
-
 
 
 }

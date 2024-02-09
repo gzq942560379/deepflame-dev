@@ -19,7 +19,7 @@
 #define TICK0(prefix) ;
 #define TICK(prefix,start,end) ;
 #endif
-#define _OPENMP
+
 namespace Foam{
 
 template<class Type>
@@ -437,7 +437,7 @@ GenMatrix_p(
     const fvMesh& mesh = p.mesh(); 
     assert(mesh.moving() == false);
 
-    const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
     const labelList& face_scheduling = meshSchedule.face_scheduling();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
@@ -1019,7 +1019,7 @@ void postProcess_P(
     clockTime clock;
     const fvMesh& mesh = p.mesh();
 
-    const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
     const labelList& face_scheduling = meshSchedule.face_scheduling();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();

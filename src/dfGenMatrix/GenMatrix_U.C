@@ -23,7 +23,7 @@ GenMatrix_U(
     const fvMesh& mesh = U.mesh();
     assert(mesh.moving() == false);
 
-    const MeshSchedule& meshSchedule = MeshSchedule::getMeshSchedule();
+    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
     const labelList& face_scheduling = meshSchedule.face_scheduling();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();

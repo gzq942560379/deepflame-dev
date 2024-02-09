@@ -2,6 +2,7 @@
 
 EXE_INC = \
 	-g \
+    -DOPT_FACE2CELL_COLORING_SCHEDULE \
     $(PFLAGS) $(PINC) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \

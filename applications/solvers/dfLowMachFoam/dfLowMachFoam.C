@@ -63,7 +63,8 @@ Description
 #include "CorrectPhi.H"
 #include "clockTime.H"
 
-#include "StructuredMeshSchedule.H"
+#include "XYBlock1DColoringStructuredMeshSchedule.H"
+#include "XBlock2DPartitionStructuredMeshSchedule.H"
 #include <typeinfo>
 #include "env.H"
 #include "GenFvMatrix.H"
@@ -384,7 +385,6 @@ int main(int argc, char *argv[])
     double ScheduleSetup_time = initClock.timeIncrement();
     Info << "ScheduleSetup time : " << ScheduleSetup_time << endl; 
     
-
 #ifdef _DIV_
     divMatrix div(mesh);
 #endif
