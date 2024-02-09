@@ -219,45 +219,46 @@ void preProcess_Y(
             const labelList& face_scheduling = schedule.face_scheduling();
 
 #ifdef _OPENMP
-        #pragma omp parallel for
+#pragma omp parallel for
 #endif
-        for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-            label face_start = face_scheduling[face_scheduling_i]; 
-            label face_end = face_scheduling[face_scheduling_i+1];
-            for (label j = face_start; j < face_end; ++j) {
-                label owner = own[j];
-                label neighbor = nei[j];
-                scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
-                scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
-                scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
-                scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
-                gradY_Species[owner * 3 + 0] += grad_x;
-                gradY_Species[owner * 3 + 1] += grad_y;
-                gradY_Species[owner * 3 + 2] += grad_z;
-                gradY_Species[neighbor * 3 + 0] -= grad_x;
-                gradY_Species[neighbor * 3 + 1] -= grad_y;
-                gradY_Species[neighbor * 3 + 2] -= grad_z;
+            for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+                label face_start = face_scheduling[face_scheduling_i]; 
+                label face_end = face_scheduling[face_scheduling_i+1];
+                for (label j = face_start; j < face_end; ++j) {
+                    label owner = own[j];
+                    label neighbor = nei[j];
+                    scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
+                    scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
+                    scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
+                    scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
+                    gradY_Species[owner * 3 + 0] += grad_x;
+                    gradY_Species[owner * 3 + 1] += grad_y;
+                    gradY_Species[owner * 3 + 2] += grad_z;
+                    gradY_Species[neighbor * 3 + 0] -= grad_x;
+                    gradY_Species[neighbor * 3 + 1] -= grad_y;
+                    gradY_Species[neighbor * 3 + 2] -= grad_z;
+                }
             }
-        }
 #ifdef _OPENMP
-        #pragma omp parallel for
+#pragma omp parallel for
 #endif
-        for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-            label face_start = face_scheduling[face_scheduling_i]; 
-            label face_end = face_scheduling[face_scheduling_i+1];
-            for (label j = face_start; j < face_end; ++j) {
-                label owner = own[j];
-                label neighbor = nei[j];
-                scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
-                scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
-                scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
-                scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
-                gradY_Species[owner * 3 + 0] += grad_x;
-                gradY_Species[owner * 3 + 1] += grad_y;
-                gradY_Species[owner * 3 + 2] += grad_z;
-                gradY_Species[neighbor * 3 + 0] -= grad_x;
-                gradY_Species[neighbor * 3 + 1] -= grad_y;
-                gradY_Species[neighbor * 3 + 2] -= grad_z;
+            for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+                label face_start = face_scheduling[face_scheduling_i]; 
+                label face_end = face_scheduling[face_scheduling_i+1];
+                for (label j = face_start; j < face_end; ++j) {
+                    label owner = own[j];
+                    label neighbor = nei[j];
+                    scalar ssf = (weightsPtr[j] * (Yi[owner] - Yi[neighbor]) + Yi[neighbor]);
+                    scalar grad_x = meshSfPtr[3 * j + 0] * ssf;
+                    scalar grad_y = meshSfPtr[3 * j + 1] * ssf;
+                    scalar grad_z = meshSfPtr[3 * j + 2] * ssf;
+                    gradY_Species[owner * 3 + 0] += grad_x;
+                    gradY_Species[owner * 3 + 1] += grad_y;
+                    gradY_Species[owner * 3 + 2] += grad_z;
+                    gradY_Species[neighbor * 3 + 0] -= grad_x;
+                    gradY_Species[neighbor * 3 + 1] -= grad_y;
+                    gradY_Species[neighbor * 3 + 2] -= grad_z;
+                }
             }
         }
 
