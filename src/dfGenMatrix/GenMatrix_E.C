@@ -364,40 +364,37 @@ GenMatrix_E(
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
     
-    for (label patchi = 0; patchi < nPatches; ++patchi){
-
+    forAll(he.boundaryField(), patchi)
+    {
         const fvPatchField<scalar>& psf = he.boundaryField()[patchi];
         const fvsPatchScalarField& patchFlux = phi.boundaryField()[patchi];
         const fvsPatchScalarField& pw_fvm = weights_he.boundaryField()[patchi];
         const fvsPatchScalarField& pGamma = gammaMagSf.boundaryField()[patchi];
         const fvsPatchScalarField& phDiffCorrFluxf = hDiffCorrFluxf.boundaryField()[patchi];
-        const fvsPatchScalarField& pDeltaCoeffs = deltaCoeffs.boundaryField()[patchi];
+        const fvsPatchScalarField& pDeltaCoeffs =
+            deltaCoeffs.boundaryField()[patchi];
+
         const fvsPatchField<scalar>& pssf = Kf.boundaryField()[patchi];
+        const labelUList& pFaceCells =
+            mesh.boundary()[patchi].faceCells();
 
-        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
-
+        if (psf.coupled())
+        {
             fvm.internalCoeffs()[patchi] =
                 -pGamma*psf.gradientInternalCoeffs(pDeltaCoeffs) + patchFlux*psf.valueInternalCoeffs(pw_fvm);
             fvm.boundaryCoeffs()[patchi] =
                 pGamma*psf.gradientBoundaryCoeffs(pDeltaCoeffs) - patchFlux*psf.valueBoundaryCoeffs(pw_fvm);
-
-        }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
-
+        }
+        else
+        {
             fvm.internalCoeffs()[patchi] = - pGamma*psf.gradientInternalCoeffs() + patchFlux*psf.valueInternalCoeffs(pw_fvm);
             fvm.boundaryCoeffs()[patchi] = pGamma*psf.gradientBoundaryCoeffs() - patchFlux*psf.valueBoundaryCoeffs(pw_fvm);
-
-        }else{
-            Info << "patch type not supported" << endl;
-            std::exit(-1);        
         }
-
-        for(label s = 0; s < patchSizes[patchi] ; ++s){
-
-            fvcDivPtr[faceCells[patchi][s]] += boundaryKf[patchi][s] * boundaryPhi[patchi][s];
-            fvcDiv2Ptr[faceCells[patchi][s]] += bouhDiffCorrFluxf[patchi][s];
-        
+        forAll(mesh.boundary()[patchi], facei)
+        {
+            fvcDivPtr[pFaceCells[facei]] += pssf[facei] * patchFlux[facei];
+            fvcDiv2Ptr[pFaceCells[facei]] += phDiffCorrFluxf[facei];
         }
-
     }
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
