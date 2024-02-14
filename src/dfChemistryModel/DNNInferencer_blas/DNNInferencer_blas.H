@@ -16,8 +16,6 @@ class DNNInferencer_blas
 private:
     std::vector<int64_t> layers_;
     std::vector<Layer<DataType>*> model0_;
-    std::vector<Layer<DataType>*> model1_;
-    std::vector<Layer<DataType>*> model2_;
 
     double FLOPs_per_sample_;
 
@@ -39,15 +37,13 @@ public:
     
     // Inference
     void Inference_multiDNNs(
-        const std::vector<DataType>& input0, std::vector<DataType>& output0, int64_t input_count0,
-        const std::vector<DataType>& input1, std::vector<DataType>& output1, int64_t input_count1,
-        const std::vector<DataType>& input2, std::vector<DataType>& output2, int64_t input_count2);
+        const std::vector<DataType>& input0, std::vector<DataType>& output0, int64_t input_count0
+        );
 
     // Inference
     void Inference_multiDNNs(
-        const DataType* input0, DataType* output0, int64_t input_count0,
-        const DataType* input1, DataType* output1, int64_t input_count1,
-        const DataType* input2, DataType* output2, int64_t input_count2);
+        const DataType* input0, DataType* output0, int64_t input_count0
+        );
 
 };
 

@@ -363,9 +363,12 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
             MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
         }
         std::ostringstream oss;
+        oss.str("");
+        std::cout <<"Opening norm file " << BLASDNNModelPath_ + "/norm.yaml" <<std::endl;
         oss << fin.rdbuf();
         norm_str = oss.str();
         count[0] = norm_str.size();
+        std::cout<< "norm_str.size();"<<  norm_str.size()  << std::endl;
         fin.close();
 
         // thermo norm
@@ -399,65 +402,75 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     // thermo norm
     YAML::Node thermoNorm = YAML::Load(thermo_norm_str);
     YAML::Node thermoMuNode = thermoNorm["mean"];
+     std::cout << "thermoMuNode.size() is " << thermoMuNode.size() << std::endl;
+
     for (size_t i = 0; i < thermoMuNode.size(); i++){
+        std::cout << thermoMuNode[i]<< std::endl;
         thermomu_.push_back(thermoMuNode[i].as<double>());
     }
     YAML::Node thermoStdNode = thermoNorm["std"];
     for (size_t i = 0; i < thermoStdNode.size(); i++){
         thermostd_.push_back(thermoStdNode[i].as<double>());
     }
+    std::cout <<"Opening norm file " << BLASDNNModelPath_ + "/norm.yaml" <<std::endl;
+    std::cout<< thermostd_[0] << std::endl;
 
     // chemistry norm
     YAML::Node norm = YAML::Load(norm_str);
-    YAML::Node Xmu0Node = norm["Xmu0"];
-    for (size_t i = 0; i < Xmu0Node.size(); i++){
+    std::cout << "norm_str is " << norm_str << std::endl;
+    YAML::Node XmuNode = norm["Xmu"];
+    std::cout << "XmuNode.size() is " << XmuNode.size() << std::endl;
+    for (size_t i = 0; i < XmuNode.size(); i++){
+        std::cout << XmuNode[i] << std::endl;
+        Xmu_.push_back(XmuNode[i].as<double>());
+    }
+    YAML::Node XstdNode = norm["Xstd"];
+    for (size_t i = 0; i < XstdNode.size(); i++){
+        Xstd_.push_back(XstdNode[i].as<double>());
+    }
+    YAML::Node YmuNode = norm["Ymu"];
+    for (size_t i = 0; i < YmuNode.size(); i++){
+        Ymu_.push_back(YmuNode[i].as<double>());
+    }
+    YAML::Node YstdNode = norm["Ystd"];
+    for (size_t i = 0; i < YstdNode.size(); i++){
+        Ystd_.push_back(YstdNode[i].as<double>());
+    }
+    // Info << "Xmu_"<< Xmu_ << endl;
+    // std::cout<<"Xmu_"<< Xmu_[0] << std::endl;
 
-        Xmu0_.push_back(Xmu0Node[i].as<double>());
-    }
-    YAML::Node Xstd0Node = norm["Xstd0"];
-    for (size_t i = 0; i < Xstd0Node.size(); i++){
-        Xstd0_.push_back(Xstd0Node[i].as<double>());
-    }
-    YAML::Node Ymu0Node = norm["Ymu0"];
-    for (size_t i = 0; i < Ymu0Node.size(); i++){
-        Ymu0_.push_back(Ymu0Node[i].as<double>());
-    }
-    YAML::Node Ystd0Node = norm["Ystd0"];
-    for (size_t i = 0; i < Ystd0Node.size(); i++){
-        Ystd0_.push_back(Ystd0Node[i].as<double>());
-    }
-    YAML::Node Xmu1Node = norm["Xmu1"];
-    for (size_t i = 0; i < Xmu1Node.size(); i++){
-        Xmu1_.push_back(Xmu1Node[i].as<double>());
-    }
-    YAML::Node Xstd1Node = norm["Xstd1"];
-    for (size_t i = 0; i < Xstd1Node.size(); i++){
-        Xstd1_.push_back(Xstd1Node[i].as<double>());
-    }
-    YAML::Node Ymu1Node = norm["Ymu1"];
-    for (size_t i = 0; i < Ymu1Node.size(); i++){
-        Ymu1_.push_back(Ymu1Node[i].as<double>());
-    }
-    YAML::Node Ystd1Node = norm["Ystd1"];
-    for (size_t i = 0; i < Ystd1Node.size(); i++){
-        Ystd1_.push_back(Ystd1Node[i].as<double>());
-    }
-    YAML::Node Xmu2Node = norm["Xmu2"];
-    for (size_t i = 0; i < Xmu2Node.size(); i++){
-        Xmu2_.push_back(Xmu2Node[i].as<double>());
-    }
-    YAML::Node Xstd2Node = norm["Xstd2"];
-    for (size_t i = 0; i < Xstd2Node.size(); i++){
-        Xstd2_.push_back(Xstd2Node[i].as<double>());
-    }
-    YAML::Node Ymu2Node = norm["Ymu2"];
-    for (size_t i = 0; i < Ymu2Node.size(); i++){
-        Ymu2_.push_back(Ymu2Node[i].as<double>());
-    }
-    YAML::Node Ystd2Node = norm["Ystd2"];
-    for (size_t i = 0; i < Ystd2Node.size(); i++){
-        Ystd2_.push_back(Ystd2Node[i].as<double>());
-    }
+    // YAML::Node Xmu1Node = norm["Xmu1"];
+    // for (size_t i = 0; i < Xmu1Node.size(); i++){
+    //     Xmu1_.push_back(Xmu1Node[i].as<double>());
+    // }
+    // YAML::Node Xstd1Node = norm["Xstd1"];
+    // for (size_t i = 0; i < Xstd1Node.size(); i++){
+    //     Xstd1_.push_back(Xstd1Node[i].as<double>());
+    // }
+    // YAML::Node Ymu1Node = norm["Ymu1"];
+    // for (size_t i = 0; i < Ymu1Node.size(); i++){
+    //     Ymu1_.push_back(Ymu1Node[i].as<double>());
+    // }
+    // YAML::Node Ystd1Node = norm["Ystd1"];
+    // for (size_t i = 0; i < Ystd1Node.size(); i++){
+    //     Ystd1_.push_back(Ystd1Node[i].as<double>());
+    // }
+    // YAML::Node Xmu2Node = norm["Xmu2"];
+    // for (size_t i = 0; i < Xmu2Node.size(); i++){
+    //     Xmu2_.push_back(Xmu2Node[i].as<double>());
+    // }
+    // YAML::Node Xstd2Node = norm["Xstd2"];
+    // for (size_t i = 0; i < Xstd2Node.size(); i++){
+    //     Xstd2_.push_back(Xstd2Node[i].as<double>());
+    // }
+    // YAML::Node Ymu2Node = norm["Ymu2"];
+    // for (size_t i = 0; i < Ymu2Node.size(); i++){
+    //     Ymu2_.push_back(Ymu2Node[i].as<double>());
+    // }
+    // YAML::Node Ystd2Node = norm["Ystd2"];
+    // for (size_t i = 0; i < Ystd2Node.size(); i++){
+    //     Ystd2_.push_back(Ystd2Node[i].as<double>());
+    // }
 
 #endif
 }
@@ -642,10 +655,7 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
         #endif 
         #ifdef USE_BLASDNN
         Info << "================using ThermoTranDNN=============" << endl;
-        const scalarField& inputH = thermo_.he().primitiveField();
-        const scalarField& inputP = p_.primitiveField();
-        scalarField inputZ = mixfrac_.primitiveField();
-        thermoDNN_blas(inputH, inputP, inputZ, rho_, T_, psi_, mu_, alpha_, rhoD_);
+        thermoDNN_blas(thermo_.he(), p_, mixfrac_, rho_, T_, psi_, mu_, alpha_, rhoD_);
         #endif
     }
    
@@ -723,6 +733,7 @@ void Foam::dfChemistryModel<ThermoType>::correctThermo()
 
     volScalarField::Boundary mixfracBf = mixfrac_.boundaryField();  
 
+    // volScalarField::Boundary& rhoDBf = rhoD_.boundaryFieldRef();
     correctThermo_part2_start = MPI_Wtime();
 
     forAll(T_.boundaryField(), patchi)

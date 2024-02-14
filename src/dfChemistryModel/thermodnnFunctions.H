@@ -1,7 +1,7 @@
 template <class ThermoType>
-void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(const scalarField& he, const scalarField& p, const scalarField& mixfrac,
-                scalarField& rho, scalarField& T, scalarField& psi, scalarField& mu,
-                scalarField& alpha, PtrList<volScalarField>& rhoD)
+void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, const volScalarField& p, volScalarField& mixfrac,
+                volScalarField& rho, volScalarField& T, volScalarField& psi, volScalarField& mu,
+                volScalarField& alpha, PtrList<volScalarField>& rhoD)
 {
     double solve_DNN_blas_start = MPI_Wtime();
 
@@ -10,11 +10,40 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(const scalarField& he, c
     label nCells = he.size();
     label input_dim = 3;
     label output_dim = 5;
+    label offset = 0;
+    label offset_r = 0;
 
     Info<<"=== begin solve_thermo with BLASDNN === "<<endl;
 
     float* NNInputs = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
     memset(NNInputs, '\0', (nCells * input_dim) * sizeof(float));
+
+    const volScalarField::Boundary& pBf = p.boundaryField();
+
+    volScalarField::Boundary& rhoBf = rho.boundaryFieldRef();
+
+    volScalarField::Boundary& TBf = T.boundaryFieldRef();
+
+    volScalarField::Boundary& psiBf = psi.boundaryFieldRef();
+
+    volScalarField::Boundary& muBf = mu.boundaryFieldRef();
+
+    volScalarField::Boundary& alphaBf = alpha.boundaryFieldRef();
+
+    volScalarField::Boundary mixfracBf = mixfrac.boundaryField();  
+    // label nPatchs = he.boundaryField().size();
+    Info<<"=== begin solve_thermo patch with BLASDNN === "<<endl;
+    label nFaces = 0;
+    volScalarField::Boundary& hBf = he.boundaryFieldRef();
+    forAll(T_.boundaryField(), patchi)
+    {
+        fvPatchScalarField& ph = hBf[patchi];
+        nFaces += ph.size();
+    }
+    Info << "total # of faces is " << nFaces << endl;
+    float* NNInputs_p = (float*)aligned_alloc(64, (nFaces * input_dim) * sizeof(float));
+    memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(float));
+
 
     // Prepare input for DNN
 #ifdef _OPENMP
@@ -65,6 +94,76 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(const scalarField& he, c
     free(results2);
     free(results3);
     free(results4);
+
+//     // Prepare input for DNN
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+
+    forAll(he.boundaryField(), patchi)
+    {
+        const fvPatchScalarField& pp = pBf[patchi];
+        fvPatchScalarField& ph = hBf[patchi];
+        fvPatchScalarField pmixfrac = mixfracBf[patchi];
+        forAll(ph, facei)
+        {
+            NNInputs_p[offset + facei * input_dim + 0] = ((std::pow(pmixfrac[facei], 0.1) - 1.) * 10. - thermomu_.back()) / thermostd_.back();
+            NNInputs_p[offset +facei * input_dim + 1] = (ph[facei] - thermomu_[5]) / thermostd_[5];
+            NNInputs_p[offset +facei * input_dim + 2] = (pp[facei] - thermomu_[6]) / thermostd_[6];
+        }
+        offset += ph.size()*input_dim;
+    }
+
+    // double prepare_dnn_input_end = MPI_Wtime();
+
+    // module inference
+    float* results0_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    float* results1_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    float* results2_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    float* results3_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    float* results4_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+
+    // double dnn_infer_start = MPI_Wtime();
+    DNNThermo_blas_.Inference(nFaces, NNInputs_p, 
+        results0_p, results1_p, results2_p, results3_p, results4_p);
+    // double update_start = MPI_Wtime();
+
+    // update thermo properties
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+
+    forAll(he.boundaryField(), patchi)
+    {
+        fvPatchScalarField& prho = rhoBf[patchi];
+        fvPatchScalarField& pT = TBf[patchi];
+        fvPatchScalarField& ppsi = psiBf[patchi];
+        fvPatchScalarField& pmu = muBf[patchi];
+        fvPatchScalarField& palpha = alphaBf[patchi];
+
+        forAll(pT, facei)
+        {
+            prho[facei] = std::pow((results0_p[offset_r +facei] * thermostd_[0] + thermomu_[0]) * 0.1 + 1., 10.) * 1000;
+            pT[facei] = results1_p[offset_r +facei] * thermostd_[1] + thermomu_[1];
+            ppsi[facei] = results2_p[offset_r +facei] * thermostd_[2] + thermomu_[2];
+            pmu[facei] = results3_p[offset_r +facei] * thermostd_[3] + thermomu_[3];
+            palpha[facei] = results4_p[offset_r +facei] * thermostd_[4] + thermomu_[4];
+            forAll(rhoD_, i)
+            {
+                rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
+            }
+        }
+        offset += pT.size();
+    }
+    
+    // double update_end = MPI_Wtime();
+    free(NNInputs_p);
+    free(results0_p);
+    free(results1_p);
+    free(results2_p);
+    free(results3_p);
+    free(results4_p);
+
 
     Info << "=== end solve_thermo with BLASDNN === " << endl;
 
