@@ -74,8 +74,7 @@ Description
 // #define _ELL_
 #define _DIV_
 // #define _LDU_
-// #define OPT_GenMatrix_Y
-// #define OPT_GenMatrix_Y
+#define OPT_GenMatrix_Y
 // #define OPT_GenMatrix_E
 #define OPT_GenMatrix_U
 #define OPT_GenMatrix_p
@@ -581,6 +580,7 @@ int main(int argc, char *argv[])
         Info << "output time index " << runTime.timeIndex() << endl;
 
         double step_time = computeClock.timeIncrement();
+
         step_timer.push_back(step_time);
 
         Info<< "========Time Spent in diffenet parts========"<< endl;
@@ -605,14 +605,26 @@ int main(int argc, char *argv[])
         Info<< "============================================"<<nl<< endl;
     }
 
-    double compute_time = computeClock.elapsedTime() - step_timer[0] - step_timer[1];
+    double compute_total_time = 0.;
+    double min_step_time = 9999999999.;
+    double max_step_time = 0.;
+    size_t compute_count = 0;
+
+    for(size_t i = 1; i < step_timer.size(); ++i){
+        double step_time = step_timer[i];
+        compute_total_time += step_time;
+        compute_count += 1;
+        max_step_time = std::max(max_step_time, step_time);
+        min_step_time = std::min(min_step_time, step_time);
+    }
 
     Info << "Total Init time : " << init_time << endl;
     Info << "First time : " << step_timer[0] << endl;
-    Info << "Second time : " << step_timer[1] << endl;
-    Info << "Compute step : " << step_timer.size() - 2 << endl;
-    Info << "Compute time : " << compute_time << endl;
-    Info << "Total time : " << init_time + step_timer[0] + step_timer[1] + compute_time << endl;
+    Info << "Compute step : " << compute_count << endl;
+    Info << "Compute time : " << compute_total_time << endl;
+    Info << "Min step time : " << min_step_time << endl;
+    Info << "Max step time : " << max_step_time << endl;
+    Info << "Total time : " << init_time + step_timer[0] + compute_total_time << endl;
     Info<< "End\n" << endl;
 
     return 0;
