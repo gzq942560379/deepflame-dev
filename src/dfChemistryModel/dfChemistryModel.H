@@ -138,9 +138,7 @@ public IOdictionary
         bool useThermoTranNN;
 
 #if defined(USE_BLASDNN)
-        std::vector<double> Xmu0_, Xstd0_, Ymu0_, Ystd0_,
-                            Xmu1_, Xstd1_, Ymu1_, Ystd1_,
-                            Xmu2_, Xstd2_, Ymu2_, Ystd2_,
+        std::vector<double> Xmu_, Xstd_, Ymu_, Ystd_,
                             thermomu_, thermostd_;
 
 #endif
@@ -253,9 +251,9 @@ public IOdictionary
         template<class DeltaTType>
         scalar solve_DNN_blas(const DeltaTType& deltaT);
 
-        void thermoDNN_blas(const scalarField& he, const scalarField& p, const scalarField& mixfrac,
-                scalarField& rho, scalarField& T, scalarField& psi, scalarField& mu,
-                scalarField& alpha, PtrList<volScalarField>& rhoD);
+        void thermoDNN_blas(volScalarField& he, const volScalarField& p, volScalarField& mixfrac,
+                volScalarField& rho, volScalarField& T, volScalarField& psi, volScalarField& mu,
+                volScalarField& alpha, PtrList<volScalarField>& rhoD);
 #endif
         //- Output logFiles
         Foam::autoPtr<Foam::OFstream> logFile(const word& name) const
