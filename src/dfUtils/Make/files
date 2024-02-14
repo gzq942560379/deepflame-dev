@@ -1,6 +1,6 @@
-
 env.C
 memory.C
 slave_utils.C
+thread.C
 
 LIB = $(DF_LIBBIN)/libdfUtils

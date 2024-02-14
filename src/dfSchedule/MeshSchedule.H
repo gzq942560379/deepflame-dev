@@ -24,6 +24,8 @@ protected:
     labelList reverseNeighbour_; // nFaces
     labelList faceIndexMapping_; // reverseFaceIndex -> faceIndex; // nFaces
 
+    labelList wallPatchPtr_;
+
     MeshSchedule(const fvMesh& mesh);
 
 public:
@@ -34,8 +36,9 @@ public:
     label nFaces() const {return nFaces_;};
     label nPatches() const {return nPatches_;};
     const List<PatchType>& patchTypes() const {return patchTypes_;};
-    const labelList& patchSizes() const {return patchSizes_;};
-
+    const labelUList& patchSizes() const {return patchSizes_;};
+    const labelUList& wallPatchPtr() const {return wallPatchPtr_;};
+    
     const labelUList& facePtr() const {return mesh_.lduAddr().ownerStartAddr();};
     const labelUList& neighbour() const {return mesh_.neighbour();};
     const labelUList& reverseFacePtr() const {return reverseFacePtr_;};
