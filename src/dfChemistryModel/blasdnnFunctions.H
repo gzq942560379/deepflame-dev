@@ -33,7 +33,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         scalarList yBCT_(mixture_.nSpecies());
         scalarList yTmp_(mixture_.nSpecies());
         scalarList u_(mixture_.nSpecies());
-        // std::cout<<"ScalarList DONE"<<std::endl;
         // get problems
         #pragma omp for
         for(size_t celli = 0; celli<nCell; ++celli){
@@ -42,27 +41,19 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             scalar pi = p_[celli];
             size_t offset = celli * input_dim;
 
-            // std::cout<<"Xstd_"<< Xstd_[1] << std::endl;
             NNInputs0[offset + 0] = (Ti - Xmu_[0])/Xstd_[0];
             NNInputs0[offset + 1] = (pi - Xmu_[1])/Xstd_[1];
-            // std::cout<<"NNInputs0[offset + 1] DONE"<<std::endl;
             for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
             {
                 yPre_[i] = Y_[i][celli];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
             }
-            // for (size_t i=0; i<CanteraGas_->nSpecies() - 1; i++) // minus 1 for Y_AR
             for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
             {
                 NNInputs0[offset + 2 + i] = (yBCT_[i] - Xmu_[i+2]) / Xstd_[i+2];
             }
-            // Info << "H2 input is " <<  NNInputs0[offset + 2 ] << " yPre_[0] is"<< yPre_[0] << " Xmu_[2] is " << Xmu_[2] << " "<< Xstd_[2] << endl;
         }
-        
     }
-
-
-    // Info << "NNInputs0 DONE" << endl;
     
     double prepare_dnn_input_end = MPI_Wtime();
 
@@ -71,17 +62,9 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 
     float* results0 = (float*)aligned_alloc(64, (nCell * output_dim) * sizeof(float));
 
-    // // if(nCell + Cell1.size() + Cell2.size() < (size_t)mesh_.nCells()){
-    // if(nCell < (size_t)mesh_.nCells()){
-    //     Warning << "nCell + Cell1.size() + Cell2.size() < mesh_.nCells()" << endl;
-    // }
-
     double dnn_infer_start = MPI_Wtime();
-    DNNInferencer_blas_.Inference_multiDNNs(
-        NNInputs0, results0, nCell
-        );
+    DNNInferencer_blas_.Inference_multiDNNs(NNInputs0, results0, nCell);
 
-    // std::cout << " results1[0]" << results1[0] << std::endl; // H2 increment
     double dnn_infer_end = MPI_Wtime();
 
     double update_start = MPI_Wtime();
@@ -99,13 +82,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         {
             size_t offset = celli * (CanteraGas_->nSpecies()-1);
             scalar Yt = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies() ; i++) // minus 1 for Y_AR
+            for (size_t i=0; i<CanteraGas_->nSpecies() ; i++)
             {
                 yPre_[i] = Y_[i][celli];
                 yTmp_[i] = Y_[i][celli];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; 
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies() -1; i++) // minus 1 for Y_AR
+            for (size_t i=0; i<CanteraGas_->nSpecies() -1; i++)
             {
 
                 u_[i] = results0[offset + i ]*Ystd_[i]+Ymu_[i];
@@ -114,7 +97,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             }
             u_[17] = 0;
             yTmp_[17] = yPre_[17] ;
-            // Yt += yTmp_[17]; 
             Qdot_[celli] = 0;
             RR_[17][celli] = 0;
             for (size_t i=0; i<CanteraGas_->nSpecies()-1; i++) 
@@ -133,10 +115,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 
     double update_end = MPI_Wtime();
     free(NNInputs0);
-
     free(results0);
-
-
     Info << "=== end solve_DNN with BLASDNN === " << endl;
 
     double solve_DNN_blas_end = MPI_Wtime();

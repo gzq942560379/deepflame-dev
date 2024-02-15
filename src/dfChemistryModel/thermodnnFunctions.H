@@ -31,7 +31,6 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     volScalarField::Boundary& alphaBf = alpha.boundaryFieldRef();
 
     volScalarField::Boundary mixfracBf = mixfrac.boundaryField();  
-    // label nPatchs = he.boundaryField().size();
     Info<<"=== begin solve_thermo patch with BLASDNN === "<<endl;
     label nFaces = 0;
     volScalarField::Boundary& hBf = he.boundaryFieldRef();
@@ -95,16 +94,19 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     free(results3);
     free(results4);
 
-//     // Prepare input for DNN
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+    /*
+    ** boundaryField
+    */
 
+    // Prepare input for DNN
     forAll(he.boundaryField(), patchi)
     {
         const fvPatchScalarField& pp = pBf[patchi];
         fvPatchScalarField& ph = hBf[patchi];
         fvPatchScalarField pmixfrac = mixfracBf[patchi];
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         forAll(ph, facei)
         {
             NNInputs_p[offset + facei * input_dim + 0] = ((std::pow(pmixfrac[facei], 0.1) - 1.) * 10. - thermomu_.back()) / thermostd_.back();
@@ -123,16 +125,10 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     float* results3_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
     float* results4_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
 
-    // double dnn_infer_start = MPI_Wtime();
     DNNThermo_blas_.Inference(nFaces, NNInputs_p, 
         results0_p, results1_p, results2_p, results3_p, results4_p);
-    // double update_start = MPI_Wtime();
 
     // update thermo properties
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-
     forAll(he.boundaryField(), patchi)
     {
         fvPatchScalarField& prho = rhoBf[patchi];
@@ -140,7 +136,9 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
         fvPatchScalarField& ppsi = psiBf[patchi];
         fvPatchScalarField& pmu = muBf[patchi];
         fvPatchScalarField& palpha = alphaBf[patchi];
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         forAll(pT, facei)
         {
             prho[facei] = std::pow((results0_p[offset_r +facei] * thermostd_[0] + thermomu_[0]) * 0.1 + 1., 10.) * 1000;

@@ -150,7 +150,7 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
     double dnn_infer_end = MPI_Wtime();
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
     // double FLOPs = (input_count0 + input_count1 + input_count2) * FLOPs_per_sample_;
-    double FLOPs = (input_count0) * FLOPs_per_sample_;
+    double FLOPs = input_count0 * FLOPs_per_sample_;
     int num_threads = omp_get_max_threads();
     double theoretical_peak = 3.3792 / 48. * num_threads;
     if(sizeof(DataType) == sizeof(double)){
@@ -234,7 +234,7 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
     double dnn_infer_end = MPI_Wtime();
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
     // double FLOPs = (input_count0 + input_count1 + input_count2) * FLOPs_per_sample_;
-    double FLOPs = (input_count0) * FLOPs_per_sample_;
+    double FLOPs = input_count0 * FLOPs_per_sample_;
     int num_threads = omp_get_max_threads();
     double theoretical_peak = 3.3792 / 48. * num_threads;
     if(sizeof(DataType) == sizeof(double)){
