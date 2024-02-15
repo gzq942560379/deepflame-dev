@@ -37,13 +37,11 @@ public:
     
     // Inference
     void Inference_multiDNNs(
-        const std::vector<DataType>& input0, std::vector<DataType>& output0, int64_t input_count0
-        );
+        const std::vector<DataType>& input0, std::vector<DataType>& output0, int64_t input_count0);
 
     // Inference
     void Inference_multiDNNs(
-        const DataType* input0, DataType* output0, int64_t input_count0
-        );
+        const DataType* input0, DataType* output0, int64_t input_count0);
 
 };
 

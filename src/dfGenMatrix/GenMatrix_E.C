@@ -128,22 +128,42 @@ GenMatrix_E(
 
     const scalar* const __restrict__ meshSfPtr = &mesh.Sf()[0][0];
     const scalar* const __restrict__ hDiffCorrFluxPtr = &hDiffCorrFlux[0][0];
-    
-    #pragma omp parallel for
-    for(label f = 0; f < nFaces; ++f){
 
-        KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
-        alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
-        // hDiffCorrFluxfPtr[f] = mesh.Sf()[f] & (weightshDiffCorrFluxPtr[f] * (hDiffCorrFlux[l[f]] - hDiffCorrFlux[u[f]]) + hDiffCorrFlux[u[f]]);
-        scalar Sfx = meshSfPtr[3 * f];
-        scalar Sfy = meshSfPtr[3 * f + 1];
-        scalar Sfz = meshSfPtr[3 * f + 2];
-        scalar w = weightshDiffCorrFluxPtr[f];
-        
-        hDiffCorrFluxfPtr[f] = Sfx * (w * (hDiffCorrFluxPtr[l[f] * 3 + 0] - hDiffCorrFluxPtr[u[f] * 3 + 0]) + hDiffCorrFluxPtr[u[f] * 3 + 0]) +
-            Sfy * (w * (hDiffCorrFluxPtr[l[f] * 3 + 1] - hDiffCorrFluxPtr[u[f] * 3 + 1]) + hDiffCorrFluxPtr[u[f] * 3 + 1]) +
-            Sfz * (w * (hDiffCorrFluxPtr[l[f] * 3 + 2] - hDiffCorrFluxPtr[u[f] * 3 + 2]) + hDiffCorrFluxPtr[u[f] * 3 + 2]);
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
+            alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar w = weightshDiffCorrFluxPtr[f];
+            hDiffCorrFluxfPtr[f] = Sfx * (w * (hDiffCorrFluxPtr[l[f] * 3 + 0] - hDiffCorrFluxPtr[u[f] * 3 + 0]) + hDiffCorrFluxPtr[u[f] * 3 + 0]) +
+                Sfy * (w * (hDiffCorrFluxPtr[l[f] * 3 + 1] - hDiffCorrFluxPtr[u[f] * 3 + 1]) + hDiffCorrFluxPtr[u[f] * 3 + 1]) +
+                Sfz * (w * (hDiffCorrFluxPtr[l[f] * 3 + 2] - hDiffCorrFluxPtr[u[f] * 3 + 2]) + hDiffCorrFluxPtr[u[f] * 3 + 2]);
+        }
+    }
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
+            alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar w = weightshDiffCorrFluxPtr[f];
+            hDiffCorrFluxfPtr[f] = Sfx * (w * (hDiffCorrFluxPtr[l[f] * 3 + 0] - hDiffCorrFluxPtr[u[f] * 3 + 0]) + hDiffCorrFluxPtr[u[f] * 3 + 0]) +
+                Sfy * (w * (hDiffCorrFluxPtr[l[f] * 3 + 1] - hDiffCorrFluxPtr[u[f] * 3 + 1]) + hDiffCorrFluxPtr[u[f] * 3 + 1]) +
+                Sfz * (w * (hDiffCorrFluxPtr[l[f] * 3 + 2] - hDiffCorrFluxPtr[u[f] * 3 + 2]) + hDiffCorrFluxPtr[u[f] * 3 + 2]);
+        }
     }
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
@@ -246,21 +266,24 @@ GenMatrix_E(
 
     }
 
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
     for(label patchi = 0; patchi < nPatches; ++patchi){
-
         if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-
                 boundaryKf[patchi][s] = (boundaryWeightsK[patchi][s] * boundaryK_internal[patchi][s] +
                         (1.0 - boundaryWeightsK[patchi][s]) * boundaryK_neighbour[patchi][s]);
-            
             }
-
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-
                 boundaryKf[patchi][s] = boundaryK[patchi][s];
-
             }
         }else{
             Info << "patch type not supported" << endl;
@@ -268,20 +291,23 @@ GenMatrix_E(
         }
     }
 
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
     for(label patchi = 0; patchi < nPatches; ++patchi){
-
         if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-
                 boundaryAlphaf[patchi][s] = (boundaryLinearWeights[patchi][s] * boundaryAlphaEff_internal[patchi][s] + 
-                        (1.0 - boundaryLinearWeights[patchi][s]) * boundaryAlphaEff_neighbour[patchi][s]);
-            
-            }
+                        (1.0 - boundaryLinearWeights[patchi][s]) * boundaryAlphaEff_neighbour[patchi][s]);}
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-
                 boundaryAlphaf[patchi][s] = boundaryAlphaEff[patchi][s];
-
             }
         }else{
             Info << "patch type not supported" << endl;
@@ -289,11 +315,15 @@ GenMatrix_E(
         }
     }
 
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
     for(label patchi = 0; patchi < nPatches; ++patchi){
-
         if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-
                 scalar Sfx = boundarySf[patchi][s * 3 + 0];
                 scalar Sfy = boundarySf[patchi][s * 3 + 1];
                 scalar Sfz = boundarySf[patchi][s * 3 + 2];
@@ -301,18 +331,18 @@ GenMatrix_E(
                 boundaryhDiff[patchi][s] = Sfx * (w * boundaryHDiffCorrFlux_internal[patchi][s * 3 + 0] + (1.0 - w) * boundaryHDiffCorrFlux_neighbour[patchi][s * 3 + 0]) +
                         Sfy * (w * boundaryHDiffCorrFlux_internal[patchi][s * 3 + 1] + (1.0 - w) * boundaryHDiffCorrFlux_neighbour[patchi][s * 3 + 1]) +
                         Sfz * (w * boundaryHDiffCorrFlux_internal[patchi][s * 3 + 2] + (1.0 - w) * boundaryHDiffCorrFlux_neighbour[patchi][s * 3 + 2]);
-            
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
             for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-
                 scalar Sfx = boundarySf[patchi][s * 3 + 0];
                 scalar Sfy = boundarySf[patchi][s * 3 + 1];
                 scalar Sfz = boundarySf[patchi][s * 3 + 2];
                 boundaryhDiff[patchi][s] = Sfx * boundaryHDiffCorrFlux[patchi][s * 3 + 0] +
                         Sfy * boundaryHDiffCorrFlux[patchi][s * 3 + 1] +
                         Sfz * boundaryHDiffCorrFlux[patchi][s * 3 + 2];
-
             }
         }else{
             Info << "patch type not supported" << endl;
@@ -340,26 +370,75 @@ GenMatrix_E(
     scalar *fvcDivPtr = new scalar[nCells]{0.};
     scalar *fvcDiv2Ptr = new scalar[nCells]{0.};
     scalar *diagLaplacPtr = new scalar[nCells]{0.};
-    
-    for(label f = 0; f < nFaces; ++f){
-        scalar var1 = - weights_he_Ptr[f] * phiPtr[f];
-        scalar var2 = - weights_he_Ptr[f] * phiPtr[f] + phiPtr[f];
-        lowerPtr[f] += var1;
-        upperPtr[f] += var2;
-        diagPtr[l[f]] -= var1;
-        diagPtr[u[f]] -= var2;
-        fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
-        fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
-        fvcDiv2Ptr[l[f]] += hDiffCorrFluxfPtr[f];
-        fvcDiv2Ptr[u[f]] -= hDiffCorrFluxfPtr[f];
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = - weights_he_Ptr[f] * phiPtr[f];
+            scalar var2 = - weights_he_Ptr[f] * phiPtr[f] + phiPtr[f];
+            lowerPtr[f] += var1;
+            upperPtr[f] += var2;
+            diagPtr[l[f]] -= var1;
+            diagPtr[u[f]] -= var2;
+            fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
+            fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
+            fvcDiv2Ptr[l[f]] += hDiffCorrFluxfPtr[f];
+            fvcDiv2Ptr[u[f]] -= hDiffCorrFluxfPtr[f];
+        }
     }
 
-    for(label f = 0; f < nFaces; ++f){
-        scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        lowerPtr[f] -= var1;
-        upperPtr[f] -= var1;
-        diagLaplacPtr[l[f]] += var1; //negSumDiag
-        diagLaplacPtr[u[f]] += var1;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = - weights_he_Ptr[f] * phiPtr[f];
+            scalar var2 = - weights_he_Ptr[f] * phiPtr[f] + phiPtr[f];
+            lowerPtr[f] += var1;
+            upperPtr[f] += var2;
+            diagPtr[l[f]] -= var1;
+            diagPtr[u[f]] -= var2;
+            fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
+            fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
+            fvcDiv2Ptr[l[f]] += hDiffCorrFluxfPtr[f];
+            fvcDiv2Ptr[u[f]] -= hDiffCorrFluxfPtr[f];
+        }
+    }
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+            lowerPtr[f] -= var1;
+            upperPtr[f] -= var1;
+            diagLaplacPtr[l[f]] += var1; //negSumDiag
+            diagLaplacPtr[u[f]] += var1;
+        }
+    }
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+            lowerPtr[f] -= var1;
+            upperPtr[f] -= var1;
+            diagLaplacPtr[l[f]] += var1; //negSumDiag
+            diagLaplacPtr[u[f]] += var1;
+        }
     }
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
@@ -399,7 +478,9 @@ GenMatrix_E(
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
-    #pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){      // cell loop
         diagPtr[c] += rDeltaT * rhoPtr[c] * meshVscPtr[c];
         diagPtr[c] += diagLaplacPtr[c];
