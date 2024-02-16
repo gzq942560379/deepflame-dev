@@ -496,6 +496,34 @@ GenMatrix_E(
     delete[] fvcDiv2Ptr;
     delete[] diagLaplacPtr;
 
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+        if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
+            delete[] boundaryK_internal[patchi];
+            delete[] boundaryK_neighbour[patchi];
+            delete[] boundaryAlphaEff_internal[patchi];
+            delete[] boundaryAlphaEff_neighbour[patchi];
+            delete[] boundaryHDiffCorrFlux_internal[patchi];
+            delete[] boundaryHDiffCorrFlux_neighbour[patchi];
+        }
+    }
+    delete[] boundaryK_internal;
+    delete[] boundaryK_neighbour;
+    delete[] boundaryAlphaEff_internal;
+    delete[] boundaryAlphaEff_neighbour;
+    delete[] boundaryHDiffCorrFlux_internal;
+    delete[] boundaryHDiffCorrFlux_neighbour;
+
+    delete[] boundaryWeightsK;
+    delete[] boundaryKf;
+    delete[] boundaryLinearWeights;
+    delete[] boundaryAlphaf;
+    delete[] boundaryWeightshDiff;
+    delete[] boundarySf;
+    delete[] boundaryhDiff;
+    delete[] boundaryK;
+    delete[] boundaryAlphaEff;
+    delete[] boundaryHDiffCorrFlux;
+
     return tfvm;
 }
 }
