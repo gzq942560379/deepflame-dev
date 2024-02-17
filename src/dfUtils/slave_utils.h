@@ -24,6 +24,11 @@
     #error "WM_ARCH_OPTION must be 32 or 64"
 #endif
 
+typedef scalar* scalarPtr;
+typedef const scalar* constScalarPtr;
+typedef label* labelPtr;
+typedef const label* constLabelPtr;
+
 #define slave_min(x,y) ((x)<(y)?(x):(y))
 #define slave_max(x,y) ((x)<(y)?(y):(x))
 

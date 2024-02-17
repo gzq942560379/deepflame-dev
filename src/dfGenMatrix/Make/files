@@ -13,4 +13,6 @@ utils.C
 
 dfThermo.C
 
+preProcessY_gradY_partition_naive.c
+
 LIB = $(DF_LIBBIN)/libdfGenMatrix

@@ -6,6 +6,7 @@
 #include "orthogonalSnGrad.H"
 #include "clockTime.H"
 #include "thread.H"
+#include "matrix_gen_slave_kernel.h"
 
 namespace Foam{
 
@@ -308,6 +309,241 @@ void preProcess_Y(
         
 #elif defined(OPT_FACE2CELL_PARTITION)
 
+#ifdef __sw_64__
+
+        int mpirank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+
+        const XBlock2DPartitionStructuredMeshSchedule& schedule = XBlock2DPartitionStructuredMeshSchedule::getXBlock2DPartitionStructuredMeshSchedule();
+
+        int thread_size = CRTS_MAX_SPE_NUM;
+
+        preProcessY_gradY_partition_param_t para;
+        for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank){
+            const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+            para.localGlabalFacePtr[thread_rank] = subMesh.localGlabalFacePtr().begin();
+            para.localGlabalFace[thread_rank] = subMesh.localGlabalFace().begin();
+        }
+        para.globalXLen = schedule.xDim();
+        para.globalYLen = schedule.yDim();
+        para.globalZLen = schedule.zDim();
+        para.weightsPtr = weightsPtr;
+        para.meshSfPtr = meshSfPtr;
+        para.Yi = Yi;
+        para.gradY_Species = gradY_Species;
+        para.mpirank = mpirank;
+        CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(preProcessY_gradY_partition_naive)), &para);
+        CRTS_athread_join();
+
+        // // alloc
+        // scalar** localCellsBuffer = new scalar*[thread_size];
+        // scalar** localPatch = new scalar*[thread_size * 4];;
+
+        // for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank){
+        //     const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+        //     localCellsBuffer[thread_rank] = new scalar[2 * subMesh.localYLen() * subMesh.localXLen() * 3];
+        //     localPatch[thread_rank * 4 + SubMesh::PatchDirection::RIGHT] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::RIGHT) * 3];
+        //     localPatch[thread_rank * 4 + SubMesh::PatchDirection::UPPER] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::UPPER) * 3];
+        //     localPatch[thread_rank * 4 + SubMesh::PatchDirection::DOWN] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::DOWN) * 3];        
+        //     localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT] = new scalar[subMesh.localPatchSize(SubMesh::PatchDirection::LEFT) * 3];
+        // }
+
+        // for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank)
+        // {
+        //     const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+
+        //     scalar* local_gradY_Species = localCellsBuffer[thread_rank];
+        //     scalar** local_gradY_Species_Patch = localPatch + thread_rank * 4;
+        //     scalar* local_gradY_Species_Patch_right = local_gradY_Species_Patch[SubMesh::PatchDirection::RIGHT];
+        //     scalar* local_gradY_Species_Patch_down = local_gradY_Species_Patch[SubMesh::PatchDirection::DOWN];
+
+        //     // init localCellsBuffer
+        //     memset(local_gradY_Species, '\0', sizeof(scalar) * 2 * subMesh.localYLen() * subMesh.localXLen() * 3);
+        //     memset(local_gradY_Species_Patch_right, '\0', sizeof(scalar) * subMesh.localPatchSize(SubMesh::PatchDirection::RIGHT) * 3);
+        //     memset(local_gradY_Species_Patch_down, '\0', sizeof(scalar) * subMesh.localPatchSize(SubMesh::PatchDirection::DOWN) * 3);
+
+        //     for(label lz = 0; lz < subMesh.localZLen(); ++lz){
+        //         label cur = lz & 1;
+        //         label next = (lz + 1) & 1;
+        //         scalar* local_gradY_Species_cur = local_gradY_Species + cur * subMesh.localYLen() * subMesh.localXLen() * 3;
+        //         scalar* local_gradY_Species_next = local_gradY_Species + next * subMesh.localYLen() * subMesh.localXLen() * 3;
+        //         label gz = subMesh.globalZ(lz);
+        //         for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+        //             label gy = subMesh.globalY(ly);
+        //             for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+        //                 label gx = subMesh.globalX(lx);
+        //                 label lc = subMesh.localIndex(lx, ly, lz);
+        //                 label lc_cur = subMesh.localIndex(lx, ly, 0);
+        //                 label gc = subMesh.globalIndex(gx, gy, gz);
+        //                 label gfp = subMesh.localGlabalFacePtr()[lc];
+        //                 scalar ownerYi = Yi[gc];
+        //                 if(gx + 1 < subMesh.globalXLen()){
+        //                     label lnc = subMesh.localIndex(lx + 1, ly, lz);;
+        //                     label lnc_cur = subMesh.localIndex(lx + 1, ly, 0);;
+        //                     label gnc = subMesh.globalIndex(gx + 1, gy, gz);
+        //                     label gf = subMesh.localGlabalFace()[gfp];
+        //                     scalar neighbourYi = Yi[gnc];
+        //                     scalar ssf = (weightsPtr[gf] * (ownerYi - neighbourYi) + neighbourYi);
+        //                     scalar grad_x = meshSfPtr[3 * gf + 0] * ssf;
+        //                     scalar grad_y = meshSfPtr[3 * gf + 1] * ssf;
+        //                     scalar grad_z = meshSfPtr[3 * gf + 2] * ssf;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 0] += grad_x;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 1] += grad_y;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 2] += grad_z;
+        //                     local_gradY_Species_cur[lnc_cur * 3 + 0] -= grad_x;
+        //                     local_gradY_Species_cur[lnc_cur * 3 + 1] -= grad_y;
+        //                     local_gradY_Species_cur[lnc_cur * 3 + 2] -= grad_z;                
+        //                     gfp += 1;
+        //                 }
+
+                        
+        //                 if(gy + 1 < subMesh.globalYLen()){
+        //                     label gnc = subMesh.globalIndex(gx, gy + 1, gz);
+        //                     label gf = subMesh.localGlabalFace()[gfp];
+        //                     scalar neighbourYi = Yi[gnc];
+        //                     scalar ssf = (weightsPtr[gf] * (ownerYi - neighbourYi) + neighbourYi);
+        //                     scalar grad_x = meshSfPtr[3 * gf + 0] * ssf;
+        //                     scalar grad_y = meshSfPtr[3 * gf + 1] * ssf;
+        //                     scalar grad_z = meshSfPtr[3 * gf + 2] * ssf;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 0] += grad_x;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 1] += grad_y;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 2] += grad_z;
+        //                     if(ly + 1 < subMesh.localYLen()){
+        //                         label lnc = subMesh.localIndex(lx, ly + 1, lz);;
+        //                         label lnc_cur = subMesh.localIndex(lx, ly + 1, 0);;
+        //                         local_gradY_Species_cur[lnc_cur * 3 + 0] -= grad_x;
+        //                         local_gradY_Species_cur[lnc_cur * 3 + 1] -= grad_y;
+        //                         local_gradY_Species_cur[lnc_cur * 3 + 2] -= grad_z;
+        //                     }else{
+        //                         label hi = lx + lz * subMesh.localXLen();
+        //                         local_gradY_Species_Patch_right[hi * 3 + 0] -= grad_x;
+        //                         local_gradY_Species_Patch_right[hi * 3 + 1] -= grad_y;
+        //                         local_gradY_Species_Patch_right[hi * 3 + 2] -= grad_z;
+        //                     }
+        //                     gfp += 1;
+        //                 }
+
+        //                 if(gz + 1 < subMesh.globalZLen()){
+        //                     label gnc = subMesh.globalIndex(gx, gy, gz + 1);
+        //                     label gf = subMesh.localGlabalFace()[gfp];
+        //                     scalar neighbourYi = Yi[gnc];
+        //                     scalar ssf = (weightsPtr[gf] * (ownerYi - neighbourYi) + neighbourYi);
+        //                     scalar grad_x = meshSfPtr[3 * gf + 0] * ssf;
+        //                     scalar grad_y = meshSfPtr[3 * gf + 1] * ssf;
+        //                     scalar grad_z = meshSfPtr[3 * gf + 2] * ssf;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 0] += grad_x;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 1] += grad_y;
+        //                     local_gradY_Species_cur[lc_cur * 3 + 2] += grad_z;
+        //                     if(lz + 1 < subMesh.localZLen()){
+        //                         label lnc = subMesh.localIndex(lx, ly, lz + 1);
+        //                         label lnc_next = subMesh.localIndex(lx, ly, 0);
+        //                         local_gradY_Species_next[lnc_next * 3 + 0] -= grad_x;
+        //                         local_gradY_Species_next[lnc_next * 3 + 1] -= grad_y;
+        //                         local_gradY_Species_next[lnc_next * 3 + 2] -= grad_z; 
+        //                     }else{
+        //                         label hi = lx + ly * subMesh.localXLen();
+        //                         local_gradY_Species_Patch_down[hi * 3 + 0] -= grad_x;
+        //                         local_gradY_Species_Patch_down[hi * 3 + 1] -= grad_y;
+        //                         local_gradY_Species_Patch_down[hi * 3 + 2] -= grad_z;
+        //                     }
+        //                     gfp += 1;
+        //                 }
+        //             }
+        //         }
+        //         // write and reset curur
+        //         for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+        //             label gy = subMesh.globalY(ly);
+        //             for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+        //                 label gx = subMesh.globalX(lx);
+        //                 label lc = subMesh.localIndex(lx, ly, lz);
+        //                 label lc_cur = subMesh.localIndex(lx, ly, 0);
+        //                 label gc = subMesh.globalIndex(gx, gy, gz);
+        //                 gradY_Species[gc * 3 + 0] = local_gradY_Species_cur[lc_cur * 3 + 0];
+        //                 gradY_Species[gc * 3 + 1] = local_gradY_Species_cur[lc_cur * 3 + 1];
+        //                 gradY_Species[gc * 3 + 2] = local_gradY_Species_cur[lc_cur * 3 + 2];
+        //                 local_gradY_Species_cur[lc_cur * 3 + 0] = 0.;
+        //                 local_gradY_Species_cur[lc_cur * 3 + 1] = 0.;
+        //                 local_gradY_Species_cur[lc_cur * 3 + 2] = 0.;
+        //             }
+        //         }
+        //     }
+        // }
+
+        // // comm halo
+        // for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank)
+        // {
+        //     const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+        //     if(subMesh.hasLeftHalo()){
+        //         int laft_thread_rank = subMesh.leftThreadRank();
+        //         std::copy(
+        //             localPatch[laft_thread_rank * 4 + SubMesh::PatchDirection::RIGHT], 
+        //             localPatch[laft_thread_rank * 4 + SubMesh::PatchDirection::RIGHT] + subMesh.localPatchSize(SubMesh::PatchDirection::LEFT) * 3,
+        //             localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT]
+        //         );
+        //     }
+        //     if(subMesh.hasUpperHalo()){
+        //         int upper_thread_rank = subMesh.upperThreadRank();
+        //         std::copy(
+        //             localPatch[upper_thread_rank * 4 + SubMesh::PatchDirection::DOWN], 
+        //             localPatch[upper_thread_rank * 4 + SubMesh::PatchDirection::DOWN] + subMesh.localPatchSize(SubMesh::PatchDirection::UPPER) * 3,
+        //             localPatch[thread_rank * 4 + SubMesh::PatchDirection::UPPER]
+        //         );
+        //     }
+        // }
+        // // update halo
+        // for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank)
+        // {
+        //     const StructuredSubMesh& subMesh = dynamic_cast<const StructuredSubMesh&>(schedule.subMesh(thread_rank));
+        //     scalar* local_gradY_Species = localCellsBuffer[thread_rank];
+        //     scalar** local_gradY_Species_Patch = localPatch + thread_rank * 4;
+        //     if(subMesh.hasLeftHalo()){
+        //         label ly = 0;
+        //         label gy = subMesh.globalY(ly);
+        //         scalar* local_gradY_Species_Patch_left = local_gradY_Species_Patch[SubMesh::PatchDirection::LEFT];
+        //         for(label lz = 0; lz < subMesh.localZLen(); ++lz){
+        //             label gz = subMesh.globalZ(lz);
+        //             for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+        //                 label gx = subMesh.globalX(lx);
+        //                 label lc = subMesh.localIndex(lx, ly, lz);
+        //                 label gc = subMesh.globalIndex(gx, gy, gz);
+        //                 label hi = lx + lz * subMesh.localXLen();
+        //                 gradY_Species[gc * 3 + 0] += local_gradY_Species_Patch_left[hi * 3 + 0];
+        //                 gradY_Species[gc * 3 + 1] += local_gradY_Species_Patch_left[hi * 3 + 1];
+        //                 gradY_Species[gc * 3 + 2] += local_gradY_Species_Patch_left[hi * 3 + 2];
+        //             }
+        //         }
+        //     }
+        //     if(subMesh.hasUpperHalo()){
+        //         label lz = 0;
+        //         label gz = subMesh.globalZ(lz);
+        //         scalar* local_gradY_Species_Patch_upper = local_gradY_Species_Patch[SubMesh::PatchDirection::UPPER];
+        //         for(label ly = 0; ly < subMesh.localYLen(); ++ly){
+        //             label gy = subMesh.globalY(ly);
+        //             for(label lx = 0; lx < subMesh.localXLen(); ++lx){
+        //                 label gx = subMesh.globalX(lx);
+        //                 label lc = subMesh.localIndex(lx, ly, lz);
+        //                 label gc = subMesh.globalIndex(gx, gy, gz);
+        //                 label hi = lx + ly * subMesh.localXLen();
+        //                 gradY_Species[gc * 3 + 0] += local_gradY_Species_Patch_upper[hi * 3 + 0];
+        //                 gradY_Species[gc * 3 + 1] += local_gradY_Species_Patch_upper[hi * 3 + 1];
+        //                 gradY_Species[gc * 3 + 2] += local_gradY_Species_Patch_upper[hi * 3 + 2];
+        //             }
+        //         }
+        //     }
+        // }
+
+        // for(int thread_rank = 0; thread_rank < thread_size; ++thread_rank){
+        //     delete [] localCellsBuffer[thread_rank];
+        //     delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::UPPER];
+        //     delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::RIGHT];
+        //     delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::DOWN];
+        //     delete [] localPatch[thread_rank * 4 + SubMesh::PatchDirection::LEFT];
+        // }  
+        // delete [] localCellsBuffer;
+        // delete [] localPatch;
+
+#else
+
         const XBlock2DPartitionStructuredMeshSchedule& schedule = XBlock2DPartitionStructuredMeshSchedule::getXBlock2DPartitionStructuredMeshSchedule();
 
 #ifdef _OPENMP
@@ -533,6 +769,8 @@ void preProcess_Y(
         }  
         delete [] localCellsBuffer;
         delete [] localPatch;
+
+#endif
 
 #else
         for(label c = 0; c < nCells; ++c){

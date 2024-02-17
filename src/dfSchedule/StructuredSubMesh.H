@@ -50,6 +50,14 @@ public:
     label localYLen() const {return y_len_;};
     label localXLen() const {return x_len_;};
 
+    label localZStart() const {return z_start_;};
+    label localYStart() const {return y_start_;};
+    label localXStart() const {return 0;};
+
+    label localZEnd() const {return z_end_;};
+    label localYEnd() const {return y_end_;};
+    label localXEnd() const {return x_len_;};
+
     label globalZLen() const {return z_dim_;};
     label globalYLen() const {return y_dim_;};
     label globalXLen() const {return x_dim_;};

@@ -32,6 +32,9 @@ public:
     
     void xyz(label index, label& x, label& y, label& z) const;
 
+    label xDim() const {return x_dim_;};
+    label yDim() const {return y_dim_;};
+    label zDim() const {return z_dim_;};
 };
 
 }
