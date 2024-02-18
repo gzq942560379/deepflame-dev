@@ -24,9 +24,13 @@ typedef struct{
     constScalarPtr meshSfPtr;
     constScalarPtr Yi;
     scalarPtr gradY_Species; // output
-    int mpirank;
 } preProcessY_gradY_partition_param_t;
 
+typedef struct{
+    label nCells;
+    scalarPtr gradY_Species;
+    constScalarPtr meshVPtr;
+} preProcessY_gradY_div_meshV_param_t;
 
 #ifdef __cplusplus
 }

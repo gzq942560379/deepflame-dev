@@ -331,7 +331,6 @@ void preProcess_Y(
         para.meshSfPtr = meshSfPtr;
         para.Yi = Yi;
         para.gradY_Species = gradY_Species;
-        para.mpirank = mpirank;
         CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(preProcessY_gradY_partition_naive)), &para);
         CRTS_athread_join();
 
@@ -727,6 +726,17 @@ void preProcess_Y(
 
         gardY_boundary_time += clock.timeIncrement();
 
+#ifdef __sw_64___
+
+        preProcessY_gradY_div_meshV_param_t para;
+        para.nCells = nCells;
+        para.gradY_Species = gradY_Species;
+        para.meshVPtr = meshVPtr;
+        CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(preProcessY_gradY_div_meshV_naive)), &para);
+        CRTS_athread_join();
+
+#else
+
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -737,6 +747,7 @@ void preProcess_Y(
             gradY_Species[c * 3 + 2] *= meshVRTmp;
         }
 
+#endif
         gardY_div_time += clock.timeIncrement();
 
         for (label j = 0; j < nPatches; ++j) {

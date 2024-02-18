@@ -62,7 +62,6 @@ void preProcessY_gradY_partition_naive(preProcessY_gradY_partition_param_t* para
     constScalarPtr weightsPtr = para.weightsPtr;
     constScalarPtr meshSfPtr = para.meshSfPtr;
     constScalarPtr Yi = para.Yi;
-    int mpirank = para.mpirank;
 
     scalarPtr gradY_Species = para.gradY_Species;
 
