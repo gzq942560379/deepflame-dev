@@ -44,6 +44,20 @@ typedef struct{
     label row_;
 } divMatrix_sumA_param_t;
 
+
+typedef struct{
+    label row;
+    label lowerUpperSize;
+    scalarPtr divDiag;
+    scalarPtr divOffDiagValue;
+
+    constScalarPtr lduDiag;
+    constScalarPtr lduLower;
+    constScalarPtr lduUpper;
+    constLabelPtr divFace2Lower;
+    constLabelPtr divFace2Upper;
+} divMatrix_value_transfer_param_t;
+
 #ifdef __cplusplus
 }
 #endif

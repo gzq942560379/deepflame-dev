@@ -152,7 +152,7 @@ divMatrix::divMatrix(const lduMesh& mesh):row_block_bit_(row_block_bit), row_blo
     tail_block_count_ = (max_distance_ + row_block_size_ - 1) / row_block_size_;
     
     // alloc off_diag_value
-    off_diag_value_.resize(distance_count_ * row_);
+    off_diag_value_.resize(distance_count_ * row_, 0);
 
     face2lower_.resize(face_count);
     face2upper_.resize(face_count);
@@ -210,7 +210,25 @@ void divMatrix::copy_value_from_fvMatrix(const lduMatrix& lduMatrix){
     assert(face2lower_.size() == lduLower.size());
     assert(face2upper_.size() == lduUpper.size());
 
-    label face_count = lduLower.size();
+    label lowerUpperSize = lduLower.size();
+
+#ifdef __sw_64__
+
+    divMatrix_value_transfer_param_t para;
+    para.row = row_;
+    para.lowerUpperSize = lowerUpperSize;
+    para.divDiag = diag_value_.begin();
+    para.divOffDiagValue = off_diag_value_.begin();
+    para.lduDiag = lduDiag.begin();
+    para.lduLower = lduLower.begin();
+    para.lduUpper = lduUpper.begin();
+    para.divFace2Lower = face2lower_.begin();
+    para.divFace2Upper = face2upper_.begin();
+
+    CRTS_athread_spawn(reinterpret_cast<void *>(SLAVE_FUN(divMatrix_value_transfer_navie)), &para);
+    CRTS_athread_join();
+
+#else
 
 #ifdef _OPENMP
     #pragma omp parallel for
@@ -219,15 +237,15 @@ void divMatrix::copy_value_from_fvMatrix(const lduMatrix& lduMatrix){
         diag_value_[i] = lduDiag[i];
     }
 
-    memset(off_diag_value_.data(), '\0', off_diag_value_.size() * sizeof(scalar));
-
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for(label i = 0; i < face_count; ++i){
+    for(label i = 0; i < lowerUpperSize; ++i){
         off_diag_value_[face2lower_[i]] = lduLower[i];
         off_diag_value_[face2upper_[i]] = lduUpper[i];
     }
+
+#endif
 }
 
 void divMatrix::analyze() const {

@@ -216,5 +216,6 @@ $(divMatrix)/smoothers/divSymGaussSeidel/divSymGaussSeidelSmoother.C
 $(divMatrix)/divMatrix/divMatrixSpMV_slave_naive.c
 $(divMatrix)/divMatrix/divMatrixJacobi_slave_naive.c
 $(divMatrix)/divMatrix/divMatrixSumA_slave_naive.c
+$(divMatrix)/divMatrix/divMatrix_value_transfer_navie.c
 
 LIB = $(DF_LIBBIN)/libdfMatrices
