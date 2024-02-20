@@ -3,9 +3,13 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
                 volScalarField& rho, volScalarField& T, volScalarField& psi, volScalarField& mu,
                 volScalarField& alpha, PtrList<volScalarField>& rhoD)
 {
-    double solve_DNN_blas_start = MPI_Wtime();
+    double init_time = 0.;
+    double prepare_time = 0.;
+    double inference_time = 0.;
+    double update_time = 0.;
+    double destory_time= 0.;
 
-    double prepare_dnn_input_start = MPI_Wtime();
+    clockTime clock;
 
     label nCells = he.size();
     label input_dim = 3;
@@ -15,8 +19,25 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
 
     Info<<"=== begin solve_thermo with BLASDNN === "<<endl;
 
-    float* NNInputs = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
-    memset(NNInputs, '\0', (nCells * input_dim) * sizeof(float));
+    // float* NNInputs = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
+    // memset(NNInputs, '\0', (nCells * input_dim) * sizeof(float));
+
+    // float* results0 = (float*)aligned_alloc(64, nCells * sizeof(float));
+    // float* results1 = (float*)aligned_alloc(64, nCells * sizeof(float));
+    // float* results2 = (float*)aligned_alloc(64, nCells * sizeof(float));
+    // float* results3 = (float*)aligned_alloc(64, nCells * sizeof(float));
+    // float* results4 = (float*)aligned_alloc(64, nCells * sizeof(float));
+
+    __fp16* NNInputs = (__fp16*)aligned_alloc(64, (nCells * input_dim) * sizeof(__fp16));
+    memset(NNInputs, '\0', (nCells * input_dim) * sizeof(__fp16));
+
+    __fp16* results0 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
+    __fp16* results1 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
+    __fp16* results2 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
+    __fp16* results3 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
+    __fp16* results4 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
+
+    init_time += clock.timeIncrement();
 
     const volScalarField::Boundary& pBf = p.boundaryField();
 
@@ -40,9 +61,6 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
         nFaces += ph.size();
     }
     Info << "total # of faces is " << nFaces << endl;
-    float* NNInputs_p = (float*)aligned_alloc(64, (nFaces * input_dim) * sizeof(float));
-    memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(float));
-
 
     // Prepare input for DNN
 #ifdef _OPENMP
@@ -55,21 +73,12 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
         NNInputs[cellI * input_dim + 2] = (p[cellI] - thermomu_[6]) / thermostd_[6];
     }
 
-    double prepare_dnn_input_end = MPI_Wtime();
+    prepare_time += clock.timeIncrement();
 
-    // module inference
-    float* results0 = (float*)aligned_alloc(64, nCells * sizeof(float));
-    float* results1 = (float*)aligned_alloc(64, nCells * sizeof(float));
-    float* results2 = (float*)aligned_alloc(64, nCells * sizeof(float));
-    float* results3 = (float*)aligned_alloc(64, nCells * sizeof(float));
-    float* results4 = (float*)aligned_alloc(64, nCells * sizeof(float));
-
-    double dnn_infer_start = MPI_Wtime();
     DNNThermo_blas_.Inference(nCells, NNInputs, 
         results0, results1, results2, results3, results4);
-    double dnn_infer_end = MPI_Wtime();
 
-    double update_start = MPI_Wtime();
+    inference_time += clock.timeIncrement();
 
     // update thermo properties
 #ifdef _OPENMP
@@ -85,8 +94,9 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
             rhoD_[i][cellI] = alpha[cellI];
         }
     }
+
+    update_time += clock.timeIncrement();
     
-    double update_end = MPI_Wtime();
     free(NNInputs);
     free(results0);
     free(results1);
@@ -94,9 +104,29 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     free(results3);
     free(results4);
 
+    destory_time += clock.timeIncrement();
+
     /*
     ** boundaryField
     */
+
+    // float* NNInputs_p = (float*)aligned_alloc(64, (nFaces * input_dim) * sizeof(float));
+    // memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(float));
+    // float* results0_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    // float* results1_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    // float* results2_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    // float* results3_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    // float* results4_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+
+    __fp16* NNInputs_p = (__fp16*)aligned_alloc(64, (nFaces * input_dim) * sizeof(__fp16));
+    memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(__fp16));
+    __fp16* results0_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
+    __fp16* results1_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
+    __fp16* results2_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
+    __fp16* results3_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
+    __fp16* results4_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
+
+    init_time += clock.timeIncrement();
 
     // Prepare input for DNN
     forAll(he.boundaryField(), patchi)
@@ -116,17 +146,12 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
         offset += ph.size()*input_dim;
     }
 
-    // double prepare_dnn_input_end = MPI_Wtime();
-
-    // module inference
-    float* results0_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
-    float* results1_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
-    float* results2_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
-    float* results3_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
-    float* results4_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+    prepare_time += clock.timeIncrement();
 
     DNNThermo_blas_.Inference(nFaces, NNInputs_p, 
         results0_p, results1_p, results2_p, results3_p, results4_p);
+
+    inference_time += clock.timeIncrement();
 
     // update thermo properties
     forAll(he.boundaryField(), patchi)
@@ -153,8 +178,9 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
         }
         offset += pT.size();
     }
+
+    update_time += clock.timeIncrement();
     
-    // double update_end = MPI_Wtime();
     free(NNInputs_p);
     free(results0_p);
     free(results1_p);
@@ -162,14 +188,19 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     free(results3_p);
     free(results4_p);
 
+    destory_time += clock.timeIncrement();
+
+    double total_time = clock.elapsedTime();
 
     Info << "=== end solve_thermo with BLASDNN === " << endl;
 
-    double solve_DNN_blas_end = MPI_Wtime();
     Info << "solve_DNN_blas_thermo profiling --------------------------------------------------" << endl;
-    Info << "solve_DNN_blas_thermo time: " << solve_DNN_blas_end - solve_DNN_blas_start << "s" << endl;
-    Info << "prepare_dnn_input time: " << prepare_dnn_input_end - prepare_dnn_input_start << "s" << endl;
-    Info << "dnn_infer time: " << dnn_infer_end - dnn_infer_start << "s" << endl;
-    Info << "update time: " << update_end - update_start << "s" << endl;
-    Info << "solve_DNN_blas profiling --------------------------------------------------" << endl;
+    Info << "solve_DNN_blas_thermo total time: " << total_time << endl;
+    Info << "init time: " << init_time << endl;
+    Info << "prepare time: " << prepare_time << endl;
+    Info << "inference time: " << inference_time << endl;
+    Info << "update time: " << update_time << endl;
+    Info << "destory time: " << destory_time << endl;
+    Info << "other time: " << total_time - init_time - prepare_time - inference_time - update_time - destory_time  << endl;
+    Info << "----------------------------------------------------------------------------------" << endl;
 }

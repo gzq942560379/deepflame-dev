@@ -226,7 +226,6 @@ void DNNThermo_blas<DataType>::Inference(
             model0_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
-    std::cout << "NN0 Inference done" << std::endl;
     // - NN1
     for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
         int64_t sample_end = std::min(input_count, sample_start + batch_size_);
@@ -242,7 +241,6 @@ void DNNThermo_blas<DataType>::Inference(
             model1_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
-    std::cout << "NN1 Inference done" << std::endl;
     // - NN2
     for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
         int64_t sample_end = std::min(input_count, sample_start + batch_size_);
@@ -258,7 +256,6 @@ void DNNThermo_blas<DataType>::Inference(
             model2_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
-    std::cout << "NN2 Inference done" << std::endl;
     // - NN3
     for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
         int64_t sample_end = std::min(input_count, sample_start + batch_size_);
@@ -274,7 +271,6 @@ void DNNThermo_blas<DataType>::Inference(
             model3_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
-    std::cout << "NN3 Inference done" << std::endl;
     // - NN4
     for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
         int64_t sample_end = std::min(input_count, sample_start + batch_size_);
@@ -290,7 +286,6 @@ void DNNThermo_blas<DataType>::Inference(
             model4_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
-    std::cout << "NN4 Inference done" << std::endl;
     double dnn_infer_end = MPI_Wtime();
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
     double FLOPs = input_count * FLOPs_per_sample0_ + 4 * input_count * FLOPs_per_sample1_;
@@ -300,6 +295,11 @@ void DNNThermo_blas<DataType>::Inference(
     }else if(sizeof(DataType) == sizeof(float)){
         theoretical_peak *= 2.;
     }
+#ifdef _FP16_
+    else if(sizeof(DataType) == sizeof(__fp16)){
+        theoretical_peak *= 4.;
+    }
+#endif
     else{
         assert(false);
     }
@@ -324,8 +324,31 @@ void DNNThermo_blas<DataType>::Inference(
         std::cout << "Theoretical peak : " << theoretical_peak << std::endl;
         std::cout << "Peak : " << peak << std::endl;
         std::cout << "-------------------------------------" << std::endl;
+        for(size_t i = 0; i < model0_.size(); ++i){
+            model0_[i]->print_timer();
+            std::cout << "-------------------------------------" << std::endl;
+        }
+        for(size_t i = 0; i < model1_.size(); ++i){
+            model1_[i]->print_timer();
+            std::cout << "-------------------------------------" << std::endl;
+        }
+        for(size_t i = 0; i < model2_.size(); ++i){
+            model2_[i]->print_timer();
+            std::cout << "-------------------------------------" << std::endl;
+        }
+        for(size_t i = 0; i < model3_.size(); ++i){
+            model3_[i]->print_timer();
+            std::cout << "-------------------------------------" << std::endl;
+        }
+        for(size_t i = 0; i < model4_.size(); ++i){
+            model4_[i]->print_timer();
+            std::cout << "-------------------------------------" << std::endl;
+        }
     }
 }
 
 template class DNNThermo_blas<float>;
 template class DNNThermo_blas<double>;
+#ifdef _FP16_
+template class DNNThermo_blas<__fp16>;
+#endif

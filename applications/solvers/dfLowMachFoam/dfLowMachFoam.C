@@ -73,14 +73,14 @@ Description
 #define _DIV_
 // #define _LDU_
 #define OPT_GenMatrix_Y
-#define OPT_GenMatrix_E
+// #define OPT_GenMatrix_E
 #define OPT_GenMatrix_U
 #define OPT_GenMatrix_p
 // #define OPT_thermo
-#define OPT_GenMatrix_U_check
-#define OPT_GenMatrix_Y_check
+// #define OPT_GenMatrix_U_check
+// #define OPT_GenMatrix_Y_check
 // #define OPT_GenMatrix_E_check
-#define OPT_GenMatrix_p_check
+// #define OPT_GenMatrix_p_check
 // #define OPT_thermo_check
 
 #ifdef _CSR_

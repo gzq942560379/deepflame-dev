@@ -9,6 +9,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     double prepare_time = 0.;
     double inference_time = 0.;
     double update_time = 0.;
+    double destory_time = 0.;
     
     clockTime clock;
 
@@ -31,11 +32,23 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     const scalar CONSTR_101325 = 1. / CONST_101325;
 
     label input_dim = nSpecies + 2;
+    int output_dim = nSpecies -1;
 
-    float* NNInputs0 = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
+    // double* NNInputs0 = (double*)aligned_alloc(64, (nCells * input_dim) * sizeof(double));
+    // double* results0 = (double*)aligned_alloc(64, (nCells * output_dim) * sizeof(double));
+    // memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(double));
 
-    memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(float));
+    // float* NNInputs0 = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
+    // float* results0 = (float*)aligned_alloc(64, (nCells * output_dim) * sizeof(float));
+    // memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(float));
+
+    __fp16* NNInputs0 = (__fp16*)aligned_alloc(64, (nCells * input_dim) * sizeof(__fp16));
+    __fp16* results0 = (__fp16*)aligned_alloc(64, (nCells * output_dim) * sizeof(__fp16));
+    memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(__fp16));
+
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
         scalarList yPre_(nSpecies);
         scalarList yBCT_(nSpecies);
@@ -65,11 +78,6 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     
     double prepare_dnn_input_end = MPI_Wtime();
 
-    // module inference
-    int output_dim = mixture_.nSpecies() -1;
-
-    float* results0 = (float*)aligned_alloc(64, (nCells * output_dim) * sizeof(float));
-
     double dnn_infer_start = MPI_Wtime();
     DNNInferencer_blas_.Inference_multiDNNs(NNInputs0, results0, nCells);
 
@@ -78,7 +86,9 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     inference_time += clock.timeIncrement();
 
     // update Q & RR
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
         scalarList yPre_(mixture_.nSpecies());
         scalarList yBCT_(mixture_.nSpecies());
@@ -125,9 +135,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 
     free(NNInputs0);
     free(results0);
-    Info << "=== end solve_DNN with BLASDNN === " << endl;
-    
+
+
+    destory_time = clock.timeIncrement();
     double solve_DNN_blas_time = clock.elapsedTime();
+
+
+    Info << "=== end solve_DNN with BLASDNN === " << endl;
 
     Info << "solve_DNN_blas profiling --------------------------------------------------" << endl;
     Info << "solve_DNN_blas time : " << solve_DNN_blas_time << endl;
@@ -135,7 +149,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     Info << "prepare time : " << prepare_time << endl;
     Info << "inference time : " << inference_time << endl;
     Info << "update time : " << update_time << endl;
-    Info << "other time : " << solve_DNN_blas_time - init_time - prepare_time - inference_time - update_time << endl;
+    Info << "destory time : " << destory_time << endl;
+    Info << "other time : " << solve_DNN_blas_time - init_time - prepare_time - inference_time - update_time - destory_time << endl;
     Info << "---------------------------------------------------------------------------" << endl;
 
     return deltaTMin;
