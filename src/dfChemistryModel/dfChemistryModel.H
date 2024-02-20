@@ -62,7 +62,8 @@ SourceFiles
 #include "scalarField.H"
 #include "volFields.H"
 #include "hashedWordList.H"
-#include "psiThermo.H"
+// #include "psiThermo.H"
+#include "rhoThermo.H"
 #include "physicoChemicalConstants.H" // for R
 #include "ChemistryProblem.H"
 #include "ChemistrySolution.H"
@@ -75,6 +76,7 @@ SourceFiles
 // blasdnn
 #ifdef USE_BLASDNN
 #include "DNNInferencer_blas.H"
+#include "DNNThermo_blas.H"
 #endif
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -125,18 +127,19 @@ public IOdictionary
         volScalarField& alpha_;
         volScalarField& T_;
         const volScalarField& p_;
-        const volScalarField& rho_;
+        volScalarField& rho_;
+        volScalarField mixfrac_;
         volScalarField& mu_;
         volScalarField& psi_;
         // heat release rate, [J/m^3/s]
         volScalarField Qdot_;
         // DNN selection fields
         volScalarField selectDNN_;
+        bool useThermoTranNN;
 
 #if defined(USE_BLASDNN)
-        std::vector<scalar> Xmu0_, Xstd0_, Ymu0_, Ystd0_, XstdR0_,
-                            Xmu1_, Xstd1_, Ymu1_, Ystd1_, XstdR1_,
-                            Xmu2_, Xstd2_, Ymu2_, Ystd2_, XstdR2_;
+        std::vector<double> Xmu_, Xstd_, Ymu_, Ystd_,
+                            thermomu_, thermostd_;
 
 #endif
 
@@ -175,14 +178,12 @@ public IOdictionary
 #ifdef USE_BLASDNN
         // tensorflow
         // DNNInferencer_blas<double> DNNInferencer_blas_;
-        // DNNInferencer_blas<float> DNNInferencer_blas_;
-
-        __fp16 *input_buffer = nullptr, *output_buffer = nullptr, *NNInputs0,  *NNInputs1, *NNInputs2, *results0, *results1, *results2;
-        // float *input_buffer = nullptr, *output_buffer = nullptr, *NNInputs0,  *NNInputs1, *NNInputs2, *results0, *results1, *results2;
-        // double *input_buffer = nullptr, *output_buffer = nullptr, *NNInputs0,  *NNInputs1, *NNInputs2, *results0, *results1, *results2;
-
-        DNNInferencer_blas<__fp16> DNNInferencer_blas_;
+        DNNInferencer_blas<float> DNNInferencer_blas_;
+        // DNNInferencer_blas<__fp16> DNNInferencer_blas_;
+        // thermo
+        DNNThermo_blas<float> DNNThermo_blas_;
         string BLASDNNModelPath_;
+        string thermoDNNModelPath_;
 #endif
 
 #ifdef USE_PYTORCH
@@ -193,6 +194,7 @@ public IOdictionary
         double time_python_;
         double time_python_import_module_;
         double time_python_inference_;
+        pybind11::module_ call_ThermoTranNN;
 #endif
 
         // Load balancing object
@@ -248,6 +250,10 @@ public IOdictionary
 #ifdef USE_BLASDNN
         template<class DeltaTType>
         scalar solve_DNN_blas(const DeltaTType& deltaT);
+
+        void thermoDNN_blas(volScalarField& he, const volScalarField& p, volScalarField& mixfrac,
+                volScalarField& rho, volScalarField& T, volScalarField& psi, volScalarField& mu,
+                volScalarField& alpha, PtrList<volScalarField>& rhoD);
 #endif
         //- Output logFiles
         Foam::autoPtr<Foam::OFstream> logFile(const word& name) const

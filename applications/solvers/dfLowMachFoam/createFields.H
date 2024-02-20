@@ -21,7 +21,7 @@ Info << "createFields time 1 : " << createFieldsClock.timeIncrement() << endl;
 
 Info<< "Reading thermophysical properties\n" << endl;
 
-fluidThermo* pThermo = new hePsiThermo<psiThermo, CanteraMixture>(mesh, word::null);
+fluidThermo* pThermo = new heRhoThermo<rhoThermo, CanteraMixture>(mesh, word::null);
 fluidThermo& thermo = *pThermo;
 
 Info << "createFields time 2 : " << createFieldsClock.timeIncrement() << endl;

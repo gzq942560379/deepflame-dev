@@ -245,6 +245,8 @@ GenMatrix_U(
     compressible::turbulenceModel& turbulence
 );
 
+void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatrix& UEqn, volVectorField& U);
+
 tmp<fvScalarMatrix>
 GenMatrix_Y(
     const volScalarField& rho,

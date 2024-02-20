@@ -6,21 +6,6 @@
 #include "orthogonalSnGrad.H"
 #include <typeinfo>
 #include "ITstream.H"
-
-#define TIME
-#ifdef TIME 
-#define TICK0(prefix)\
-    double prefix##_tick_0 = MPI_Wtime();
-
-#define TICK(prefix,start,end)\
-    double prefix##_tick_##end = MPI_Wtime();\
-    Info << #prefix << "_time_" << #end << " : " << prefix##_tick_##end - prefix##_tick_##start << endl;
-
-#else
-#define TICK0(prefix) ;
-#define TICK(prefix,start,end) ;
-#endif
-
 namespace Foam{
 
 tmp<fvScalarMatrix>
@@ -35,25 +20,47 @@ GenMatrix_E(
     const volVectorField& hDiffCorrFlux,
     const surfaceScalarField& linear_weights
 ){
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "1" << endl;
+    tmp<fvScalarMatrix> tfvm
+    (
+        new fvScalarMatrix
+        (
+            he,
+            rho.dimensions()*he.dimensions()*dimVol/dimTime
+        )
+    );
+
+    fvScalarMatrix& fvm = tfvm.ref();
+
+    typedef scalar* scalarPtr;
+    typedef const scalar* constScalarPtr;
+    typedef const label* constLabelPtr;
+
     const fvMesh& mesh = he.mesh();
     assert(mesh.moving() == false);
 
-    label nCells = mesh.nCells();
-    label nFaces = mesh.neighbour().size();
+    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();;
+    const labelList& face_scheduling = meshSchedule.face_scheduling();
+    const label nCells = meshSchedule.nCells();
+    const label nFaces = meshSchedule.nFaces();
+    const label nPatches = meshSchedule.nPatches();
+    const List<MeshSchedule::PatchType> patchTypes = meshSchedule.patchTypes();
+    const labelList& patchSizes = meshSchedule.patchSizes();
 
-    const labelUList& l = mesh.lduAddr().lowerAddr();
-    const labelUList& u = mesh.lduAddr().upperAddr();
+    const label *l = &fvm.lduAddr().lowerAddr()[0];
+    const label *u = &fvm.lduAddr().upperAddr()[0];
 
     scalar rDeltaT = 1.0/mesh.time().deltaTValue();
 
-    const scalar* const __restrict__ rhoPtr = rho.primitiveField().begin();
-    const scalar* const __restrict__ meshVscPtr = mesh.Vsc()().begin();
-    const scalar* const __restrict__ meshVPtr = mesh.V().begin();
-    const scalar* const __restrict__ rhoOldTimePtr = rho.oldTime().primitiveField().begin();
-    const scalar* const __restrict__ heOldTimePtr = he.oldTime().primitiveField().begin();
-
-    // ITstream ITstream_surfaceInterpolationScheme_limitedLinear_1("surfaceInterpolationScheme_limitedLinear_1", tokenList{token(word("limitedLinear")), token(label(1))});
-    // tmp<surfaceInterpolationScheme<scalar>> tsurfaceInterpolationScheme_limitedLinear_1  = surfaceInterpolationScheme<scalar>::New(mesh, phi, ITstream_surfaceInterpolationScheme_limitedLinear_1);
+    const scalar* const __restrict__ rhoPtr = &rho.primitiveField()[0];
+    const scalar* const __restrict__ meshVscPtr = &mesh.Vsc()()[0];
+    const scalar* const __restrict__ meshVPtr = &mesh.V()[0];
+    const scalar* const __restrict__ rhoOldTimePtr = &rho.oldTime().primitiveField()[0];
+    const scalar* const __restrict__ heOldTimePtr = &he.oldTime().primitiveField()[0];
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "2" << endl;
 
     tmp<fv::convectionScheme<scalar>> cs_he = fv::convectionScheme<scalar>::New(mesh, phi, mesh.divScheme("div("+phi.name()+','+he.name()+')'));
     fv::gaussConvectionScheme<scalar>& gcs_he = dynamic_cast<fv::gaussConvectionScheme<scalar>&>(cs_he.ref());
@@ -64,15 +71,14 @@ GenMatrix_E(
     tmp<surfaceInterpolationScheme<scalar>> surfaceInterpolationScheme_linear(new linear<scalar>(mesh));
     tmp<fv::snGradScheme<scalar>> snGradScheme_orthogonal(new fv::orthogonalSnGrad<scalar>(mesh));
 
-    // TODO expancive
-    // tmp<surfaceScalarField> tweights_he = surfaceInterpolationScheme_linear().weights(he);
-    // tmp<surfaceScalarField> tweights_he = tsurfaceInterpolationScheme_limitedLinear_1().weights(he);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "3" << endl;
+
     tmp<surfaceScalarField> tweights_he = gcs_he.interpScheme().weights(he);
     const surfaceScalarField& weights_he = tweights_he();    
 
-    // TODO expancive
-    // tmp<surfaceScalarField> tweights_K = surfaceInterpolationScheme_linear().weights(K);
-    // tmp<surfaceScalarField> tweights_K = tsurfaceInterpolationScheme_limitedLinear_1().weights(K);
+
     tmp<surfaceScalarField> tweights_K = gcs_K.interpScheme().weights(K);
     const surfaceScalarField& weights_K = tweights_K();
 
@@ -116,124 +122,389 @@ GenMatrix_E(
         mesh.Sf().dimensions()*hDiffCorrFlux.dimensions()
     );
 
-    scalar* KfPtr = Kf.begin();
-    const scalar* const __restrict__ weights_K_Ptr = weights_K.primitiveField().begin(); // get weight
-    const scalar* const __restrict__ KPtr = K.primitiveField().begin();
+    scalar* KfPtr = &Kf[0];
+    const scalar* const __restrict__ weights_K_Ptr = &weights_K.primitiveField()[0]; // get weight
+    const scalar* const __restrict__ KPtr = &K.primitiveField()[0];
     
-    scalar* alphafPtr = Alphaf.begin();
-    const scalar* const __restrict__ laplacianWeightsPtr = laplacianWeight.primitiveField().begin();
-    const scalar* const __restrict__ alphaPtr = alphaEff.primitiveField().begin();
+    scalar* alphafPtr = &Alphaf[0];
+    const scalar* const __restrict__ laplacianWeightsPtr = &laplacianWeight.primitiveField()[0];
+    const scalar* const __restrict__ alphaPtr = &alphaEff.primitiveField()[0];
 
-    scalar* hDiffCorrFluxfPtr = hDiffCorrFluxf.begin();
-    const scalar* const __restrict__ weightshDiffCorrFluxPtr = weightshDiffCorrFlux.primitiveField().begin(); // get weight
+    scalar* hDiffCorrFluxfPtr = &hDiffCorrFluxf[0];
+    const scalar* const __restrict__ weightshDiffCorrFluxPtr = &weightshDiffCorrFlux.primitiveField()[0]; // get weight
+
+    const scalar* const __restrict__ meshSfPtr = &mesh.Sf()[0][0];
+    const scalar* const __restrict__ hDiffCorrFluxPtr = &hDiffCorrFlux[0][0];
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "4" << endl;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
+            alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar w = weightshDiffCorrFluxPtr[f];
+            hDiffCorrFluxfPtr[f] = Sfx * (w * (hDiffCorrFluxPtr[l[f] * 3 + 0] - hDiffCorrFluxPtr[u[f] * 3 + 0]) + hDiffCorrFluxPtr[u[f] * 3 + 0]) +
+                Sfy * (w * (hDiffCorrFluxPtr[l[f] * 3 + 1] - hDiffCorrFluxPtr[u[f] * 3 + 1]) + hDiffCorrFluxPtr[u[f] * 3 + 1]) +
+                Sfz * (w * (hDiffCorrFluxPtr[l[f] * 3 + 2] - hDiffCorrFluxPtr[u[f] * 3 + 2]) + hDiffCorrFluxPtr[u[f] * 3 + 2]);
+        }
+    }
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
+            alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
+            scalar Sfx = meshSfPtr[3 * f];
+            scalar Sfy = meshSfPtr[3 * f + 1];
+            scalar Sfz = meshSfPtr[3 * f + 2];
+            scalar w = weightshDiffCorrFluxPtr[f];
+            hDiffCorrFluxfPtr[f] = Sfx * (w * (hDiffCorrFluxPtr[l[f] * 3 + 0] - hDiffCorrFluxPtr[u[f] * 3 + 0]) + hDiffCorrFluxPtr[u[f] * 3 + 0]) +
+                Sfy * (w * (hDiffCorrFluxPtr[l[f] * 3 + 1] - hDiffCorrFluxPtr[u[f] * 3 + 1]) + hDiffCorrFluxPtr[u[f] * 3 + 1]) +
+                Sfz * (w * (hDiffCorrFluxPtr[l[f] * 3 + 2] - hDiffCorrFluxPtr[u[f] * 3 + 2]) + hDiffCorrFluxPtr[u[f] * 3 + 2]);
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "5" << endl;
+
+    /* --------------------------------------------------------------------------------------------------------------------------------------------- */
+
+    constScalarPtr* boundaryWeightsK = new constScalarPtr[nPatches];
+    scalarPtr* boundaryKf = new scalarPtr[nPatches];
+    constScalarPtr* boundaryLinearWeights = new constScalarPtr[nPatches];
+    scalarPtr* boundaryAlphaf = new scalarPtr[nPatches];
+    constScalarPtr* boundaryWeightshDiff = new constScalarPtr[nPatches];
+    constScalarPtr* boundarySf = new constScalarPtr[nPatches];
+    scalarPtr* boundaryhDiff = new scalarPtr[nPatches];
+    constScalarPtr* boundaryK = new constScalarPtr[nPatches];
+    scalarPtr* boundaryK_internal = new scalarPtr[nPatches];
+    scalarPtr* boundaryK_neighbour = new scalarPtr[nPatches];
+    constScalarPtr* boundaryAlphaEff = new constScalarPtr[nPatches];
+    scalarPtr* boundaryAlphaEff_internal = new scalarPtr[nPatches];
+    scalarPtr* boundaryAlphaEff_neighbour = new scalarPtr[nPatches];
+    constScalarPtr* boundaryHDiffCorrFlux = new constScalarPtr[nPatches];
+    scalarPtr* boundaryHDiffCorrFlux_internal = new scalarPtr[nPatches];
+    scalarPtr* boundaryHDiffCorrFlux_neighbour = new scalarPtr[nPatches];
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "6" << endl;
+
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+        label patchSize = patchSizes[patchi];
+
+        // const fvsPatchScalarField& pLambda = weights_K.boundaryField()[patchi];
+        boundaryWeightsK[patchi] = weights_K.boundaryField()[patchi].begin();
+        // fvsPatchScalarField& psf = Kf.boundaryFieldRef()[patchi];
+        boundaryKf[patchi] = Kf.boundaryFieldRef()[patchi].begin();
+
+        // const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[patchi];
+        boundaryLinearWeights[patchi] = linear_weights.boundaryField()[patchi].begin();
+        // fvsPatchScalarField& psf = Alphaf.boundaryFieldRef()[patchi];
+        boundaryAlphaf[patchi] = Alphaf.boundaryFieldRef()[patchi].begin();
+
+        // const fvsPatchScalarField& pLambda = weightshDiffCorrFlux.boundaryField()[patchi];
+        boundaryWeightshDiff[patchi] = weightshDiffCorrFlux.boundaryField()[patchi].begin();
+        // const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[patchi];
+        boundarySf[patchi] = (scalar*)mesh.Sf().boundaryField()[patchi].begin();
+        // fvsPatchScalarField& psf = hDiffCorrFluxf.boundaryFieldRef()[patchi];
+        boundaryhDiff[patchi] = hDiffCorrFluxf.boundaryFieldRef()[patchi].begin();
+
+        const fvPatchScalarField& patchK = K.boundaryField()[patchi];
+        boundaryK[patchi] = patchK.begin();
+        const fvPatchScalarField& patchAlphaEff = alphaEff.boundaryField()[patchi];
+        boundaryAlphaEff[patchi] = alphaEff.begin();
+        const fvPatchVectorField& patchHDiffCorrFlux = hDiffCorrFlux.boundaryField()[patchi];
+        boundaryHDiffCorrFlux[patchi] = (scalar*) patchHDiffCorrFlux.begin();
+
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+
+            tmp<scalarField> tPatchKInternal = 
+                    dynamic_cast<const processorFvPatchField<scalar>&>(patchK).patchInternalField();
+            const scalarField& patchKInternal = tPatchKInternal();
+            boundaryK_internal[patchi] = new scalar[patchSize];
+            memcpy(boundaryK_internal[patchi], &patchKInternal[0], patchSize * sizeof(scalar));
+
+            Pout << "6.1" << endl;
+            
+            tmp<scalarField> tPatchKNeighbour = 
+                    dynamic_cast<const processorFvPatchField<scalar>&>(patchK).patchNeighbourField();
+            const scalarField& patchKNeighbour = tPatchKNeighbour();
+            boundaryK_neighbour[patchi] = new scalar[patchSize];
+            memcpy(boundaryK_neighbour[patchi], &patchKNeighbour[0], patchSize * sizeof(scalar));
+
+            Pout << "6.2" << endl;
+
+            tmp<scalarField> tPatchAlphaEffInternal = 
+                    dynamic_cast<const processorFvPatchField<scalar>&>(patchAlphaEff).patchInternalField();
+            const scalarField& patchAlphaEffInternal = tPatchAlphaEffInternal();
+            boundaryAlphaEff_internal[patchi] = new scalar[patchSize];
+            memcpy(boundaryAlphaEff_internal[patchi], &patchAlphaEffInternal[0], patchSize * sizeof(scalar));
+
+            Pout << "6.3" << endl;
+
+            tmp<scalarField> tPatchAlphaEffNeighbour = 
+                    dynamic_cast<const processorFvPatchField<scalar>&>(patchAlphaEff).patchNeighbourField();
+            const scalarField& patchAlphaEffNeighbour = tPatchAlphaEffNeighbour();
+            boundaryAlphaEff_neighbour[patchi] = new scalar[patchSize];
+            memcpy(boundaryAlphaEff_neighbour[patchi], &patchAlphaEffNeighbour[0], patchSize * sizeof(scalar));
+
+            Pout << "6.4" << endl;
+
+            tmp<vectorField> tPatchHDiffCorrFluxInternal = 
+                    dynamic_cast<const processorFvPatchField<vector>&>(patchHDiffCorrFlux).patchInternalField();
+            const vectorField& patchHDiffCorrFluxInternal = tPatchHDiffCorrFluxInternal();
+            boundaryHDiffCorrFlux_internal[patchi] = new scalar[patchSize * 3];
+            memcpy(boundaryHDiffCorrFlux_internal[patchi], &patchHDiffCorrFluxInternal[0][0], patchSize * 3 * sizeof(scalar));
+
+            Pout << "6.5" << endl;
+
+            tmp<vectorField> tPatchHDiffCorrFluxNeighbour = 
+                    dynamic_cast<const processorFvPatchField<vector>&>(patchHDiffCorrFlux).patchNeighbourField();
+            const vectorField& patchHDiffCorrFluxNeighbour = tPatchHDiffCorrFluxNeighbour();
+            boundaryHDiffCorrFlux_neighbour[patchi] = new scalar[patchSize * 3];
+            memcpy(boundaryHDiffCorrFlux_neighbour[patchi], &patchHDiffCorrFluxNeighbour[0][0], patchSize * 3 * sizeof(scalar));
+
+            Pout << "6.6" << endl;
+
+        }else if (patchTypes[patchi] == MeshSchedule::PatchType::wall){
+
+            boundaryK_internal[patchi] = nullptr;
+
+            boundaryK_neighbour[patchi] = nullptr;
+
+            boundaryAlphaEff_internal[patchi] = nullptr;
+
+            boundaryAlphaEff_neighbour[patchi] = nullptr;
+
+            boundaryHDiffCorrFlux_internal[patchi] = nullptr;
+
+            boundaryHDiffCorrFlux_neighbour[patchi] = nullptr;
+
+        }else{
+            Pout << "patch type not supported" << endl;
+            std::exit(-1);
+        }
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "7" << endl;
     
-    #pragma omp parallel for
-    for(label f = 0; f < nFaces; ++f){
-        KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
-        alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
-        hDiffCorrFluxfPtr[f] = mesh.Sf()[f] & (weightshDiffCorrFluxPtr[f] * (hDiffCorrFlux[l[f]] - hDiffCorrFlux[u[f]]) + hDiffCorrFlux[u[f]]);
-    }
-
-    forAll(weights_K.boundaryField(), Ki)
-    {
-        const fvsPatchScalarField& pLambda = weights_K.boundaryField()[Ki];
-        fvsPatchScalarField& psf = Kf.boundaryFieldRef()[Ki];
-        if (K.boundaryField()[Ki].coupled())
-        {
-            psf =(pLambda*K.boundaryField()[Ki].patchInternalField() + (1.0 - pLambda)*K.boundaryField()[Ki].patchNeighbourField());
-        }
-        else
-        {
-            psf = K.boundaryField()[Ki];
-        }
-    }
-
-    forAll(linear_weights.boundaryField(), Ki)
-    {
-        const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[Ki];
-        fvsPatchScalarField& psf = Alphaf.boundaryFieldRef()[Ki];
-        if (alphaEff.boundaryField()[Ki].coupled())
-        {
-            psf =(pLambda*alphaEff.boundaryField()[Ki].patchInternalField()+ (1.0 - pLambda)*alphaEff.boundaryField()[Ki].patchNeighbourField());
-        }
-        else
-        {
-            psf = alphaEff.boundaryField()[Ki];
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    for(label patchi = 0; patchi < nPatches; ++patchi){
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
+                boundaryKf[patchi][s] = (boundaryWeightsK[patchi][s] * boundaryK_internal[patchi][s] +
+                        (1.0 - boundaryWeightsK[patchi][s]) * boundaryK_neighbour[patchi][s]);
+            }
+        }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
+                boundaryKf[patchi][s] = boundaryK[patchi][s];
+            }
+        }else{
+            Pout << "patch type not supported" << endl;
+            std::exit(-1);        
         }
     }
 
-    forAll(weightshDiffCorrFlux.boundaryField(), Ki)
-    {
-        const fvsPatchScalarField& pLambda = weightshDiffCorrFlux.boundaryField()[Ki];
-        const fvsPatchVectorField& pSf = mesh.Sf().boundaryField()[Ki];
-        fvsPatchScalarField& psf = hDiffCorrFluxf.boundaryFieldRef()[Ki];
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "8" << endl;
 
-        if (K.boundaryField()[Ki].coupled())
-        {
-            psf = pSf
-              & (
-                    pLambda*hDiffCorrFlux.boundaryField()[Ki].patchInternalField()
-                + (1.0 - pLambda)*hDiffCorrFlux.boundaryField()[Ki].patchNeighbourField()
-                );
-        }
-        else
-        {
-            psf = pSf & hDiffCorrFlux.boundaryField()[Ki];
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    for(label patchi = 0; patchi < nPatches; ++patchi){
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
+                boundaryAlphaf[patchi][s] = (boundaryLinearWeights[patchi][s] * boundaryAlphaEff_internal[patchi][s] + 
+                        (1.0 - boundaryLinearWeights[patchi][s]) * boundaryAlphaEff_neighbour[patchi][s]);}
+        }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
+                boundaryAlphaf[patchi][s] = boundaryAlphaEff[patchi][s];
+            }
+        }else{
+            Pout << "patch type not supported" << endl;
+            std::exit(-1);        
         }
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "9" << endl;
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    for(label patchi = 0; patchi < nPatches; ++patchi){
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
+                scalar Sfx = boundarySf[patchi][s * 3 + 0];
+                scalar Sfy = boundarySf[patchi][s * 3 + 1];
+                scalar Sfz = boundarySf[patchi][s * 3 + 2];
+                scalar w = boundaryWeightshDiff[patchi][s];
+                boundaryhDiff[patchi][s] = Sfx * (w * boundaryHDiffCorrFlux_internal[patchi][s * 3 + 0] + (1.0 - w) * boundaryHDiffCorrFlux_neighbour[patchi][s * 3 + 0]) +
+                        Sfy * (w * boundaryHDiffCorrFlux_internal[patchi][s * 3 + 1] + (1.0 - w) * boundaryHDiffCorrFlux_neighbour[patchi][s * 3 + 1]) +
+                        Sfz * (w * boundaryHDiffCorrFlux_internal[patchi][s * 3 + 2] + (1.0 - w) * boundaryHDiffCorrFlux_neighbour[patchi][s * 3 + 2]);
+            }
+        }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
+                scalar Sfx = boundarySf[patchi][s * 3 + 0];
+                scalar Sfy = boundarySf[patchi][s * 3 + 1];
+                scalar Sfz = boundarySf[patchi][s * 3 + 2];
+                boundaryhDiff[patchi][s] = Sfx * boundaryHDiffCorrFlux[patchi][s * 3 + 0] +
+                        Sfy * boundaryHDiffCorrFlux[patchi][s * 3 + 1] +
+                        Sfz * boundaryHDiffCorrFlux[patchi][s * 3 + 2];
+            }
+        }else{
+            Pout << "patch type not supported" << endl;
+            std::exit(-1);        
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "10" << endl;
+
+    /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
     surfaceScalarField gammaMagSf(Alphaf * mesh.magSf());
-    
-    // expansive
-    tmp<fvScalarMatrix> tfvm
-    (
-        new fvScalarMatrix
-        (
-            he,
-            rho.dimensions()*he.dimensions()*dimVol/dimTime
-        )
-    );
 
-    fvScalarMatrix& fvm = tfvm.ref();
+    scalar* __restrict__ diagPtr = &fvm.diag()[0];
+    scalar* __restrict__ sourcePtr = &fvm.source()[0];
+    scalar* __restrict__ lowerPtr = &fvm.lower()[0];
+    scalar* __restrict__ upperPtr = &fvm.upper()[0];
 
-    scalar* __restrict__ diagPtr = fvm.diag().begin();
-    scalar* __restrict__ sourcePtr = fvm.source().begin();
-    scalar* __restrict__ lowerPtr = fvm.lower().begin();
-    scalar* __restrict__ upperPtr = fvm.upper().begin();
+    const scalar* const __restrict__ weights_he_Ptr = &weights_he.primitiveField()[0]; // get weight
+    const scalar* const __restrict__ phiPtr = &phi.primitiveField()[0];
 
-    const scalar* const __restrict__ weights_he_Ptr = weights_he.primitiveField().begin(); // get weight
-    const scalar* const __restrict__ phiPtr = phi.primitiveField().begin();
+    const scalar* const __restrict__ deltaCoeffsPtr = &deltaCoeffs.primitiveField()[0];
+    const scalar* const __restrict__ gammaMagSfPtr = &gammaMagSf.primitiveField()[0];
 
-    const scalar* const __restrict__ deltaCoeffsPtr = deltaCoeffs.primitiveField().begin();
-    const scalar* const __restrict__ gammaMagSfPtr = gammaMagSf.primitiveField().begin();
+    const scalar* const __restrict__ KOldTimePtr = &K.oldTime().primitiveField()[0];
 
-    const scalar* const __restrict__ KOldTimePtr = K.oldTime().primitiveField().begin();
+    scalar *fvcDivPtr = new scalar[nCells]{0.};
+    scalar *fvcDiv2Ptr = new scalar[nCells]{0.};
+    scalar *diagLaplacPtr = new scalar[nCells]{0.};
 
-    double *fvcDivPtr = new double[nCells]{0.};
-    double *fvcDiv2Ptr = new double[nCells]{0.};
-    double *diagLaplacPtr = new double[nCells]{0.};
-    
-    for(label f = 0; f < nFaces; ++f){
-        scalar var1 = - weights_he_Ptr[f] * phiPtr[f];
-        scalar var2 = - weights_he_Ptr[f] * phiPtr[f] + phiPtr[f];
-        lowerPtr[f] += var1;
-        upperPtr[f] += var2;
-        diagPtr[l[f]] -= var1;
-        diagPtr[u[f]] -= var2;
-        fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
-        fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
-        fvcDiv2Ptr[l[f]] += hDiffCorrFluxf[f];
-        fvcDiv2Ptr[u[f]] -= hDiffCorrFluxf[f];
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = - weights_he_Ptr[f] * phiPtr[f];
+            scalar var2 = - weights_he_Ptr[f] * phiPtr[f] + phiPtr[f];
+            lowerPtr[f] += var1;
+            upperPtr[f] += var2;
+            diagPtr[l[f]] -= var1;
+            diagPtr[u[f]] -= var2;
+            fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
+            fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
+            fvcDiv2Ptr[l[f]] += hDiffCorrFluxfPtr[f];
+            fvcDiv2Ptr[u[f]] -= hDiffCorrFluxfPtr[f];
+        }
     }
 
-    for(label f = 0; f < nFaces; ++f){
-        scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
-        lowerPtr[f] -= var1;
-        upperPtr[f] -= var1;
-        diagLaplacPtr[l[f]] += var1; //negSumDiag
-        diagLaplacPtr[u[f]] += var1;
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "11" << endl;
+
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = - weights_he_Ptr[f] * phiPtr[f];
+            scalar var2 = - weights_he_Ptr[f] * phiPtr[f] + phiPtr[f];
+            lowerPtr[f] += var1;
+            upperPtr[f] += var2;
+            diagPtr[l[f]] -= var1;
+            diagPtr[u[f]] -= var2;
+            fvcDivPtr[l[f]] += phiPtr[f] * KfPtr[f];
+            fvcDivPtr[u[f]] -= phiPtr[f] * KfPtr[f];
+            fvcDiv2Ptr[l[f]] += hDiffCorrFluxfPtr[f];
+            fvcDiv2Ptr[u[f]] -= hDiffCorrFluxfPtr[f];
+        }
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "12" << endl;
+
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+            lowerPtr[f] -= var1;
+            upperPtr[f] -= var1;
+            diagLaplacPtr[l[f]] += var1; //negSumDiag
+            diagLaplacPtr[u[f]] += var1;
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "13" << endl;
+
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+        label face_start = face_scheduling[face_scheduling_i]; 
+        label face_end = face_scheduling[face_scheduling_i+1];
+        for (label f = face_start; f < face_end; ++f) {
+            scalar var1 = deltaCoeffsPtr[f] * gammaMagSfPtr[f];
+            lowerPtr[f] -= var1;
+            upperPtr[f] -= var1;
+            diagLaplacPtr[l[f]] += var1; //negSumDiag
+            diagLaplacPtr[u[f]] += var1;
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "14" << endl;
+
+
+    /* --------------------------------------------------------------------------------------------------------------------------------------------- */
+    
     forAll(he.boundaryField(), patchi)
     {
         const fvPatchField<scalar>& psf = he.boundaryField()[patchi];
@@ -267,7 +538,14 @@ GenMatrix_E(
         }
     }
 
-    #pragma omp parallel for
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "15" << endl;
+
+    /* --------------------------------------------------------------------------------------------------------------------------------------------- */
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for(label c = 0; c < nCells; ++c){      // cell loop
         diagPtr[c] += rDeltaT * rhoPtr[c] * meshVscPtr[c];
         diagPtr[c] += diagLaplacPtr[c];
@@ -279,10 +557,48 @@ GenMatrix_E(
         sourcePtr[c] += fvcDiv2Ptr[c];
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "16" << endl;
+
+
     delete[] fvcDivPtr;
     delete[] fvcDiv2Ptr;
     delete[] diagLaplacPtr;
+
+    for (label patchi = 0; patchi < nPatches; ++patchi){
+        if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
+            delete[] boundaryK_internal[patchi];
+            delete[] boundaryK_neighbour[patchi];
+            delete[] boundaryAlphaEff_internal[patchi];
+            delete[] boundaryAlphaEff_neighbour[patchi];
+            delete[] boundaryHDiffCorrFlux_internal[patchi];
+            delete[] boundaryHDiffCorrFlux_neighbour[patchi];
+        }
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "17" << endl;
+
+    delete[] boundaryK_internal;
+    delete[] boundaryK_neighbour;
+    delete[] boundaryAlphaEff_internal;
+    delete[] boundaryAlphaEff_neighbour;
+    delete[] boundaryHDiffCorrFlux_internal;
+    delete[] boundaryHDiffCorrFlux_neighbour;
+
+    delete[] boundaryWeightsK;
+    delete[] boundaryKf;
+    delete[] boundaryLinearWeights;
+    delete[] boundaryAlphaf;
+    delete[] boundaryWeightshDiff;
+    delete[] boundarySf;
+    delete[] boundaryhDiff;
+    delete[] boundaryK;
+    delete[] boundaryAlphaEff;
+    delete[] boundaryHDiffCorrFlux;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    Pout << "18" << endl;
+
     return tfvm;
 }
-
 }

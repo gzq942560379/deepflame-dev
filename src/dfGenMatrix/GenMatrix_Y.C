@@ -1035,8 +1035,9 @@ GenMatrix_Y(
         boundary_upwind_weights[patchi] = new scalar[patchSize];
 
         if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
-            scalarField patchRhoDInternal = 
-                    dynamic_cast<const processorFvPatchField<scalar>&>(patchRhoD).patchInternalField()();
+            tmp<scalarField> tPatchRhoDInternal = 
+                    dynamic_cast<const processorFvPatchField<scalar>&>(patchRhoD).patchInternalField();
+            const scalarField& patchRhoDInternal = tPatchRhoDInternal();
             boundary_rhoD_internal[patchi] = new scalar[patchSize];
             memcpy(boundary_rhoD_internal[patchi], patchRhoDInternal.begin(), patchSize * sizeof(scalar));
         } else if (patchTypes[patchi] == MeshSchedule::PatchType::wall) {
