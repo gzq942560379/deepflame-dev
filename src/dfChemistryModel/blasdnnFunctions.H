@@ -38,13 +38,15 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     // double* results0 = (double*)aligned_alloc(64, (nCells * output_dim) * sizeof(double));
     // memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(double));
 
-    // float* NNInputs0 = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
-    // float* results0 = (float*)aligned_alloc(64, (nCells * output_dim) * sizeof(float));
-    // memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(float));
-
+#ifdef _FP16_
     __fp16* NNInputs0 = (__fp16*)aligned_alloc(64, (nCells * input_dim) * sizeof(__fp16));
     __fp16* results0 = (__fp16*)aligned_alloc(64, (nCells * output_dim) * sizeof(__fp16));
     memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(__fp16));
+#else
+    float* NNInputs0 = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
+    float* results0 = (float*)aligned_alloc(64, (nCells * output_dim) * sizeof(float));
+    memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(float));
+#endif
 
 #ifdef _OPENMP
     #pragma omp parallel
@@ -130,6 +132,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             }
         }
     }
+    Info << "l 138" << endl;
 
     update_time = clock.timeIncrement();
 

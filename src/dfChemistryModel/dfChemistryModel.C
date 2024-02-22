@@ -427,8 +427,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     for (size_t i = 0; i < YstdNode.size(); i++){
         Ystd_.push_back(YstdNode[i].as<double>());
     }
-    // Info << "Xmu_"<< Xmu_ << endl;
-    // std::cout<<"Xmu_"<< Xmu_[0] << std::endl;
 
     // YAML::Node Xmu1Node = norm["Xmu1"];
     // for (size_t i = 0; i < Xmu1Node.size(); i++){
