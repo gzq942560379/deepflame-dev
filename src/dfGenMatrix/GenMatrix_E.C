@@ -112,16 +112,6 @@ GenMatrix_E(
         mesh,
         mesh.Sf().dimensions()*K.dimensions()
     );
-    surfaceScalarField Alphaf(
-        IOobject
-        (
-            "interpolate("+alphaEff.name()+')',
-            alphaEff.instance(),
-            alphaEff.db()
-        ),
-        mesh,
-        mesh.Sf().dimensions()*alphaEff.dimensions()
-    );
 
     surfaceScalarField hDiffCorrFluxf(
         IOobject
@@ -138,7 +128,6 @@ GenMatrix_E(
     const scalar* const __restrict__ weights_K_Ptr = &weights_K.primitiveField()[0]; // get weight
     const scalar* const __restrict__ KPtr = &K.primitiveField()[0];
     
-    scalar* alphafPtr = &Alphaf[0];
     const scalar* const __restrict__ laplacianWeightsPtr = &laplacianWeight.primitiveField()[0];
     const scalar* const __restrict__ alphaPtr = &alphaEff.primitiveField()[0];
 
@@ -161,7 +150,6 @@ GenMatrix_E(
         label face_end = face_scheduling[face_scheduling_i+1];
         for (label f = face_start; f < face_end; ++f) {
             KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
-            alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
             scalar Sfx = meshSfPtr[3 * f];
             scalar Sfy = meshSfPtr[3 * f + 1];
             scalar Sfz = meshSfPtr[3 * f + 2];
@@ -179,7 +167,6 @@ GenMatrix_E(
         label face_end = face_scheduling[face_scheduling_i+1];
         for (label f = face_start; f < face_end; ++f) {
             KfPtr[f] = weights_K_Ptr[f] * (KPtr[l[f]] - KPtr[u[f]]) + KPtr[u[f]];
-            alphafPtr[f] = laplacianWeightsPtr[f] * (alphaPtr[l[f]] - alphaPtr[u[f]]) + alphaPtr[u[f]];
             scalar Sfx = meshSfPtr[3 * f];
             scalar Sfy = meshSfPtr[3 * f + 1];
             scalar Sfz = meshSfPtr[3 * f + 2];
@@ -200,7 +187,6 @@ GenMatrix_E(
     constScalarPtr* boundaryWeightsK = new constScalarPtr[nPatches];
     scalarPtr* boundaryKf = new scalarPtr[nPatches];
     constScalarPtr* boundaryLinearWeights = new constScalarPtr[nPatches];
-    scalarPtr* boundaryAlphaf = new scalarPtr[nPatches];
     constScalarPtr* boundaryWeightshDiff = new constScalarPtr[nPatches];
     constScalarPtr* boundarySf = new constScalarPtr[nPatches];
     scalarPtr* boundaryhDiff = new scalarPtr[nPatches];
@@ -229,8 +215,6 @@ GenMatrix_E(
 
         // const fvsPatchScalarField& pLambda = linear_weights.boundaryField()[patchi];
         boundaryLinearWeights[patchi] = linear_weights.boundaryField()[patchi].begin();
-        // fvsPatchScalarField& psf = Alphaf.boundaryFieldRef()[patchi];
-        boundaryAlphaf[patchi] = Alphaf.boundaryFieldRef()[patchi].begin();
 
         // const fvsPatchScalarField& pLambda = weightshDiffCorrFlux.boundaryField()[patchi];
         boundaryWeightshDiff[patchi] = weightshDiffCorrFlux.boundaryField()[patchi].begin();
@@ -352,36 +336,6 @@ GenMatrix_E(
     }
     Pout << "8" << endl;
 
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    for(label patchi = 0; patchi < nPatches; ++patchi){
-        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
-#ifdef _OPENMP
-#pragma omp for
-#endif
-            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-                boundaryAlphaf[patchi][s] = (boundaryLinearWeights[patchi][s] * boundaryAlphaEff_internal[patchi][s] + 
-                        (1.0 - boundaryLinearWeights[patchi][s]) * boundaryAlphaEff_neighbour[patchi][s]);}
-        }else if(patchTypes[patchi] == MeshSchedule::PatchType::wall){
-#ifdef _OPENMP
-#pragma omp for
-#endif
-            for(label s = 0 ; s < patchSizes[patchi] ; ++s){
-                boundaryAlphaf[patchi][s] = boundaryAlphaEff[patchi][s];
-            }
-        }else{
-            Pout << "patch type not supported" << endl;
-            std::exit(-1);        
-        }
-    }
-
-    if (MPI_init){
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
-    Pout << "9" << endl;
-
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -424,7 +378,8 @@ GenMatrix_E(
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
 
-    surfaceScalarField gammaMagSf(Alphaf * mesh.magSf());
+    surfaceScalarField AlphafRef = surfaceInterpolationScheme_linear().interpolate(alphaEff);
+    surfaceScalarField gammaMagSf(AlphafRef * mesh.magSf());
 
     scalar* __restrict__ diagPtr = &fvm.diag()[0];
     scalar* __restrict__ sourcePtr = &fvm.source()[0];
@@ -627,7 +582,6 @@ GenMatrix_E(
     delete[] boundaryWeightsK;
     delete[] boundaryKf;
     delete[] boundaryLinearWeights;
-    delete[] boundaryAlphaf;
     delete[] boundaryWeightshDiff;
     delete[] boundarySf;
     delete[] boundaryhDiff;
