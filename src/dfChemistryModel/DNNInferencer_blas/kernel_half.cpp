@@ -1,4 +1,7 @@
 #include "kernel.H"
+
+#ifdef _FP16_
+
 #include "gelu_h_table.h"
 
 #ifdef __ARM_FEATURE_SVE
@@ -218,3 +221,5 @@ template<>
 void gemm<__fp16>(char transa, char transb, int m, int n, int k, __fp16 alpha, const __fp16* a, int lda, const __fp16* b, int ldb, __fp16 beta, __fp16 *c, int ldc){
     fjcblas_gemm_r16(CblasColMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
+
+#endif

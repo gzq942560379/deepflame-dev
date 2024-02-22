@@ -43,7 +43,6 @@ extern "C"{
 
 extern void sgemm_(char* transA, char* transB, int* m, int* n, int* k, float* alpha, const float* a, int* lda, const float* b, int* ldb, float* beta, float* c, int* ldc);
 extern void dgemm_(char* transA, char* transB, int* m, int* n, int* k, double* alpha, const double* a, int* lda, const double* b, int* ldb, double* beta, double* c, int* ldc);
-// extern void zgemm_(char* transA, char* transB, int* m, int* n, int* k, std::complex<double>* alpha, const std::complex<double>* a, int* lda, const std::complex<double>* b, int* ldb, std::complex<double>* beta, std::complex<double>* c, int* ldc);
 
 #ifdef __cplusplus
 }

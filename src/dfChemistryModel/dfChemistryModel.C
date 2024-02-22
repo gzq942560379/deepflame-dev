@@ -364,11 +364,9 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         }
         std::ostringstream oss;
         oss.str("");
-        std::cout <<"Opening norm file " << BLASDNNModelPath_ + "/norm.yaml" <<std::endl;
         oss << fin.rdbuf();
         norm_str = oss.str();
         count[0] = norm_str.size();
-        std::cout<< "norm_str.size();"<<  norm_str.size()  << std::endl;
         fin.close();
 
         // thermo norm
@@ -402,26 +400,19 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     // thermo norm
     YAML::Node thermoNorm = YAML::Load(thermo_norm_str);
     YAML::Node thermoMuNode = thermoNorm["mean"];
-     std::cout << "thermoMuNode.size() is " << thermoMuNode.size() << std::endl;
 
     for (size_t i = 0; i < thermoMuNode.size(); i++){
-        std::cout << thermoMuNode[i]<< std::endl;
         thermomu_.push_back(thermoMuNode[i].as<double>());
     }
     YAML::Node thermoStdNode = thermoNorm["std"];
     for (size_t i = 0; i < thermoStdNode.size(); i++){
         thermostd_.push_back(thermoStdNode[i].as<double>());
     }
-    std::cout <<"Opening norm file " << BLASDNNModelPath_ + "/norm.yaml" <<std::endl;
-    std::cout<< thermostd_[0] << std::endl;
 
     // chemistry norm
     YAML::Node norm = YAML::Load(norm_str);
-    std::cout << "norm_str is " << norm_str << std::endl;
     YAML::Node XmuNode = norm["Xmu"];
-    std::cout << "XmuNode.size() is " << XmuNode.size() << std::endl;
     for (size_t i = 0; i < XmuNode.size(); i++){
-        std::cout << XmuNode[i] << std::endl;
         Xmu_.push_back(XmuNode[i].as<double>());
     }
     YAML::Node XstdNode = norm["Xstd"];

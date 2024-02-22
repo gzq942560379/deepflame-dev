@@ -73,7 +73,7 @@
     );
     E_build_org_end = MPI_Wtime();
     Info << "E_build_org_time = " << E_build_org_end - E_build_org_start << endl;
-    check_fvmatrix_equal(EEqn, EEqn_answer);
+    check_fvmatrix_equal(EEqn, EEqn_answer, "EEqn");
 #endif
 
 #ifdef _DIV_

@@ -5,6 +5,8 @@
 #include <functional>
 #include <cmath>
 
+#define _FP16_
+
 template<typename DataType>
 class Tensor{
 private:

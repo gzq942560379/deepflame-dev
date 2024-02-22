@@ -157,9 +157,11 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
     }else if(sizeof(DataType) == sizeof(float)){
         theoretical_peak *= 2.;
     }
-    // else if(sizeof(DataType) == sizeof(__fp16)){
-    //     theoretical_peak *= 4.;
-    // }
+#ifdef _FP16_
+    else if(sizeof(DataType) == sizeof(__fp16)){
+        theoretical_peak *= 4.;
+    }
+#endif
     else{
         assert(false);
     }
@@ -241,9 +243,11 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
     }else if(sizeof(DataType) == sizeof(float)){
         theoretical_peak *= 2.;
     }
-    // else if(sizeof(DataType) == sizeof(__fp16)){
-    //     theoretical_peak *= 4.;
-    // }
+#ifdef _FP16_
+    else if(sizeof(DataType) == sizeof(__fp16)){
+        theoretical_peak *= 4.;
+    }
+#endif
     else{
         assert(false);
     }
@@ -280,4 +284,6 @@ void DNNInferencer_blas<DataType>::Inference_multiDNNs(
 
 template class DNNInferencer_blas<float>;
 template class DNNInferencer_blas<double>;
-// template class DNNInferencer_blas<__fp16>;
+#ifdef _FP16_
+template class DNNInferencer_blas<__fp16>;
+#endif

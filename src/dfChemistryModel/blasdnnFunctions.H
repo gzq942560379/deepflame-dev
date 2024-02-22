@@ -5,9 +5,13 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     const DeltaTType& deltaT
 )
 {
-    double solve_DNN_blas_start = MPI_Wtime();
-
-    double prepare_dnn_input_start = MPI_Wtime();
+    double init_time = 0.;
+    double prepare_time = 0.;
+    double inference_time = 0.;
+    double update_time = 0.;
+    double destory_time = 0.;
+    
+    clockTime clock;
 
     scalar deltaTMin = great;
     if (!this->chemistry_)
@@ -16,26 +20,43 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     }
     Info<<"=== begin solve_DNN with BLASDNN === "<<endl;
 
+    label nCells = mesh_.nCells();
     std::vector<size_t> Cell0;
-
+    Cell0.reserve(nCells);
     
-    const double lambda = 0.1;
+    size_t nSpecies = mixture_.nSpecies();
 
-    label input_dim = mixture_.nSpecies() + 2;
-    label nCell = T_.size();
+    const scalar lambda = 0.1;
+    const scalar lambdaR = 1 / lambda;
+    const scalar CONST_101325 = 101325.;
+    const scalar CONSTR_101325 = 1. / CONST_101325;
 
-    float* NNInputs0 = (float*)aligned_alloc(64, (nCell * input_dim) * sizeof(float));
+    label input_dim = nSpecies + 2;
+    int output_dim = nSpecies -1;
 
-    memset(NNInputs0, '\0', (nCell * input_dim) * sizeof(float));
+    // double* NNInputs0 = (double*)aligned_alloc(64, (nCells * input_dim) * sizeof(double));
+    // double* results0 = (double*)aligned_alloc(64, (nCells * output_dim) * sizeof(double));
+    // memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(double));
+
+    // float* NNInputs0 = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
+    // float* results0 = (float*)aligned_alloc(64, (nCells * output_dim) * sizeof(float));
+    // memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(float));
+
+    __fp16* NNInputs0 = (__fp16*)aligned_alloc(64, (nCells * input_dim) * sizeof(__fp16));
+    __fp16* results0 = (__fp16*)aligned_alloc(64, (nCells * output_dim) * sizeof(__fp16));
+    memset(NNInputs0, '\0', (nCells * input_dim) * sizeof(__fp16));
+
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
-        scalarList yPre_(mixture_.nSpecies());
-        scalarList yBCT_(mixture_.nSpecies());
-        scalarList yTmp_(mixture_.nSpecies());
-        scalarList u_(mixture_.nSpecies());
+        scalarList yPre_(nSpecies);
+        scalarList yBCT_(nSpecies);
+        scalarList yTmp_(nSpecies);
+        scalarList u_(nSpecies);
         // get problems
         #pragma omp for
-        for(size_t celli = 0; celli<nCell; ++celli){
+        for(size_t celli = 0; celli<nCells; ++celli){
             // size_t celli = Cell0[celli];
             scalar Ti = T_[celli];
             scalar pi = p_[celli];
@@ -43,12 +64,12 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
 
             NNInputs0[offset + 0] = (Ti - Xmu_[0])/Xstd_[0];
             NNInputs0[offset + 1] = (pi - Xmu_[1])/Xstd_[1];
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<nSpecies; i++)
             {
                 yPre_[i] = Y_[i][celli];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; // function BCT
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies(); i++)
+            for (size_t i=0; i<nSpecies; i++)
             {
                 NNInputs0[offset + 2 + i] = (yBCT_[i] - Xmu_[i+2]) / Xstd_[i+2];
             }
@@ -57,20 +78,17 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
     
     double prepare_dnn_input_end = MPI_Wtime();
 
-    // module inference
-    int output_dim = mixture_.nSpecies() -1;
-
-    float* results0 = (float*)aligned_alloc(64, (nCell * output_dim) * sizeof(float));
-
     double dnn_infer_start = MPI_Wtime();
-    DNNInferencer_blas_.Inference_multiDNNs(NNInputs0, results0, nCell);
+    DNNInferencer_blas_.Inference_multiDNNs(NNInputs0, results0, nCells);
 
     double dnn_infer_end = MPI_Wtime();
 
-    double update_start = MPI_Wtime();
+    inference_time += clock.timeIncrement();
 
     // update Q & RR
+#ifdef _OPENMP
     #pragma omp parallel
+#endif
     {
         scalarList yPre_(mixture_.nSpecies());
         scalarList yBCT_(mixture_.nSpecies());
@@ -78,17 +96,17 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         scalarList u_(mixture_.nSpecies());
         // // - NN0
         #pragma omp for
-        for(size_t celli = 0; celli<nCell; celli ++)
+        for(size_t celli = 0; celli<nCells; celli ++)
         {
-            size_t offset = celli * (CanteraGas_->nSpecies()-1);
+            size_t offset = celli * (nSpecies-1);
             scalar Yt = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies() ; i++)
+            for (size_t i=0; i<nSpecies ; i++)
             {
                 yPre_[i] = Y_[i][celli];
                 yTmp_[i] = Y_[i][celli];
                 yBCT_[i] = (pow(yPre_[i],lambda) - 1) / lambda; 
             }
-            for (size_t i=0; i<CanteraGas_->nSpecies() -1; i++)
+            for (size_t i=0; i<nSpecies -1; i++)
             {
 
                 u_[i] = results0[offset + i ]*Ystd_[i]+Ymu_[i];
@@ -99,7 +117,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
             yTmp_[17] = yPre_[17] ;
             Qdot_[celli] = 0;
             RR_[17][celli] = 0;
-            for (size_t i=0; i<CanteraGas_->nSpecies()-1; i++) 
+            for (size_t i=0; i<nSpecies-1; i++) 
             {
                 if(T_[celli]<500){
                     RR_[i][celli] = 0;
@@ -113,24 +131,26 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
         }
     }
 
-    double update_end = MPI_Wtime();
+    update_time = clock.timeIncrement();
+
     free(NNInputs0);
     free(results0);
+
+
+    destory_time = clock.timeIncrement();
+    double solve_DNN_blas_time = clock.elapsedTime();
+
+
     Info << "=== end solve_DNN with BLASDNN === " << endl;
-
-    double solve_DNN_blas_end = MPI_Wtime();
-
-    double solve_DNN_blas_time = solve_DNN_blas_end - solve_DNN_blas_start;
-    double prepare_dnn_input_time = prepare_dnn_input_end - prepare_dnn_input_start;
-    double dnn_infer_time = dnn_infer_end - dnn_infer_start;
-    double update_time = update_end - update_start;
 
     Info << "solve_DNN_blas profiling --------------------------------------------------" << endl;
     Info << "solve_DNN_blas time : " << solve_DNN_blas_time << endl;
-    Info << "prepare dnn input time : " << prepare_dnn_input_time << endl;
-    Info << "dnn inference time : " << dnn_infer_time << endl;
+    Info << "init time : " << init_time << endl;
+    Info << "prepare time : " << prepare_time << endl;
+    Info << "inference time : " << inference_time << endl;
     Info << "update time : " << update_time << endl;
-    Info << "other time : " << solve_DNN_blas_time - prepare_dnn_input_time - dnn_infer_time - update_time << endl;
+    Info << "destory time : " << destory_time << endl;
+    Info << "other time : " << solve_DNN_blas_time - init_time - prepare_time - inference_time - update_time - destory_time << endl;
     Info << "---------------------------------------------------------------------------" << endl;
 
     return deltaTMin;

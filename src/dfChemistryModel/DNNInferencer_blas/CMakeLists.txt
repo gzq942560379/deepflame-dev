@@ -4,16 +4,16 @@ project(DNNInferencer_blas)
 
 find_package(OpenMP REQUIRED)
 
+option(YAML_INCLUDE "path to yaml include dir" "")
+option(YAML_LIBRARY "path to yaml lib" "")
+option(BLAS_LIBRARY "path to blas lib" "")
+
 include_directories(
-    /root/MassiveParallel/deepflame-dev/yaml-cpp/include
+    ${YAML_INCLUDE}
 )
-
-set(CMAKE_CXX_COMPILER mpiCC)
-
-set(CMAKE_CXX_FLAGS "-Ofast -g -fopenmp -std=c++11")
 
 add_library(${PROJECT_NAME} SHARED DNNInferencer_blas.cpp Layer.cpp kernel_double.cpp kernel_float.cpp DNNThermo_blas.cpp)
 
 target_link_libraries(${PROJECT_NAME}   
-    /root/MassiveParallel/deepflame-dev/yaml-cpp/build/libyaml-cpp.a
+    ${YAML_LIBRARY} ${BLAS_LIBRARY}
 )

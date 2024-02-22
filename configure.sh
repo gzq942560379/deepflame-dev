@@ -16,8 +16,8 @@ print_usage() {
 LIBTORCH_AUTO=false
 USE_LIBTORCH=false
 USE_PYTORCH=false
-USE_TENSORFLOW=
 USE_BLASDNN=
+USE_FUGAKU=
 
 while test $# -gt 0; do
     case "$1" in
@@ -30,17 +30,6 @@ while test $# -gt 0; do
             if test $# -gt 0; then
                 LIBTORCH_DIR=$1
                 USE_LIBTORCH=true
-            else
-                print_usage
-            return
-            fi
-            shift
-            ;;
-        --libtensorflow_dir)
-            shift
-            if test $# -gt 0; then
-                LIBTENSORFLOW_DIR=$1
-                USE_TENSORFLOW=true
             else
                 print_usage
             return
@@ -66,7 +55,10 @@ while test $# -gt 0; do
         --use_blasdnn)
             shift
             USE_BLASDNN=true
+            ;;
+        --use_fugaku)
             shift
+            USE_FUGAKU=true
             ;;
         --libcantera_dir)
             shift
@@ -166,23 +158,22 @@ if [ $USE_PYTORCH = true ]; then
     echo PYTORCH_INC=$PYTORCH_INC
     echo PYTORCH_LIB=$PYTORCH_LIB
 fi
-if [ ! -z "$USE_TENSORFLOW" ]; then
-    echo USE_TENSORFLOW=$USE_TENSORFLOW
-    echo LIBTENSORFLOW_DIR=$LIBTENSORFLOW_DIR
-fi
 if [ ! -z "$USE_BLASDNN" ]; then
     echo USE_BLASDNN=$USE_BLASDNN
+fi
+if [ ! -z "$USE_FUGAKU" ]; then
+    echo USE_FUGAKU=$USE_FUGAKU
 fi
 
 cp bashrc.in bashrc
 sed -i "s#pwd#$PWD#g" ./bashrc
 sed -i "s#LIBTORCH_DIR#$LIBTORCH_DIR#g" ./bashrc
-sed -i "s#@USE_TENSORFLOW@#$USE_TENSORFLOW#g" ./bashrc
-sed -i "s#LIBTENSORFLOW_DIR#$LIBTENSORFLOW_DIR#g" ./bashrc
 sed -i "s#PYTORCH_INC#$PYTORCH_INC#g" ./bashrc
 sed -i "s#PYTORCH_LIB#$PYTORCH_LIB#g" ./bashrc
 sed -i "s#@USE_BLASDNN@#$USE_BLASDNN#g" ./bashrc
 sed -i "s#LIBCANTERA_DIR#$LIBCANTERA_DIR#g" ./bashrc
+sed -i "s#@USE_FUGAKU@#$USE_FUGAKU#g" ./bashrc
+
 
 
 

@@ -41,6 +41,13 @@ void Foam::DIVGAMGSolver::scale
     const direction cmpt
 ) const
 {
+    scalar* fieldPtr = field.begin();
+    scalar* AcfPtr = Acf.begin();
+    const scalar* sourcePtr = source.begin();
+    const scalar* diagPtr = A.diag().begin();
+
+    const label nCells = source.size();
+
     clockTime clock;
 
     A.Amul
@@ -60,16 +67,16 @@ void Foam::DIVGAMGSolver::scale
 #ifdef _OPENMP
     #pragma omp parallel for reduction(+:scalingFactorNum) reduction(+:scalingFactorDenom)
 #endif
-    for(label i = 0; i < field.size(); ++i){
-        scalingFactorNum += source[i] * field[i];
-        scalingFactorDenom += Acf[i] * field[i];
+    for(label i = 0; i < nCells; ++i){
+        scalingFactorNum += sourcePtr[i] * fieldPtr[i];
+        scalingFactorDenom += AcfPtr[i] * fieldPtr[i];
     }
 
     scale_norm_time += clock.timeIncrement();
 
     vector2D scalingVector(scalingFactorNum, scalingFactorDenom);
 
-    A.mesh().reduce(scalingVector, sumOp<vector2D>());
+    reduce(scalingVector, sumOp<vector2D>());
 
     scale_vector2D_reduce_time += clock.timeIncrement();
 
@@ -82,17 +89,17 @@ void Foam::DIVGAMGSolver::scale
 
     scale_sf_time += clock.timeIncrement();
 
-    const scalarField& D = A.diag();
-
 #ifdef _OPENMP
     #pragma omp parallel for
 #endif
-    for(label i = 0; i < field.size(); ++i){
-        field[i] = sf * field[i] + (source[i] - sf * Acf[i]) / D[i];
+    for(label i = 0; i < nCells; ++i){
+        field[i] = sf * fieldPtr[i] + (sourcePtr[i] - sf * AcfPtr[i]) / diagPtr[i];
     }
 
     scale_field_time += clock.timeIncrement();
     scale_total_time += clock.elapsedTime();
+
+    A.flops_ += nCells * (2 + 9);
 }
 
 
