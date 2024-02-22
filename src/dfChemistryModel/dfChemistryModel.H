@@ -178,12 +178,19 @@ public IOdictionary
 #ifdef USE_BLASDNN
         // tensorflow
         // DNNInferencer_blas<double> DNNInferencer_blas_;
-        // DNNInferencer_blas<float> DNNInferencer_blas_;
+#ifdef _FP16_
         DNNInferencer_blas<__fp16> DNNInferencer_blas_;
+#else
+        DNNInferencer_blas<float> DNNInferencer_blas_;
+#endif
         // thermo
         // DNNThermo_blas<double> DNNThermo_blas_;
         // DNNThermo_blas<float> DNNThermo_blas_;
+#ifdef _FP16_
         DNNThermo_blas<__fp16> DNNThermo_blas_;
+#else
+        DNNThermo_blas<float> DNNThermo_blas_;
+#endif
         string BLASDNNModelPath_;
         string thermoDNNModelPath_;
 #endif

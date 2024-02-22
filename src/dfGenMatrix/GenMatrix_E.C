@@ -20,7 +20,14 @@ GenMatrix_E(
     const volVectorField& hDiffCorrFlux,
     const surfaceScalarField& linear_weights
 ){
-    MPI_Barrier(MPI_COMM_WORLD);
+    label MPI_init;
+    MPI_Initialized(&MPI_init);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+    label rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     Pout << "1" << endl;
     tmp<fvScalarMatrix> tfvm
     (
@@ -30,6 +37,7 @@ GenMatrix_E(
             rho.dimensions()*he.dimensions()*dimVol/dimTime
         )
     );
+    he.correctBoundaryConditions();
 
     fvScalarMatrix& fvm = tfvm.ref();
 
@@ -59,7 +67,9 @@ GenMatrix_E(
     const scalar* const __restrict__ rhoOldTimePtr = &rho.oldTime().primitiveField()[0];
     const scalar* const __restrict__ heOldTimePtr = &he.oldTime().primitiveField()[0];
     
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "2" << endl;
 
     tmp<fv::convectionScheme<scalar>> cs_he = fv::convectionScheme<scalar>::New(mesh, phi, mesh.divScheme("div("+phi.name()+','+he.name()+')'));
@@ -72,7 +82,9 @@ GenMatrix_E(
     tmp<fv::snGradScheme<scalar>> snGradScheme_orthogonal(new fv::orthogonalSnGrad<scalar>(mesh));
 
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "3" << endl;
 
     tmp<surfaceScalarField> tweights_he = gcs_he.interpScheme().weights(he);
@@ -136,7 +148,9 @@ GenMatrix_E(
     const scalar* const __restrict__ meshSfPtr = &mesh.Sf()[0][0];
     const scalar* const __restrict__ hDiffCorrFluxPtr = &hDiffCorrFlux[0][0];
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "4" << endl;
 
 #ifdef _OPENMP
@@ -176,7 +190,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "5" << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
@@ -198,7 +214,9 @@ GenMatrix_E(
     scalarPtr* boundaryHDiffCorrFlux_internal = new scalarPtr[nPatches];
     scalarPtr* boundaryHDiffCorrFlux_neighbour = new scalarPtr[nPatches];
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "6" << endl;
 
     for (label patchi = 0; patchi < nPatches; ++patchi){
@@ -224,7 +242,7 @@ GenMatrix_E(
         const fvPatchScalarField& patchK = K.boundaryField()[patchi];
         boundaryK[patchi] = patchK.begin();
         const fvPatchScalarField& patchAlphaEff = alphaEff.boundaryField()[patchi];
-        boundaryAlphaEff[patchi] = alphaEff.begin();
+        boundaryAlphaEff[patchi] = patchAlphaEff.begin();
         const fvPatchVectorField& patchHDiffCorrFlux = hDiffCorrFlux.boundaryField()[patchi];
         boundaryHDiffCorrFlux[patchi] = (scalar*) patchHDiffCorrFlux.begin();
 
@@ -299,7 +317,9 @@ GenMatrix_E(
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "7" << endl;
     
 #ifdef _OPENMP
@@ -327,7 +347,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "8" << endl;
 
 
@@ -355,7 +377,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "9" << endl;
 
 #ifdef _OPENMP
@@ -393,7 +417,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "10" << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
@@ -437,7 +463,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "11" << endl;
 
 
@@ -461,7 +489,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "12" << endl;
 
 
@@ -480,7 +510,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "13" << endl;
 
 
@@ -499,12 +531,13 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "14" << endl;
 
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
-    
     forAll(he.boundaryField(), patchi)
     {
         const fvPatchField<scalar>& psf = he.boundaryField()[patchi];
@@ -538,7 +571,9 @@ GenMatrix_E(
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "15" << endl;
 
     /* --------------------------------------------------------------------------------------------------------------------------------------------- */
@@ -557,7 +592,9 @@ GenMatrix_E(
         sourcePtr[c] += fvcDiv2Ptr[c];
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "16" << endl;
 
 
@@ -575,7 +612,9 @@ GenMatrix_E(
             delete[] boundaryHDiffCorrFlux_neighbour[patchi];
         }
     }
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "17" << endl;
 
     delete[] boundaryK_internal;
@@ -596,7 +635,9 @@ GenMatrix_E(
     delete[] boundaryAlphaEff;
     delete[] boundaryHDiffCorrFlux;
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    if (MPI_init){
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     Pout << "18" << endl;
 
     return tfvm;
