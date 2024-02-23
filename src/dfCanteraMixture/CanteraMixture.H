@@ -117,7 +117,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+            // return CanteraGas_->meanMolecularWeight()/CanteraGas_->RT();
+            return 0.;
         }
         
         scalar rho
@@ -126,7 +127,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraGas_->density();
+            // return CanteraGas_->density();
+            return 0.;
         }
         
         scalar mu
@@ -135,7 +137,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraTransport_->viscosity();
+            // return CanteraTransport_->viscosity();
+            return 0.;
         }
 
         scalar alphah
@@ -144,7 +147,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraTransport_->thermalConductivity()/(CanteraGas_->cp_mass());
+            // return CanteraTransport_->thermalConductivity()/(CanteraGas_->cp_mass());
+            return 0.;
         }
 
         scalar HE
@@ -153,7 +157,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraGas_->enthalpy_mass(); // J/kg
+            // return CanteraGas_->enthalpy_mass(); // J/kg
+            return 0.;
         }
 
         scalar Hc() const; // J/kg
@@ -164,7 +169,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraGas_->cp_mass(); // J/kg/K
+            // return CanteraGas_->cp_mass(); // J/kg/K
+            return 0.;
         }
 
         scalar Cv
@@ -173,7 +179,8 @@ public:
             const scalar& T
         ) const
         {
-            return CanteraGas_->cv_mass(); // J/kg/K
+            // return CanteraGas_->cv_mass(); // J/kg/K
+            return 0.;
         }
 
         scalar gamma
@@ -182,7 +189,8 @@ public:
             const scalar& T
         ) const
         {
-            return Cp(p, T)/Cv(p, T);
+            // return Cp(p, T)/Cv(p, T);
+            return 0.;
         }
 
         scalar Cpv
@@ -191,7 +199,8 @@ public:
             const scalar& T
         ) const
         {
-            return Cp(p, T);
+            // return Cp(p, T);
+            return 0.;
         }
 
         scalar CpByCpv
@@ -205,7 +214,8 @@ public:
 
         scalar W() const
         {
-            return CanteraGas_->meanMolecularWeight();
+            // return CanteraGas_->meanMolecularWeight();
+            return 0.;
         }
 
         static inline word heName() {return "ha";}
@@ -220,7 +230,7 @@ public:
         const volScalarField& Y(const word& specieName) const {return Y_[species_[specieName]];}
 
         const hashedWordList& species() const {return species_;}
-        int nSpecies() {return int(CanteraGas_->nSpecies());}
+        int nSpecies() {return 18;}
 
         std::shared_ptr<Cantera::ThermoPhase> CanteraGas() {return CanteraGas_;}
 
@@ -245,65 +255,76 @@ public:
 
     void calcCp(const scalar T, const scalar p)
     {
-        const scalar RR = constant::physicoChemical::R.value()*1e3; // J/(kmol·k)
+        // const scalar RR = constant::physicoChemical::R.value()*1e3; // J/(kmol·k)
 
-        CanteraGas_->setState_TP(T, p);
+        // CanteraGas_->setState_TP(T, p);
 
-        scalarList Cp_R(nSpecies());
-        CanteraGas_->getCp_R(Cp_R.begin());
-        CpTemp_ = Cp_R*RR;
-        for(int i=0; i < nSpecies(); ++i)
-        {
-            CvTemp_[i] = CpTemp_[i] - RR;
-        }
+        // scalarList Cp_R(nSpecies());
+        // CanteraGas_->getCp_R(Cp_R.begin());
+        // CpTemp_ = Cp_R*RR;
+        // for(int i=0; i < nSpecies(); ++i)
+        // {
+        //     CvTemp_[i] = CpTemp_[i] - RR;
+        // }
     }
 
     void calcMu(const scalar T, const scalar p)
     {
-        CanteraGas_->setState_TP(T, p);
+        // CanteraGas_->setState_TP(T, p);
 
-        CanteraTransport_->getSpeciesViscosities(muTemp_.begin());
+        // CanteraTransport_->getSpeciesViscosities(muTemp_.begin());
     }
 
     void calcH(const scalar T, const scalar p)
     {
-        const scalar RT = constant::physicoChemical::R.value()*1e3*T; // J/kmol/K
+        // const scalar RT = constant::physicoChemical::R.value()*1e3*T; // J/kmol/K
 
-        CanteraGas_->setState_TP(T, p);
+        // CanteraGas_->setState_TP(T, p);
 
-        scalarList Ha_RT(nSpecies());
-        CanteraGas_->getEnthalpy_RT(Ha_RT.begin());
-        HaTemp_ = Ha_RT*RT;
+        // scalarList Ha_RT(nSpecies());
+        // CanteraGas_->getEnthalpy_RT(Ha_RT.begin());
+        // HaTemp_ = Ha_RT*RT;
     }
 
     // J/(kg·K)
     scalar Cp(label i, scalar p, scalar T) const
     {
-        return CpTemp_[i]/CanteraGas_->molecularWeight(i);
+        // return CpTemp_[i]/CanteraGas_->molecularWeight(i);
+        return 0.;
     }
 
     // J/(kg·K)
     scalar Cv(label i, scalar p, scalar T) const
     {
-
-        return CvTemp_[i]/CanteraGas_->molecularWeight(i);
+        // return CvTemp_[i]/CanteraGas_->molecularWeight(i);
+        return 0.;
     }
 
     // kg/(m·s)
     scalar mu(label i, scalar p, scalar T) const
     {
-        return muTemp_[i];
+        // return muTemp_[i];
+        return 0.;
     }
 
     // J/kg
     scalar Ha(label i, scalar p, scalar T) const
     {
-        return HaTemp_[i]/CanteraGas_->molecularWeight(i);
+        // return HaTemp_[i]/CanteraGas_->molecularWeight(i);
+        return 0.;
     }
 
-    scalar Hc(label i) const {return CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);} // J/kg
+    scalar Hc(label i) const 
+    {
+        // return CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i); 
+        return 0.;
+    } // J/kg
 
-    scalar Hs(label i, scalar p, scalar T) const {return Ha(i, p, T) - Hc(i);} // J/kg
+    scalar Hs(label i, scalar p, scalar T) const 
+    {
+        // return Ha(i, p, T) - Hc(i);
+        return 0.;
+    } // J/kg
 
     // W/m/K
     scalar kappa(label i, scalar p, scalar T) const
@@ -314,12 +335,17 @@ public:
         //return CanteraTransport_->thermalConductivity();
 
         // use OpenFOAM method to calc kappa
-        scalar Cv_ = Cv(i, p, T); // J/(kg·K)
-        const scalar RR = constant::physicoChemical::R.value()*1e3; // J/(kmol·k)
-        return mu(i, p, T)*Cv_*(1.32 + 1.77*RR/CanteraGas_->molecularWeight(i)/Cv_);
+        // scalar Cv_ = Cv(i, p, T); // J/(kg·K)
+        // const scalar RR = constant::physicoChemical::R.value()*1e3; // J/(kmol·k)
+        // return mu(i, p, T)*Cv_*(1.32 + 1.77*RR/CanteraGas_->molecularWeight(i)/Cv_);
+        return 0.;
     } // W/m/K
 
-    scalar Wi(label i) const {return CanteraGas_->molecularWeight(i);} // kg/kmol
+    scalar Wi(label i) const 
+    {
+        // return CanteraGas_->molecularWeight(i);
+        return 0.;
+    } // kg/kmol
 
 
     //- Read dictionary
