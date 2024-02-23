@@ -127,12 +127,11 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN_blas
                 else{
                     yTmp_[i] = yTmp_[i] / Yt *(1-yTmp_[17]);
                     RR_[i][celli] = (yTmp_[i] - Y_[i][celli])*rho_[celli]/1e-8;
-                    Qdot_[celli] -= hc_[i]*RR_[i][celli];
+                    // Qdot_[celli] -= hc_[i]*RR_[i][celli];
                 }
             }
         }
     }
-    Info << "l 138" << endl;
 
     update_time = clock.timeIncrement();
 

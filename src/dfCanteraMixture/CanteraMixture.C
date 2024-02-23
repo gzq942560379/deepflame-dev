@@ -75,7 +75,7 @@ Foam::CanteraMixture::CanteraMixture
 {
     clockTime clock;
 
-    buildCanteraSolution();
+    // buildCanteraSolution();
 
     Info << "Foam::CanteraMixture::CanteraMixture time0 : " << clock.timeIncrement() << endl;
 
@@ -86,9 +86,11 @@ Foam::CanteraMixture::CanteraMixture
     CvTemp_.resize(nSpecies());
     muTemp_.resize(nSpecies());
 
+    std::vector<string> speciesName = {"H2", "H", "O", "O2", "OH", "H2O", "HO2", "H2O2", "CH3", 
+            "CH4", "CO", "CO2", "HCO", "CH2O", "CH3O", "C2H6", "CH3O2", "N2"};
     forAll(Y_, i)
     {
-        species_.append(CanteraGas_->speciesName(i));
+        species_.append(speciesName[i]);
     }
 
     tmp<volScalarField> tYdefault;
@@ -306,11 +308,11 @@ void Foam::CanteraMixture::read(const dictionary& thermoDict)
 
 const Foam::CanteraMixture& Foam::CanteraMixture::cellMixture(const label celli) const
 {
-    forAll(Y_, i)
-    {
-        yTemp_[i] = Y_[i][celli];
-    }
-    CanteraGas_->setState_TPY(Tref_[celli], pref_[celli], yTemp_.begin());
+    // forAll(Y_, i)
+    // {
+    //     yTemp_[i] = Y_[i][celli];
+    // }
+    // CanteraGas_->setState_TPY(Tref_[celli], pref_[celli], yTemp_.begin());
 
     return *this;
 }
@@ -322,11 +324,11 @@ const Foam::CanteraMixture& Foam::CanteraMixture::patchFaceMixture
     const label facei
 ) const
 {
-    forAll(Y_, i)
-    {
-        yTemp_[i] = Y_[i].boundaryField()[patchi][facei];
-    }
-    CanteraGas_->setState_TPY(Tref_.boundaryField()[patchi][facei],pref_.boundaryField()[patchi][facei],yTemp_.begin());
+    // forAll(Y_, i)
+    // {
+    //     yTemp_[i] = Y_[i].boundaryField()[patchi][facei];
+    // }
+    // CanteraGas_->setState_TPY(Tref_.boundaryField()[patchi][facei],pref_.boundaryField()[patchi][facei],yTemp_.begin());
 
     return *this;
 }
@@ -339,17 +341,18 @@ Foam::scalar Foam::CanteraMixture::THE
     const scalar& T
 ) const
 {
-    CanteraGas_->setState_HP(h, p);
-    return CanteraGas_->temperature();
+    // CanteraGas_->setState_HP(h, p);
+    // return CanteraGas_->temperature();
+    return 500.;
 }
 
 Foam::scalar Foam::CanteraMixture::Hc() const
 {
     scalar chemicalEnthalpy = 0;
-    forAll(yTemp_, i)
-    {
-        chemicalEnthalpy += yTemp_[i]*CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
-    }
+    // forAll(yTemp_, i)
+    // {
+    //     chemicalEnthalpy += yTemp_[i]*CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
+    // }
     return chemicalEnthalpy;
 }
 
