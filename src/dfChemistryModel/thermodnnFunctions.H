@@ -19,7 +19,8 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
 
     Info<<"=== begin solve_thermo with BLASDNN === "<<endl;
 
-#ifdef _FP16_
+
+#if defined(USE_BLASDNN_HALF)
     __fp16* NNInputs = (__fp16*)aligned_alloc(64, (nCells * input_dim) * sizeof(__fp16));
     memset(NNInputs, '\0', (nCells * input_dim) * sizeof(__fp16));
 
@@ -28,7 +29,7 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     __fp16* results2 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
     __fp16* results3 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
     __fp16* results4 = (__fp16*)aligned_alloc(64, nCells * sizeof(__fp16));
-#else
+#elif defined(USE_BLASDNN_FLOAT)
     float* NNInputs = (float*)aligned_alloc(64, (nCells * input_dim) * sizeof(float));
     memset(NNInputs, '\0', (nCells * input_dim) * sizeof(float));
 
@@ -37,6 +38,17 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     float* results2 = (float*)aligned_alloc(64, nCells * sizeof(float));
     float* results3 = (float*)aligned_alloc(64, nCells * sizeof(float));
     float* results4 = (float*)aligned_alloc(64, nCells * sizeof(float));
+#elif defined(USE_BLASDNN_DOUBLE)
+    double* NNInputs = (double*)aligned_alloc(64, (nCells * input_dim) * sizeof(double));
+    memset(NNInputs, '\0', (nCells * input_dim) * sizeof(double));
+
+    double* results0 = (double*)aligned_alloc(64, nCells * sizeof(double));
+    double* results1 = (double*)aligned_alloc(64, nCells * sizeof(double));
+    double* results2 = (double*)aligned_alloc(64, nCells * sizeof(double));
+    double* results3 = (double*)aligned_alloc(64, nCells * sizeof(double));
+    double* results4 = (double*)aligned_alloc(64, nCells * sizeof(double));
+#else
+#error "must define one of USE_BLASDNN_HALF, USE_BLASDNN_FLOAT or USE_BLASDNN_DOUBLE"
 #endif
 
     init_time += clock.timeIncrement();
@@ -111,7 +123,8 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     /*
     ** boundaryField
     */
-#ifdef _FP16_
+// #ifdef _FP16_
+#if defined(USE_BLASDNN_HALF)
     __fp16* NNInputs_p = (__fp16*)aligned_alloc(64, (nFaces * input_dim) * sizeof(__fp16));
     memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(__fp16));
     __fp16* results0_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
@@ -119,7 +132,7 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     __fp16* results2_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
     __fp16* results3_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
     __fp16* results4_p = (__fp16*)aligned_alloc(64, nFaces * sizeof(__fp16));
-#else
+#elif defined(USE_BLASDNN_FLOAT)
     float* NNInputs_p = (float*)aligned_alloc(64, (nFaces * input_dim) * sizeof(float));
     memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(float));
     float* results0_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
@@ -127,6 +140,16 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     float* results2_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
     float* results3_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
     float* results4_p = (float*)aligned_alloc(64, nFaces * sizeof(float));
+#elif defined(USE_BLASDNN_DOUBLE)
+    double* NNInputs_p = (double*)aligned_alloc(64, (nFaces * input_dim) * sizeof(double));
+    memset(NNInputs_p, '\0', (nFaces * input_dim) * sizeof(double));
+    double* results0_p = (double*)aligned_alloc(64, nFaces * sizeof(double));
+    double* results1_p = (double*)aligned_alloc(64, nFaces * sizeof(double));
+    double* results2_p = (double*)aligned_alloc(64, nFaces * sizeof(double));
+    double* results3_p = (double*)aligned_alloc(64, nFaces * sizeof(double));
+    double* results4_p = (double*)aligned_alloc(64, nFaces * sizeof(double));
+#else
+#error "must define one of USE_BLASDNN_HALF, USE_BLASDNN_FLOAT or USE_BLASDNN_DOUBLE"
 #endif
 
     init_time += clock.timeIncrement();

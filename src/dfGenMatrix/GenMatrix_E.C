@@ -20,12 +20,12 @@ GenMatrix_E(
     const volVectorField& hDiffCorrFlux,
     const surfaceScalarField& linear_weights
 ){
-    label MPI_init;
+    int MPI_init;
     MPI_Initialized(&MPI_init);
     if (MPI_init){
         MPI_Barrier(MPI_COMM_WORLD);
     }
-    label rank;
+    int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     Pout << "1" << endl;
