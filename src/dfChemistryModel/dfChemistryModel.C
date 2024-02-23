@@ -234,7 +234,9 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     }
 #endif
 
-    for(const auto& name : CanteraGas_->speciesNames())
+    std::vector<string> speciesName = {"H2", "H", "O", "O2", "OH", "H2O", "HO2", "H2O2", "CH3", 
+            "CH4", "CO", "CO2", "HCO", "CH2O", "CH3O", "C2H6", "CH3O2", "N2"};
+    for (auto name : speciesName)
     {
         species_.append(name);
     }
@@ -316,10 +318,10 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     Info<<"relTol_ === "<<relTol_<<endl;
     Info<<"absTol_ === "<<absTol_<<endl;
 
-    forAll(hc_, i)
-    {
-        hc_[i] = CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
-    }
+    // forAll(hc_, i)
+    // {
+    //     hc_[i] = CanteraGas_->Hf298SS(i)/CanteraGas_->molecularWeight(i);
+    // }
 
     // set normalization parameters
 
