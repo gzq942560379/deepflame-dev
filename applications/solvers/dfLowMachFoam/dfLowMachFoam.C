@@ -73,7 +73,7 @@ Description
 #define _DIV_
 // #define _LDU_
 #define OPT_GenMatrix_Y
-// #define OPT_GenMatrix_E
+#define OPT_GenMatrix_E
 #define OPT_GenMatrix_U
 #define OPT_GenMatrix_p
 // #define OPT_thermo
