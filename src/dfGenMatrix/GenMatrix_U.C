@@ -1158,14 +1158,15 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
                 boundaryrAU_internal[patchi][s] = rAU[cellIndex];
             }
         }
-        for (label patchi = 0; patchi < nPatches; ++patchi) {
-            if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
-                MPI_Sendrecv(
-                    &boundaryrAU_internal[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, 
-                    &boundaryrAU[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, 
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE
-                );
-            }
+    }
+
+    for (label patchi = 0; patchi < nPatches; ++patchi) {
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+            MPI_Sendrecv(
+                &boundaryrAU_internal[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, 
+                &boundaryrAU[patchi][0], patchSizes[patchi], MPI_DOUBLE, neighbProcNo[patchi], 0, 
+                MPI_COMM_WORLD, MPI_STATUS_IGNORE
+            );
         }
     }
     Info << "prepreprocess_p correct_boundary_conditions_scalar : " << clock.timeIncrement() << endl;
@@ -1329,17 +1330,21 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
                 boundaryHbyA_internal[patchi][s * 3 + 2] = HbyA[cellIndex * 3 + 2];
             }
         }
-        for (label patchi = 0; patchi < nPatches; ++patchi) {
-            if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
-                MPI_Sendrecv(
-                    &boundaryHbyA_internal[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0,
-                    &boundaryHbyA[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0,
-                    MPI_COMM_WORLD, MPI_STATUS_IGNORE
-                );
-            }
-        }
     }
     Info << "prepreprocess_p correct_boundary_conditions_vector : " << clock.timeIncrement() << endl;
+
+    for (label patchi = 0; patchi < nPatches; ++patchi) {
+        if (patchTypes[patchi] == MeshSchedule::PatchType::processor){
+            MPI_Sendrecv(
+                &boundaryHbyA_internal[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0,
+                &boundaryHbyA[patchi][0], patchSizes[patchi] * 3, MPI_DOUBLE, neighbProcNo[patchi], 0,
+                MPI_COMM_WORLD, MPI_STATUS_IGNORE
+            );
+        }
+    }
+
+    Info << "prepreprocess_p comm : " << clock.timeIncrement() << endl;
+
 
     /* scalar_field_multiply_vector_field */
 
