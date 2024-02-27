@@ -221,8 +221,6 @@ int main(int argc, char *argv[])
 
     benchmark();
 
-    Info << "typeid(unsigned).name() : " << typeid(unsigned).name() << endl;
-    Info << "sizeof(unsigned) : " << sizeof(unsigned) << endl;
  
     clockTime initClock;
 
