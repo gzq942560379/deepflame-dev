@@ -361,6 +361,8 @@ extern Foam::label nBoundaryPatches;
 extern Foam::label nProcessBoundarySurfaces;
 extern Foam::label *surfacePerPatch;
 extern int *neighbProcNo;
+extern Foam::label **faceCellsGroup;
+extern Foam::label *nInterfacesGroup;
 
 enum boundaryConditions{
     zeroGradient,

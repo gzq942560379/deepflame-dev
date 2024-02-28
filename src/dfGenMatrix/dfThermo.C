@@ -17,6 +17,8 @@ size_t nasa_coeffs_size, viscosity_coeffs_size, conductivity_coeffs_size, binary
 Foam::label nSpecies = 0, nBoundarySurfaces = 0, nBoundaryPatches = 0;
 Foam::label nCells = 0, nFaces = 0, nProcessBoundarySurfaces = 0;
 Foam::label *surfacePerPatch;
+Foam::label **faceCellsGroup;
+Foam::label *nInterfacesGroup;
 int *neighbProcNo;
 
 std::string get_filename(std::string mechanism_file){
@@ -53,13 +55,25 @@ void init_const_coeff_ptr(std::string mechanism_file, Foam::PtrList<Foam::volSca
     }
     neighbProcNo = new int[nBoundaryPatches];
     surfacePerPatch = new Foam::label[nBoundaryPatches];
+    faceCellsGroup = new Foam::label*[nBoundaryPatches];
+    nInterfacesGroup = new Foam::label[nBoundaryPatches];
+
     std::fill(neighbProcNo, neighbProcNo + nBoundaryPatches, -1);
     forAll(Y[0].boundaryField(), patchi) {
         const Foam::fvPatchScalarField& patchYi = Y[0].boundaryField()[patchi];
         surfacePerPatch[patchi] = patchYi.size();
         if (patchYi.type() == "processor" || patchYi.type() == "processorCyclic") {
             neighbProcNo[patchi] = dynamic_cast<const Foam::processorFvPatchField<Foam::scalar>&>(patchYi).neighbProcNo();
-        } 
+            nInterfacesGroup[patchi] = patchYi.size();
+        } else {
+            nInterfacesGroup[patchi] = 0;
+        }
+        
+        faceCellsGroup[patchi] = new Foam::label[patchYi.size()];
+        const Foam::labelUList& faceCells = patchYi.patch().faceCells();
+        forAll(faceCells, facei) {
+            faceCellsGroup[patchi][facei] = faceCells[facei];
+        }
     }
 
 }
