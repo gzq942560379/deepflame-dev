@@ -186,6 +186,12 @@ public:
                 return rank_;
             }
 
+            //- Return the processor interface
+            virtual const processorDIVGAMGInterface& procInterface() const
+            {
+                return procInterface_;
+            }
+
 
     // Member Operators
 

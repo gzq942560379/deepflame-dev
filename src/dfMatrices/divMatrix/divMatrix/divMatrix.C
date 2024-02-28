@@ -180,6 +180,18 @@ divMatrix::divMatrix(const lduMesh& mesh):row_block_bit_(row_block_bit), row_blo
         face2upper_[i] = index;
     }
 
+    // init comm info
+    scalarSendBufList_ = new scalar*[nBoundaryPatches];
+    scalarRecvBufList_ = new scalar*[nBoundaryPatches];
+    scalarSendBufListGAMG_.resize(nBoundaryPatches);
+    scalarRecvBufListGAMG_.resize(nBoundaryPatches);
+    for (label patchi = 0; patchi < nBoundaryPatches; patchi++) {
+        if (nInterfacesGroup[patchi]) {
+            scalarSendBufList_[patchi] = new scalar[nInterfacesGroup[patchi]];
+            scalarRecvBufList_[patchi] = new scalar[nInterfacesGroup[patchi]];
+        }
+    }
+    
     Info << "divMatrix info : ----------------------------------" << endl;
     Info << "row_ : " << row_ << endl;
     Info << "block_count_ : " << block_count_ << endl;
