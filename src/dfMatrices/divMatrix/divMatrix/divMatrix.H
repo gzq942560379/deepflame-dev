@@ -14,6 +14,8 @@
 #include "surfaceFields.H"
 #include "tmp.H"
 #include "className.H"
+#include <mpi.h>
+#include "GenFvMatrix.H"
 
 #include "lduMatrix.H"
 #include "clockTime.H"
@@ -73,6 +75,11 @@ private:
     bool symmetric_;
     bool asymmetric_;
 
+    mutable std::vector<ompi_request_t*> send_recv_requests_;
+    mutable scalar** scalarSendBufList_;
+    mutable scalar** scalarRecvBufList_;
+    mutable std::vector<std::vector<double>> scalarSendBufListGAMG_;
+    mutable std::vector<std::vector<double>> scalarRecvBufListGAMG_;
 public:
 
     mutable scalar flops_ = 0.;
@@ -96,7 +103,10 @@ public:
         max_distance_(other.max_distance_),min_distance_(other.min_distance_),head_block_count_(other.head_block_count_),
         tail_block_count_(other.tail_block_count_),off_diag_value_(other.off_diag_value_), face2lower_(other.face2lower_),
         face2upper_(other.face2upper_),diagonal_(other.diagonal_), symmetric_(other.symmetric_), asymmetric_(other.asymmetric_)
-        {};
+        {
+            scalarSendBufListGAMG_.resize(nBoundaryPatches);
+            scalarRecvBufListGAMG_.resize(nBoundaryPatches);
+        };
 
     // Copy constructor
     // void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
