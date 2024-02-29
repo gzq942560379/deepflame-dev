@@ -15,7 +15,6 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
     label input_dim = 3;
     label output_dim = 5;
     label offset = 0;
-    label offset_r = 0;
 
     Info<<"=== begin solve_thermo with BLASDNN === "<<endl;
 
@@ -154,6 +153,7 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
 
     init_time += clock.timeIncrement();
 
+    offset = 0;
     // Prepare input for DNN
     forAll(he.boundaryField(), patchi)
     {
@@ -179,6 +179,7 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
 
     inference_time += clock.timeIncrement();
 
+    offset = 0;
     // update thermo properties
     forAll(he.boundaryField(), patchi)
     {
@@ -192,11 +193,11 @@ void Foam::dfChemistryModel<ThermoType>::thermoDNN_blas(volScalarField& he, cons
 #endif
         forAll(pT, facei)
         {
-            prho[facei] = std::pow((results0_p[offset_r +facei] * thermostd_[0] + thermomu_[0]) * 0.1 + 1., 10.) * 1000;
-            pT[facei] = results1_p[offset_r +facei] * thermostd_[1] + thermomu_[1];
-            ppsi[facei] = results2_p[offset_r +facei] * thermostd_[2] + thermomu_[2];
-            pmu[facei] = results3_p[offset_r +facei] * thermostd_[3] + thermomu_[3];
-            palpha[facei] = results4_p[offset_r +facei] * thermostd_[4] + thermomu_[4];
+            prho[facei] = std::pow((results0_p[offset + facei] * thermostd_[0] + thermomu_[0]) * 0.1 + 1., 10.) * 1000;
+            pT[facei] = results1_p[offset + facei] * thermostd_[1] + thermomu_[1];
+            ppsi[facei] = results2_p[offset + facei] * thermostd_[2] + thermomu_[2];
+            pmu[facei] = results3_p[offset + facei] * thermostd_[3] + thermomu_[3];
+            palpha[facei] = results4_p[offset + facei] * thermostd_[4] + thermomu_[4];
             forAll(rhoD_, i)
             {
                 rhoD_[i].boundaryFieldRef()[patchi][facei] = palpha[facei];
