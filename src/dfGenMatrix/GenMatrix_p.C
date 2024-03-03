@@ -29,11 +29,9 @@ UEqn_H
     fvMatrix<Type>& UEqn
 )
 {
-    TICK0(UEqn_H);
     const GeometricField<Type, fvPatchField, volMesh>& psi_ = UEqn.psi();
     const Field<Type>& source_ = UEqn.source();
     FieldField<Field, Type>& internalCoeffs_ = UEqn.internalCoeffs();
-    TICK(UEqn_H, 0, 1);
     tmp<GeometricField<Type, fvPatchField, volMesh>> tHphi
     (
         new GeometricField<Type, fvPatchField, volMesh>
@@ -52,7 +50,6 @@ UEqn_H
         )
     );
     GeometricField<Type, fvPatchField, volMesh>& Hphi = tHphi.ref();
-    TICK(UEqn_H, 1, 2);
 
     for (direction cmpt=0; cmpt<Type::nComponents; cmpt++)
     {
@@ -76,7 +73,6 @@ UEqn_H
 
         Hphi.primitiveFieldRef().replace(cmpt, boundaryDiagCmpt*psiCmpt);
     }
-    TICK(UEqn_H, 2, 3);
 
     // lduMatrix::H
     const lduAddressing& lduAddr = UEqn.mesh().lduAddr();
@@ -91,7 +87,6 @@ UEqn_H
     const label* __restrict__ lPtr = lduAddr.lowerAddr().begin();
     const scalar* __restrict__ lowerPtr = UEqn.lower().begin();
     const scalar* __restrict__ upperPtr = UEqn.upper().begin();
-    TICK(UEqn_H, 3, 4);
 
     for (label face=0; face<nFaces; face++)
     {
@@ -99,11 +94,7 @@ UEqn_H
         HpsiPtr[lPtr[face]] -= upperPtr[face]*psiPtr[uPtr[face]];
     }
 
-    TICK(UEqn_H, 4, 5);
-
     Hphi.primitiveFieldRef() += (tHpsi + source_);
-
-    TICK(UEqn_H, 5, 6);
 
     FieldField<Field, vector> boundaryCoeffs_ = UEqn.boundaryCoeffs();
     forAll(psi_.boundaryField(), patchi)
@@ -132,15 +123,12 @@ UEqn_H
             }
         }
     }
-    TICK(UEqn_H, 6, 7);
 
     // addBoundarySource(Hphi.primitiveFieldRef());
 
     Hphi.primitiveFieldRef() /= psi_.mesh().V();
-    TICK(UEqn_H, 7, 8);
 
     Hphi.correctBoundaryConditions();
-    TICK(UEqn_H, 8, 9);
 
     typename Type::labelType validComponents
     (
@@ -158,7 +146,6 @@ UEqn_H
             );
         }
     }
-    TICK(UEqn_H, 9, 10);
 
     return tHphi;
 }
@@ -169,8 +156,6 @@ rAUConstructor
     fvMatrix<vector>& UEqn
 )
 {
-    TICK0(rAUConstructor);
-
     const scalarField& diag_ = UEqn.diag();
     const GeometricField<vector, fvPatchField, volMesh>& psi_ = UEqn.psi();
     const fvMesh& mesh = psi_.mesh();
@@ -184,12 +169,10 @@ rAUConstructor
             extrapolatedCalculatedFvPatchScalarField::typeName
         )
     );
-    TICK(rAUConstructor, 0, 1);
     // D()
     FieldField<Field, vector>& internalCoeffs_ = UEqn.internalCoeffs();
     tmp<scalarField> tdiag(new scalarField(diag_)); // D
     scalarField& diagD = tdiag.ref();
-    TICK(rAUConstructor, 1, 2);
 
     // addCmptAvBoundaryDiag(tdiag.ref());
     const lduAddressing& lduAddr = UEqn.mesh().lduAddr();
@@ -208,7 +191,6 @@ rAUConstructor
             diagD[addr[facei]] += internalCoeffs_ave()[facei];
         }
     }
-    TICK(rAUConstructor, 2, 3);
 
     rAU.ref().primitiveFieldRef() = 1.0 / (tdiag / mesh.V());
 
@@ -217,9 +199,7 @@ rAUConstructor
     //     rAU.ref().primitiveFieldRef()[i] = 1.0 / tdiag()[i] / mesh.V()[i];
     // }
 
-    TICK(rAUConstructor, 3, 4);
     rAU.ref().correctBoundaryConditions();
-    TICK(rAUConstructor, 4, 5);
 
     return rAU;
 }
@@ -301,17 +281,7 @@ phiHbyAConstructor
 )
 {
     const fvMesh& mesh = rho.mesh(); 
-    // tmp<surfaceScalarField> tphiHbyA
-    // (
-    //     surfaceScalarField::New
-    //     (
-    //         "phiHbyA",
-    //         mesh,
-    //         dimensionSet(1,0,-1,0,0,0,0)
-    //     )
-    // );
 
-    // fvc::interpolate(rho)
     const scalar* const __restrict__ linearWeightsPtr = linear_weights.primitiveField().begin(); // get linear weight
     tmp<surfaceScalarField> trhof
     (
@@ -357,11 +327,6 @@ phiHbyAConstructor
             psf = rho.boundaryField()[Ki];
         }
     }
-
-    // tmp<surfaceScalarField> ttest = fvc::interpolate(rho);
-    // surfaceScalarField test = ttest.ref();
-    // check_field_equal(test, rhof);
-
 
     // fvc::flux(HbyA)
     tmp<surfaceScalarField> tHbyAf
@@ -469,7 +434,7 @@ GenMatrix_p(
     typedef scalar* scalarPtr;
     typedef const scalar* constScalarPtr;
     typedef const label* constLabelPtr;
-    Info << "GenMatrix_p init : " << clock.timeIncrement() << endl;
+    Info << "Gen_p init : " << clock.timeIncrement() << endl;
 
     const scalar *rAUPtr = rAU.begin();
     const scalar *rhoPtr = rho.begin();
@@ -631,10 +596,8 @@ GenMatrix_p(
 #endif
     for (label i = 0; i < nFaces; ++i) {
         double w = weightsPtr[i];
-        
         label owner = own[i];
         label neighbor = nei[i];
-
         double rhorAU_owner = rhoPtr[owner] * rAUPtr[owner];
         double rhorAU_neighbor = rhoPtr[neighbor] * rAUPtr[neighbor];
         rhorAUfPtr[i] = w * (rhorAU_owner - rhorAU_neighbor) + rhorAU_neighbor;
@@ -758,7 +721,6 @@ GenMatrix_p(
     for (label i = 0; i < nFaces; ++i) {
         double phiCorrVal = phiHbyAPtr[i];
         double phiVal = phiOldPtr[i];
-
         double tddtCouplingCoeff = 1. - min(fabs(phiCorrVal)/fabs(phiVal) + Foam::SMALL, 1.);
         phiHbyAPtr[i] = tddtCouplingCoeff * rDeltaT * phiCorrVal;
     }
@@ -788,9 +750,7 @@ GenMatrix_p(
         double ssfx = (w * (HbyAPtr[owner * 3] - HbyAPtr[neighbor * 3]) + HbyAPtr[neighbor * 3]);
         double ssfy = (w * (HbyAPtr[owner * 3 + 1] - HbyAPtr[neighbor * 3 + 1]) + HbyAPtr[neighbor * 3 + 1]);
         double ssfz = (w * (HbyAPtr[owner * 3 + 2] - HbyAPtr[neighbor * 3 + 2]) + HbyAPtr[neighbor * 3 + 2]);
-
         double vf_interp = (w * (rhoPtr[owner] - rhoPtr[neighbor]) + rhoPtr[neighbor]);
-
         phiHbyAPtr[i] += (Sfx * ssfx + Sfy * ssfy + Sfz * ssfz) * vf_interp;
     }
     
@@ -865,7 +825,6 @@ GenMatrix_p(
         double srcVal = sourcePtr[i];
         double APsi = - diagPtr[i] * pPtr[i] + srcVal;
         sourcePtr[i] -= APsi;
-
         double tPsiVal = thermoPsiPtr[i];
         sourcePtr[i] *= tPsiVal;
         diagPtr[i] *= tPsiVal;
@@ -890,7 +849,6 @@ GenMatrix_p(
         for (label j = face_start; j < face_end; ++j) {
             label owner = own[j];
             label neighbor = nei[j];
-
             double issf = phiHbyAPtr[j];
             sourcePtr[owner] -= issf;
             sourcePtr[neighbor] += issf;
