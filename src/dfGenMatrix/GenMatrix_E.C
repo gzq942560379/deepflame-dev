@@ -25,8 +25,6 @@ GenMatrix_E(
     if (MPI_init){
         MPI_Barrier(MPI_COMM_WORLD);
     }
-    label rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     Pout << "1" << endl;
     tmp<fvScalarMatrix> tfvm

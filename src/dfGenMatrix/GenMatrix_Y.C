@@ -644,29 +644,21 @@ void preProcess_Y(
 
             if (patchTypes[j] == MeshSchedule::PatchType::wall) {
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif      
-                for (label ptr = 0; ptr < wallPatchPtr.size() - 1; ++ptr){
-                    label ks = wallPatchPtr[ptr];
-                    label ke = wallPatchPtr[ptr + 1];
-#ifdef _OPENMP
-#pragma omp for
-#endif      
-                    for (label k = ks; k < ke; ++k) {
-                        scalar bouvf = boundaryYi_patch[k];
-                        label cellIdx = faceCells_patch[k];
-                        scalar bouSfx = boundarySf_patch[k * 3 + 0];
-                        scalar bouSfy = boundarySf_patch[k * 3 + 1];
-                        scalar bouSfz = boundarySf_patch[k * 3 + 2];
-                        scalar grad_x = bouSfx * bouvf;
-                        scalar grad_y = bouSfy * bouvf;
-                        scalar grad_z = bouSfz * bouvf;
-                        gradY_Species[cellIdx * 3 + 0] += grad_x;
-                        gradY_Species[cellIdx * 3 + 1] += grad_y;
-                        gradY_Species[cellIdx * 3 + 2] += grad_z;
-                    }
+                for (label k = 0; k < patchSize; ++k) {
+                    scalar bouvf = boundaryYi_patch[k];
+                    label cellIdx = faceCells_patch[k];
+                    scalar bouSfx = boundarySf_patch[k * 3 + 0];
+                    scalar bouSfy = boundarySf_patch[k * 3 + 1];
+                    scalar bouSfz = boundarySf_patch[k * 3 + 2];
+                    scalar grad_x = bouSfx * bouvf;
+                    scalar grad_y = bouSfy * bouvf;
+                    scalar grad_z = bouSfz * bouvf;
+                    gradY_Species[cellIdx * 3 + 0] += grad_x;
+                    gradY_Species[cellIdx * 3 + 1] += grad_y;
+                    gradY_Species[cellIdx * 3 + 2] += grad_z;
                 }
-
             } else if (patchTypes[j] == MeshSchedule::PatchType::processor) {
 #ifdef _OPENMP
 #pragma omp parallel for
