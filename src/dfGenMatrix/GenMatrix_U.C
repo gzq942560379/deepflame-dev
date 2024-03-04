@@ -785,17 +785,8 @@ GenMatrix_U(
                 scalar bouDiv_x = (bouSfx * boussf_xx + bouSfy * boussf_yx + bouSfz * boussf_zx);
                 scalar bouDiv_y = (bouSfx * boussf_xy + bouSfy * boussf_yy + bouSfz * boussf_zy);
                 scalar bouDiv_z = (bouSfx * boussf_xz + bouSfy * boussf_yz + bouSfz * boussf_zz);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3] += bouDiv_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 1] += bouDiv_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 2] += bouDiv_z;
 
             }
@@ -821,17 +812,8 @@ GenMatrix_U(
                 scalar bouDiv_y = (bouSfx * boussf_xy + bouSfy * boussf_yy + bouSfz * boussf_zy);
                 scalar bouDiv_z = (bouSfx * boussf_xz + bouSfy * boussf_yz + bouSfz * boussf_zz);
                 label cellIndex = faceCells[patchi][s];
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[cellIndex * 3] += bouDiv_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[cellIndex * 3 + 1] += bouDiv_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[cellIndex * 3 + 2] += bouDiv_z;
             }
         }else{
@@ -914,17 +896,8 @@ GenMatrix_U(
                 scalar grad_x = bouSfx * bouvf;
                 scalar grad_y = bouSfy * bouvf;
                 scalar grad_z = bouSfz * bouvf;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3] -= grad_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 1] -= grad_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 2] -= grad_z;
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
@@ -940,17 +913,8 @@ GenMatrix_U(
                 scalar grad_x = bouSfx * bouvf;
                 scalar grad_y = bouSfy * bouvf;
                 scalar grad_z = bouSfz * bouvf;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3] -= grad_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 1] -= grad_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 sourcePtr[faceCells[patchi][s] * 3 + 2] -= grad_z;
 
             }
@@ -1122,9 +1086,6 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
             scalar internal_y = internalCoeffsPtr[patchi][s * 3 + 1];
             scalar internal_z = internalCoeffsPtr[patchi][s * 3 + 2];
             scalar ave_internal = (internal_x + internal_y + internal_z)/3;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
             rAU[cellIndex] += ave_internal;
         }
     }
@@ -1186,17 +1147,8 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
             scalar internal_z = internalCoeffsPtr[patchi][s * 3 + 2];
             scalar ave_internal = (internal_x + internal_y + internal_z)/3;
             label cellIndex = faceCells[patchi][s];
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
             HbyA[cellIndex * 3 + 0] += ( (-internal_x + ave_internal) * UPtr[cellIndex * 3 + 0]);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
             HbyA[cellIndex * 3 + 1] += ( (-internal_y + ave_internal) * UPtr[cellIndex * 3 + 1]);
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
             HbyA[cellIndex * 3 + 2] += ( (-internal_z + ave_internal) * UPtr[cellIndex * 3 + 2]);
         }
     }
@@ -1247,17 +1199,8 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
                 scalar boundary_y = boundaryCoeffsPtr[patchi][s * 3 + 1];
                 scalar boundary_z = boundaryCoeffsPtr[patchi][s * 3 + 2];
                 label cellIndex = faceCells[patchi][s];
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 HbyA[cellIndex * 3 + 0] += boundary_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 HbyA[cellIndex * 3 + 1] += boundary_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 HbyA[cellIndex * 3 + 2] += boundary_z;
             }
         }else if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
@@ -1273,17 +1216,8 @@ void getrAUandHbyA(volScalarField& rAUout, volVectorField& HbyAout, fvVectorMatr
                 scalar boundary_vf_y = boundaryU[patchi][s * 3 + 1];
                 scalar boundary_vf_z = boundaryU[patchi][s * 3 + 2];
                 label cellIndex = faceCells[patchi][s];
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 HbyA[cellIndex * 3 + 0] += boundary_x * boundary_vf_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 HbyA[cellIndex * 3 + 1] += boundary_y * boundary_vf_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 HbyA[cellIndex * 3 + 2] += boundary_z * boundary_vf_z;
             }
         }

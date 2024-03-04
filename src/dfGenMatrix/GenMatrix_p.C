@@ -759,14 +759,8 @@ GenMatrix_p(
     
     // - boundary
     for (label patchi = 0; patchi < nPatches; ++patchi) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
         for (label f = 0; f < patchSizes[patchi]; ++f) {
             label cellIndex = boundary_face_cell[patchi][f];
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
             sourcePtr[cellIndex] -= boundary_phiHbyAPtr[patchi][f];
         }
     }
@@ -1157,17 +1151,8 @@ void postProcess_P(
                 scalar grad_x = bouSfx * boup;
                 scalar grad_y = bouSfy * boup;
                 scalar grad_z = bouSfz * boup;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 UPtr[faceCell * 3] += grad_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 UPtr[faceCell * 3 + 1] += grad_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 UPtr[faceCell * 3 + 2] += grad_z;
             }
         } else {
@@ -1183,17 +1168,8 @@ void postProcess_P(
                 scalar grad_x = bouSfx * boup;
                 scalar grad_y = bouSfy * boup;
                 scalar grad_z = bouSfz * boup;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 UPtr[faceCell * 3] += grad_x;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 UPtr[faceCell * 3 + 1] += grad_y;
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
                 UPtr[faceCell * 3 + 2] += grad_z;
             }
         }
