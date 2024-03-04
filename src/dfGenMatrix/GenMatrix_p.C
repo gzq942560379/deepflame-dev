@@ -524,27 +524,27 @@ GenMatrix_p(
             scalarField patchRAUInternal = 
                     dynamic_cast<const processorFvPatchField<scalar>&>(pRAU).patchInternalField()();
             boundary_rAU_internal[patchi] = new scalar[patchSize]; // patchSize
-            memcpy(boundary_rAU_internal[patchi], &patchRAUInternal[0], patchSize * sizeof(double));
+            memcpy(boundary_rAU_internal[patchi], &patchRAUInternal[0], patchSize * sizeof(scalar));
 
             vectorField patchHbyAInternal =
                     dynamic_cast<const processorFvPatchField<vector>&>(pHbyA).patchInternalField()();
             boundary_HbyA_internal[patchi] = new scalar[3*patchSize]; // 3 * patchSize
-            memcpy(boundary_HbyA_internal[patchi], &patchHbyAInternal[0][0], 3*patchSize * sizeof(double));
+            memcpy(boundary_HbyA_internal[patchi], &patchHbyAInternal[0][0], 3*patchSize * sizeof(scalar));
 
             scalarField patchRhoInternal = 
                     dynamic_cast<const processorFvPatchField<scalar>&>(pRho).patchInternalField()();
             boundary_rho_internal[patchi] = new scalar[patchSize]; // patchSize
-            memcpy(boundary_rho_internal[patchi], &patchRhoInternal[0], patchSize * sizeof(double));
+            memcpy(boundary_rho_internal[patchi], &patchRhoInternal[0], patchSize * sizeof(scalar));
 
             scalarField patchRhoOldInternal = 
                     dynamic_cast<const processorFvPatchField<scalar>&>(pRhoOld).patchInternalField()();
             boundary_rhoOld_internal[patchi] = new scalar[patchSize]; // patchSize
-            memcpy(boundary_rhoOld_internal[patchi], &patchRhoOldInternal[0], patchSize * sizeof(double));
+            memcpy(boundary_rhoOld_internal[patchi], &patchRhoOldInternal[0], patchSize * sizeof(scalar));
 
             vectorField patchUOldInternal =
                     dynamic_cast<const processorFvPatchField<vector>&>(pUOld).patchInternalField()();
             boundary_Uold_internal[patchi] = new scalar[3*patchSize]; // 3 * patchSize
-            memcpy(boundary_Uold_internal[patchi], &patchUOldInternal[0][0], 3*patchSize * sizeof(double));
+            memcpy(boundary_Uold_internal[patchi], &patchUOldInternal[0][0], 3*patchSize * sizeof(scalar));
         } else if (patchTypes[patchi] == MeshSchedule::PatchType::wall) {
             boundary_rAU_internal[patchi] = nullptr;
             boundary_HbyA_internal[patchi] = nullptr;
@@ -594,11 +594,11 @@ GenMatrix_p(
 #pragma omp parallel for
 #endif
     for (label i = 0; i < nFaces; ++i) {
-        double w = weightsPtr[i];
+        scalar w = weightsPtr[i];
         label owner = own[i];
         label neighbor = nei[i];
-        double rhorAU_owner = rhoPtr[owner] * rAUPtr[owner];
-        double rhorAU_neighbor = rhoPtr[neighbor] * rAUPtr[neighbor];
+        scalar rhorAU_owner = rhoPtr[owner] * rAUPtr[owner];
+        scalar rhorAU_neighbor = rhoPtr[neighbor] * rAUPtr[neighbor];
         rhorAUfPtr[i] = w * (rhorAU_owner - rhorAU_neighbor) + rhorAU_neighbor;
         rhorAUf[i] = rhorAUfPtr[i];
     }
@@ -639,29 +639,29 @@ GenMatrix_p(
 #pragma omp parallel for
 #endif
     for (label i = 0; i < nFaces; ++i) {
-        double weights = weightsPtr[i];
+        scalar weights = weightsPtr[i];
         label owner = own[i];
         label neighbor = nei[i];
-        double Sfx = meshSfPtr[i * 3];
-        double Sfy = meshSfPtr[i * 3 + 1];
-        double Sfz = meshSfPtr[i * 3 + 2];
-        double vf_own_x = UOldPtr[owner * 3 + 0] * rhoOldPtr[owner];
-        double vf_own_y = UOldPtr[owner * 3 + 1] * rhoOldPtr[owner];
-        double vf_own_z = UOldPtr[owner * 3 + 2] * rhoOldPtr[owner];
-        double vf_nei_x = UOldPtr[neighbor * 3 + 0] * rhoOldPtr[neighbor];
-        double vf_nei_y = UOldPtr[neighbor * 3 + 1] * rhoOldPtr[neighbor];
-        double vf_nei_z = UOldPtr[neighbor * 3 + 2] * rhoOldPtr[neighbor];
-        double ssfx_vf = (weights * (vf_own_x - vf_nei_x) + vf_nei_x);
-        double ssfy_vf = (weights * (vf_own_y - vf_nei_y) + vf_nei_y);
-        double ssfz_vf = (weights * (vf_own_z - vf_nei_z) + vf_nei_z);
-        double phiCorrVal = phiOldPtr[i] - (Sfx * ssfx_vf + Sfy * ssfy_vf + Sfz * ssfz_vf);
-        double phiVal = phiOldPtr[i];
-        double tddtCouplingCoeff = 1. - min(fabs(phiCorrVal)/fabs(phiVal) + Foam::SMALL, 1.);
-        double phiHbyA_ = tddtCouplingCoeff * rDeltaT * phiCorrVal * rhorAUfPtr[i];
-        double ssfx_HbyA = (weights * (HbyAPtr[owner * 3 + 0] - HbyAPtr[neighbor * 3 + 0]) + HbyAPtr[neighbor * 3 + 0]);
-        double ssfy_HbyA = (weights * (HbyAPtr[owner * 3 + 1] - HbyAPtr[neighbor * 3 + 1]) + HbyAPtr[neighbor * 3 + 1]);
-        double ssfz_HbyA = (weights * (HbyAPtr[owner * 3 + 2] - HbyAPtr[neighbor * 3 + 2]) + HbyAPtr[neighbor * 3 + 2]);
-        double vf_interp = (weights * (rhoPtr[owner] - rhoPtr[neighbor]) + rhoPtr[neighbor]);
+        scalar Sfx = meshSfPtr[i * 3];
+        scalar Sfy = meshSfPtr[i * 3 + 1];
+        scalar Sfz = meshSfPtr[i * 3 + 2];
+        scalar vf_own_x = UOldPtr[owner * 3 + 0] * rhoOldPtr[owner];
+        scalar vf_own_y = UOldPtr[owner * 3 + 1] * rhoOldPtr[owner];
+        scalar vf_own_z = UOldPtr[owner * 3 + 2] * rhoOldPtr[owner];
+        scalar vf_nei_x = UOldPtr[neighbor * 3 + 0] * rhoOldPtr[neighbor];
+        scalar vf_nei_y = UOldPtr[neighbor * 3 + 1] * rhoOldPtr[neighbor];
+        scalar vf_nei_z = UOldPtr[neighbor * 3 + 2] * rhoOldPtr[neighbor];
+        scalar ssfx_vf = (weights * (vf_own_x - vf_nei_x) + vf_nei_x);
+        scalar ssfy_vf = (weights * (vf_own_y - vf_nei_y) + vf_nei_y);
+        scalar ssfz_vf = (weights * (vf_own_z - vf_nei_z) + vf_nei_z);
+        scalar phiCorrVal = phiOldPtr[i] - (Sfx * ssfx_vf + Sfy * ssfy_vf + Sfz * ssfz_vf);
+        scalar phiVal = phiOldPtr[i];
+        scalar tddtCouplingCoeff = 1. - min(fabs(phiCorrVal)/fabs(phiVal) + Foam::SMALL, 1.);
+        scalar phiHbyA_ = tddtCouplingCoeff * rDeltaT * phiCorrVal * rhorAUfPtr[i];
+        scalar ssfx_HbyA = (weights * (HbyAPtr[owner * 3 + 0] - HbyAPtr[neighbor * 3 + 0]) + HbyAPtr[neighbor * 3 + 0]);
+        scalar ssfy_HbyA = (weights * (HbyAPtr[owner * 3 + 1] - HbyAPtr[neighbor * 3 + 1]) + HbyAPtr[neighbor * 3 + 1]);
+        scalar ssfz_HbyA = (weights * (HbyAPtr[owner * 3 + 2] - HbyAPtr[neighbor * 3 + 2]) + HbyAPtr[neighbor * 3 + 2]);
+        scalar vf_interp = (weights * (rhoPtr[owner] - rhoPtr[neighbor]) + rhoPtr[neighbor]);
         phiHbyA_ += (Sfx * ssfx_HbyA + Sfy * ssfy_HbyA + Sfz * ssfz_HbyA) * vf_interp;
         phiHbyAPtr[i] = phiHbyA_;
         phiHbyA[i] = phiHbyA_;
@@ -717,10 +717,10 @@ GenMatrix_p(
 #pragma omp parallel for
 #endif
     for (label i = 0; i < nCells; ++i) {
-        double srcVal = sourcePtr[i];
+        scalar srcVal = sourcePtr[i];
         assert(srcVal == 0);
-        double APsi = - diagPtr[i] * pPtr[i] + srcVal;
-        double tPsiVal = thermoPsiPtr[i];
+        scalar APsi = - diagPtr[i] * pPtr[i] + srcVal;
+        scalar tPsiVal = thermoPsiPtr[i];
         diagPtr[i] += rDeltaT * meshVPtr[i] * tPsiVal;
         sourcePtr[i] += (rDeltaT * pOldPtr[i] * meshVPtr[i] - APsi) * tPsiVal - (rhoPtr[i] - rhoOldPtr[i]) * rDeltaT * meshVPtr[i];
     }
@@ -736,7 +736,7 @@ GenMatrix_p(
         for (label j = face_start; j < face_end; ++j) {
             label owner = own[j];
             label neighbor = nei[j];
-            double issf = phiHbyAPtr[j];
+            scalar issf = phiHbyAPtr[j];
             sourcePtr[owner] -= issf;
             sourcePtr[neighbor] += issf;
         }
@@ -751,7 +751,7 @@ GenMatrix_p(
             label owner = own[j];
             label neighbor = nei[j];
 
-            double issf = phiHbyAPtr[j];
+            scalar issf = phiHbyAPtr[j];
             sourcePtr[owner] -= issf;
             sourcePtr[neighbor] += issf;
         }
@@ -1032,9 +1032,9 @@ void postProcess_P(
     for (label f = 0; f < nFaces; ++f) {
         label owner = own[f];
         label neighbor = nei[f];
-
         flux[f] = upperPtr[f] * pPtr[neighbor] - upperPtr[f] * pPtr[owner];
     }
+
     // - boundary_flux
 #ifdef _OPENMP
 #pragma omp parallel
@@ -1045,8 +1045,8 @@ void postProcess_P(
 #pragma omp for
 #endif
             for(label p = 0; p < patchSizes[patchi]; ++p){
-                double internal_contrib = boundary_p_internal[patchi][p] * internal_coeffs[patchi][p];
-                double neighbor_contrib = boundary_p[patchi][p] * boundary_coeffs[patchi][p];
+                scalar internal_contrib = boundary_p_internal[patchi][p] * internal_coeffs[patchi][p];
+                scalar neighbor_contrib = boundary_p[patchi][p] * boundary_coeffs[patchi][p];
                 boundary_flux[patchi][p] = internal_contrib - neighbor_contrib;
             }
         } else {
@@ -1059,6 +1059,7 @@ void postProcess_P(
             }
         }
     }
+
     // field_add_scalar
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -1105,10 +1106,10 @@ void postProcess_P(
             scalar grad_x = Sfx * ssf;
             scalar grad_y = Sfy * ssf;
             scalar grad_z = Sfz * ssf;
-            UPtr[owner * 3] += grad_x;
+            UPtr[owner * 3 + 0] += grad_x;
             UPtr[owner * 3 + 1] += grad_y;
             UPtr[owner * 3 + 2] += grad_z;
-            UPtr[neighbor * 3] -= grad_x;
+            UPtr[neighbor * 3 + 0] -= grad_x;
             UPtr[neighbor * 3 + 1] -= grad_y;
             UPtr[neighbor * 3 + 2] -= grad_z;
         }
@@ -1130,10 +1131,10 @@ void postProcess_P(
             scalar grad_x = Sfx * ssf;
             scalar grad_y = Sfy * ssf;
             scalar grad_z = Sfz * ssf;
-            UPtr[owner * 3] += grad_x;
+            UPtr[owner * 3 + 0] += grad_x;
             UPtr[owner * 3 + 1] += grad_y;
             UPtr[owner * 3 + 2] += grad_z;
-            UPtr[neighbor * 3] -= grad_x;
+            UPtr[neighbor * 3 + 0] -= grad_x;
             UPtr[neighbor * 3 + 1] -= grad_y;
             UPtr[neighbor * 3 + 2] -= grad_z;
         }
@@ -1153,9 +1154,9 @@ void postProcess_P(
                 scalar bouSfz = boundary_sf[patchi][p * 3 + 2];
                 scalar boup = (1 - bouWeight) * boundary_p[patchi][p] + bouWeight * boundary_p_internal[patchi][p];
                 label faceCell = faceCells_patch[p];
-                double grad_x = bouSfx * boup;
-                double grad_y = bouSfy * boup;
-                double grad_z = bouSfz * boup;
+                scalar grad_x = bouSfx * boup;
+                scalar grad_y = bouSfy * boup;
+                scalar grad_z = bouSfz * boup;
 #ifdef _OPENMP
 #pragma omp atomic
 #endif
@@ -1179,9 +1180,9 @@ void postProcess_P(
                 scalar bouSfy = boundary_sf[patchi][p * 3 + 1];
                 scalar bouSfz = boundary_sf[patchi][p * 3 + 2];
                 label faceCell = faceCells_patch[p];
-                double grad_x = bouSfx * boup;
-                double grad_y = bouSfy * boup;
-                double grad_z = bouSfz * boup;
+                scalar grad_x = bouSfx * boup;
+                scalar grad_y = bouSfy * boup;
+                scalar grad_z = bouSfz * boup;
 #ifdef _OPENMP
 #pragma omp atomic
 #endif
@@ -1203,30 +1204,15 @@ void postProcess_P(
 #endif
     for (label c = 0; c < nCells; ++c) {
         scalar meshVRTmp = 1. / meshVPtr[c];
-        UPtr[c * 3] *= meshVRTmp;
-        UPtr[c * 3 + 1] *= meshVRTmp;
-        UPtr[c * 3 + 2] *= meshVRTmp;
-    }
-
-    // - scalar_field_multiply_vector_field
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (label c = 0; c < nCells; ++c) {
-        UPtr[c * 3] *= rAUPtr[c];
-        UPtr[c * 3 + 1] *= rAUPtr[c];
-        UPtr[c * 3 + 2] *= rAUPtr[c];
-    }
-
-    // - field_add_vector
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (label c = 0; c < nCells; ++c) {
-        UPtr[c * 3] = HbyAPtr[c * 3] - UPtr[c * 3];
+        scalar rAU = rAUPtr[c];
+        UPtr[c * 3 + 0] *= meshVRTmp * rAU;
+        UPtr[c * 3 + 1] *= meshVRTmp * rAU;
+        UPtr[c * 3 + 2] *= meshVRTmp * rAU;
+        UPtr[c * 3 + 0] = HbyAPtr[c * 3 + 0] - UPtr[c * 3 + 0];
         UPtr[c * 3 + 1] = HbyAPtr[c * 3 + 1] - UPtr[c * 3 + 1];
         UPtr[c * 3 + 2] = HbyAPtr[c * 3 + 2] - UPtr[c * 3 + 2];
     }
+
     Info << "postProcess_P update U : " << clock.timeIncrement() << endl;
 
     // - correct_boundary_conditions_vector
@@ -1275,11 +1261,12 @@ void postProcess_P(
 #pragma omp parallel for
 #endif
     for (label c = 0; c < nCells; ++c) {
-        scalar u = UPtr[c * 3];
+        scalar u = UPtr[c * 3 + 1];
         scalar v = UPtr[c * 3 + 1];
         scalar w = UPtr[c * 3 + 2];
         KPtr[c] = 0.5 * (u * u + v * v + w * w);
     }
+
     for (label patchi = 0; patchi < nPatches; ++patchi) {
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -1300,7 +1287,33 @@ void postProcess_P(
     for (label c = 0; c < nCells; ++c) {
         dpdtPtr[c] = (pPtr[c] - pOldPtr[c]) * rDeltaT;
     }
+
     Info << "postProcess_P update dpdt : " << clock.timeIncrement() << endl;
+
+
+    for(label patchi = 0; patchi < nPatches; ++patchi) {
+        delete [] boundary_flux[patchi];
+        if(patchTypes[patchi] == MeshSchedule::PatchType::processor){
+            delete [] boundary_p_internal[patchi];
+            delete [] boundary_u_internal[patchi];
+        }
+    }
+
+    delete [] flux;
+    delete [] faceCells;
+    delete [] boundary_p;
+    delete [] boundary_p_internal;
+    delete [] boundary_u;
+    delete [] boundary_u_internal;
+    delete [] boundary_flux;
+    delete [] boundary_phi;
+    delete [] boundary_phiHbyA;
+    delete [] boundary_sf;
+    delete [] boundary_weights;
+    delete [] boundary_K;
+    delete [] internal_coeffs;
+    delete [] boundary_coeffs;
+    Info << "postProcess_P free : " << clock.timeIncrement() << endl;
     Info << "postProcess_P total : " << clock.elapsedTime() << endl;
 }
 
