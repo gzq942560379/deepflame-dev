@@ -3,9 +3,9 @@ XYBlock1DColoringStructuredMeshSchedule::buildXYBlock1DColoringStructuredMeshSch
 
 XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule().show();
 
-XBlock2DPartitionStructuredMeshSchedule::buildXBlock2DPartitionStructuredMeshSchedule(mesh);
+// XBlock2DPartitionStructuredMeshSchedule::buildXBlock2DPartitionStructuredMeshSchedule(mesh);
 
-XBlock2DPartitionStructuredMeshSchedule::getXBlock2DPartitionStructuredMeshSchedule().show();
+// XBlock2DPartitionStructuredMeshSchedule::getXBlock2DPartitionStructuredMeshSchedule().show();
 
 // MPI_Barrier(MPI_COMM_WORLD);
 // MPI_Abort(MPI_COMM_WORLD, -1);
