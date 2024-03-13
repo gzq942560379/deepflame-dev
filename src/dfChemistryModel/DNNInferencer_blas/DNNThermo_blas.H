@@ -17,9 +17,6 @@ private:
     std::vector<int64_t> layers1_;
     std::vector<Layer<DataType>*> model0_;
     std::vector<Layer<DataType>*> model1_;
-    std::vector<Layer<DataType>*> model2_;
-    std::vector<Layer<DataType>*> model3_;
-    std::vector<Layer<DataType>*> model4_;
 
     double FLOPs_per_sample0_;
     double FLOPs_per_sample1_;
@@ -46,8 +43,7 @@ public:
     // Inference
     void Inference(
         const int64_t input_count, const DataType* input, 
-        DataType* output0, DataType* output1, DataType* output2,
-        DataType* output3, DataType* output4);
+        DataType* output0, DataType* output1);
 };
 
 #endif
