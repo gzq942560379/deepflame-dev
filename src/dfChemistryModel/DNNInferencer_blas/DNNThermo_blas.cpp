@@ -115,51 +115,6 @@ void DNNThermo_blas<DataType>::load_models(const std::string dir) {
         }
     }
 
-    // - model 2
-    YAML::Node modelNode2 = setting1["model"];
-    for(size_t i = 0; i < modelNode2.size(); ++i){
-        std::string layerType = modelNode2[i]["layer"]["type"].as<std::string>();
-        int64_t in_features = modelNode2[i]["layer"]["in_features"].as<int64_t>();
-        int64_t out_features = modelNode2[i]["layer"]["out_features"].as<int64_t>();
-        if(layerType == "LinearGELU"){
-            model2_.push_back(new LinearGELU<DataType>(in_features, out_features));
-        }else if(layerType == "Linear"){
-            model2_.push_back(new Linear<DataType>(in_features, out_features));
-        }else{
-            assert(false);
-        }
-    }
-
-    // - model 3
-    YAML::Node modelNode3 = setting1["model"];
-    for(size_t i = 0; i < modelNode3.size(); ++i){
-        std::string layerType = modelNode3[i]["layer"]["type"].as<std::string>();
-        int64_t in_features = modelNode3[i]["layer"]["in_features"].as<int64_t>();
-        int64_t out_features = modelNode3[i]["layer"]["out_features"].as<int64_t>();
-        if(layerType == "LinearGELU"){
-            model3_.push_back(new LinearGELU<DataType>(in_features, out_features));
-        }else if(layerType == "Linear"){
-            model3_.push_back(new Linear<DataType>(in_features, out_features));
-        }else{
-            assert(false);
-        }
-    }
-
-    // - model 4
-    YAML::Node modelNode4 = setting1["model"];
-    for(size_t i = 0; i < modelNode4.size(); ++i){
-        std::string layerType = modelNode4[i]["layer"]["type"].as<std::string>();
-        int64_t in_features = modelNode4[i]["layer"]["in_features"].as<int64_t>();
-        int64_t out_features = modelNode4[i]["layer"]["out_features"].as<int64_t>();
-        if(layerType == "LinearGELU"){
-            model4_.push_back(new LinearGELU<DataType>(in_features, out_features));
-        }else if(layerType == "Linear"){
-            model4_.push_back(new Linear<DataType>(in_features, out_features));
-        }else{
-            assert(false);
-        }
-    }
-
     // load parameters
     for(int i = 0; i < model0_.size(); ++i){
         model0_[i]->load_parameters(dir+"/0", i);
@@ -167,23 +122,16 @@ void DNNThermo_blas<DataType>::load_models(const std::string dir) {
     for(int i = 0; i < model1_.size(); ++i){
         model1_[i]->load_parameters(dir+"/1", i);
     }
-    for(int i = 0; i < model2_.size(); ++i){
-        model2_[i]->load_parameters(dir+"/2", i);
-    }
-    for(int i = 0; i < model3_.size(); ++i){
-        model3_[i]->load_parameters(dir+"/3", i);
-    }
-    for(int i = 0; i < model4_.size(); ++i){
-        model4_[i]->load_parameters(dir+"/4", i);
-    }
 
     buffer_alloced_ = true;
     FLOPs_per_sample0_ = 0;
     FLOPs_per_sample1_ = 0;
     for(size_t i = 1; i < layers0_.size() - 1; ++i){
         output_buffer0_.push_back((DataType*)aligned_alloc(64, batch_size_ * layers0_[i] * sizeof(DataType)));
-        output_buffer1_.push_back((DataType*)aligned_alloc(64, batch_size_ * layers1_[i] * sizeof(DataType)));
         FLOPs_per_sample0_ += 2.0 * layers0_[i - 1] * layers0_[i];
+    }
+    for(size_t i = 1; i < layers1_.size() - 1; ++i){
+        output_buffer1_.push_back((DataType*)aligned_alloc(64, batch_size_ * layers1_[i] * sizeof(DataType)));
         FLOPs_per_sample1_ += 2.0 * layers1_[i - 1] * layers1_[i];
     }
 }
@@ -191,23 +139,13 @@ void DNNThermo_blas<DataType>::load_models(const std::string dir) {
 template<typename DataType>
 void DNNThermo_blas<DataType>::Inference(
     const int64_t input_count, const DataType* input, 
-    DataType* output0, DataType* output1, DataType* output2,
-    DataType* output3, DataType* output4
+    DataType* output0, DataType* output1
 ){
     for(size_t i = 0; i < model0_.size(); ++i){
         model0_[i]->reset_timer();
     }
     for(size_t i = 0; i < model1_.size(); ++i){
         model1_[i]->reset_timer();
-    }
-    for(size_t i = 0; i < model2_.size(); ++i){
-        model2_[i]->reset_timer();
-    }
-    for(size_t i = 0; i < model3_.size(); ++i){
-        model3_[i]->reset_timer();
-    }
-    for(size_t i = 0; i < model4_.size(); ++i){
-        model4_[i]->reset_timer();
     }
     double dnn_infer_start = MPI_Wtime();
     // inference 
@@ -226,6 +164,9 @@ void DNNThermo_blas<DataType>::Inference(
             model0_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
+
+    // std::cout << "Done NN0 inference" << std::endl;
+
     // - NN1
     for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
         int64_t sample_end = std::min(input_count, sample_start + batch_size_);
@@ -236,59 +177,13 @@ void DNNThermo_blas<DataType>::Inference(
             tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[i]}, output_buffer1_[i - 1]));
         }
         tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[layers1_.size() - 1]}, output1 + sample_start * output_dim1()));
-
         for(size_t i = 0; i < model1_.size(); ++i){
             model1_[i]->forward(tensor_list[i], tensor_list[i+1]);
         }
     }
-    // - NN2
-    for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
-        int64_t sample_end = std::min(input_count, sample_start + batch_size_);
-        int64_t sample_len = sample_end - sample_start;
-        std::vector<Tensor<DataType>> tensor_list;
-        tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[0]}, const_cast<DataType*>(input) + sample_start * input_dim1()));
-        for(size_t i = 1; i < layers1_.size() - 1; ++i){
-            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[i]}, output_buffer1_[i - 1]));
-        }
-        tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[layers1_.size() - 1]}, output2 + sample_start * output_dim1()));
-
-        for(size_t i = 0; i < model2_.size(); ++i){
-            model2_[i]->forward(tensor_list[i], tensor_list[i+1]);
-        }
-    }
-    // - NN3
-    for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
-        int64_t sample_end = std::min(input_count, sample_start + batch_size_);
-        int64_t sample_len = sample_end - sample_start;
-        std::vector<Tensor<DataType>> tensor_list;
-        tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[0]}, const_cast<DataType*>(input) + sample_start * input_dim1()));
-        for(size_t i = 1; i < layers1_.size() - 1; ++i){
-            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[i]}, output_buffer1_[i - 1]));
-        }
-        tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[layers1_.size() - 1]}, output3 + sample_start * output_dim1()));
-
-        for(size_t i = 0; i < model3_.size(); ++i){
-            model3_[i]->forward(tensor_list[i], tensor_list[i+1]);
-        }
-    }
-    // - NN4
-    for(int64_t sample_start = 0; sample_start < input_count; sample_start += batch_size_){
-        int64_t sample_end = std::min(input_count, sample_start + batch_size_);
-        int64_t sample_len = sample_end - sample_start;
-        std::vector<Tensor<DataType>> tensor_list;
-        tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[0]}, const_cast<DataType*>(input) + sample_start * input_dim1()));
-        for(size_t i = 1; i < layers1_.size() - 1; ++i){
-            tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[i]}, output_buffer1_[i - 1]));
-        }
-        tensor_list.emplace_back(Tensor<DataType>({sample_len, layers1_[layers1_.size() - 1]}, output4 + sample_start * output_dim1()));
-
-        for(size_t i = 0; i < model4_.size(); ++i){
-            model4_[i]->forward(tensor_list[i], tensor_list[i+1]);
-        }
-    }
     double dnn_infer_end = MPI_Wtime();
     double dnn_infer_time = dnn_infer_end - dnn_infer_start;
-    double FLOPs = input_count * FLOPs_per_sample0_ + 4 * input_count * FLOPs_per_sample1_;
+    double FLOPs = input_count * FLOPs_per_sample0_ + input_count * FLOPs_per_sample1_;
     int num_threads = omp_get_max_threads();
     double theoretical_peak = 3.3792 / 48. * num_threads;
     if(sizeof(DataType) == sizeof(double)){
@@ -330,18 +225,6 @@ void DNNThermo_blas<DataType>::Inference(
         }
         for(size_t i = 0; i < model1_.size(); ++i){
             model1_[i]->print_timer();
-            std::cout << "-------------------------------------" << std::endl;
-        }
-        for(size_t i = 0; i < model2_.size(); ++i){
-            model2_[i]->print_timer();
-            std::cout << "-------------------------------------" << std::endl;
-        }
-        for(size_t i = 0; i < model3_.size(); ++i){
-            model3_[i]->print_timer();
-            std::cout << "-------------------------------------" << std::endl;
-        }
-        for(size_t i = 0; i < model4_.size(); ++i){
-            model4_[i]->print_timer();
             std::cout << "-------------------------------------" << std::endl;
         }
     }

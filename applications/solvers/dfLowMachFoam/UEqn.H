@@ -73,6 +73,12 @@ if (pimple.momentumPredictor())
     U_convert_end = MPI_Wtime();
     U_convert_time += U_convert_end - U_convert_start;
 #endif
+#ifdef _CSR_
+    U_convert_start = MPI_Wtime();
+    csrMatrix csr(UEqn);
+    U_convert_end = MPI_Wtime();
+    U_convert_time += U_convert_end - U_convert_start;
+#endif
     U_solve_start = MPI_Wtime();
 #ifdef _DIV_
     auto& psi = const_cast<volVectorField&>(UEqn.psi());
@@ -80,7 +86,16 @@ if (pimple.momentumPredictor())
     auto& internalCoeffs = UEqn.internalCoeffs();
     auto& boundaryCoeffs = UEqn.boundaryCoeffs();
     div.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
+#endif
+#ifdef _CSR_
+    auto& psi = const_cast<volVectorField&>(UEqn.psi());
+    auto& source = UEqn.source();
+    auto& internalCoeffs = UEqn.internalCoeffs();
+    auto& boundaryCoeffs = UEqn.boundaryCoeffs();
+    csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#endif
+
+#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
     UEqn.solve();
 #endif
 
