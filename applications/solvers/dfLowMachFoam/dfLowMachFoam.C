@@ -210,19 +210,27 @@ int main(int argc, char *argv[])
     pybind11::scoped_interpreter guard{};//start python interpreter
 #endif
 
+    clockTime initClock;
+
     #include "postProcess.H"
+
+    double postProcess_time = initClock.timeIncrement();
+
     // #include "setRootCaseLists.H"
     #include "listOptions.H"
 
+    double listOptions_time = initClock.timeIncrement();
+
     // MPI init here
     #include "setRootCase2.H"
+
+    double setRootCase2_time = initClock.timeIncrement();
+
+    Info << "postProcess time : " << postProcess_time << endl;
+    Info << "listOptions time : " << listOptions_time << endl;
+    Info << "setRootCase2 time : " << setRootCase2_time << endl;
     
     env_show();
-
-    benchmark();
-
- 
-    clockTime initClock;
 
     #include "listOutput.H"
     double listOutput_time = initClock.timeIncrement();
@@ -259,18 +267,16 @@ int main(int argc, char *argv[])
     double turbulenceValidate_time = initClock.timeIncrement();
     Info << "turbulenceValidate time : " << turbulenceValidate_time << endl;
 
-    if (!LTS)
-    {
-        #include "compressibleCourantNo.H"
-        #include "setInitialDeltaT.H"
-    }
+    // if (!LTS)
+    // {
+    //     #include "compressibleCourantNo.H"
+    //     #include "setInitialDeltaT.H"
+    // }
+
     int flag_mpi_init;
-    MPI_Initialized(&flag_mpi_init);
-    if(flag_mpi_init){
-        MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-    }
-    double setInitialDeltaT_time = initClock.timeIncrement();
-    Info << "setInitialDeltaT time : " << setInitialDeltaT_time << endl;
+
+    // double setInitialDeltaT_time = initClock.timeIncrement();
+    // Info << "setInitialDeltaT time : " << setInitialDeltaT_time << endl;
 
     double refine_time = 0.;
 

@@ -18,7 +18,25 @@ DNNThermo_blas<DataType>::DNNThermo_blas() {
 
 // TODO: Implement the destructor
 template<typename DataType>
-DNNThermo_blas<DataType>::~DNNThermo_blas() {}
+DNNThermo_blas<DataType>::~DNNThermo_blas() {
+    for(int i = 0;i < model0_.size(); ++i){
+        delete model0_[i];
+    }
+    model0_.clear();
+
+    for(size_t i = 0; i < output_buffer0_.size(); ++i){
+        free(output_buffer0_[i]);
+    }
+
+    for(int i = 0;i < model1_.size(); ++i){
+        delete model1_[i];
+    }
+    model1_.clear();
+
+    for(size_t i = 0; i < output_buffer1_.size(); ++i){
+        free(output_buffer1_[i]);
+    }
+}
 
 template<typename DataType>
 void DNNThermo_blas<DataType>::load_models(const std::string dir) {
