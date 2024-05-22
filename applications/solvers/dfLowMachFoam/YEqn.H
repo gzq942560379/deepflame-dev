@@ -1,4 +1,4 @@
-start = MPI_Wtime();
+start = std::clock();
 
 hDiffCorrFlux = Zero;
 diffAlphaD = Zero;
@@ -19,14 +19,14 @@ forAll(Y, i)
 {
     sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
 }
-const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
+const surfaceScalarField phiUc = linearInterpolate(sumYDiffError) & mesh.Sf();
 
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 label flag_mpi_init;
 MPI_Initialized(&flag_mpi_init);
 if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-end = MPI_Wtime();
-time_monitor_corrDiff += end - start;
+end = std::clock();
+time_monitor_corrDiff += double(end - start) / double(CLOCKS_PER_SEC);
 
 {
     if (!splitting)
@@ -43,7 +43,7 @@ time_monitor_corrDiff += end - start;
 
     volScalarField Yt(0.0*Y[0]);
 
-    start = MPI_Wtime();
+    start = std::clock();
     forAll(Y, i)
     {
         volScalarField& Yi = Y[i];
@@ -78,6 +78,6 @@ time_monitor_corrDiff += end - start;
     Y[inertIndex] = scalar(1) - Yt;
     Y[inertIndex].max(0.0);
 
-    end = MPI_Wtime();
-    time_monitor_Y += end - start;
+    end = std::clock();
+    time_monitor_Y += double(end - start) / double(CLOCKS_PER_SEC);
 }

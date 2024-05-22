@@ -17,7 +17,7 @@ forAll(Y, i)
 {
     sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
 }
-const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
+const surfaceScalarField phiUc = linearInterpolate(sumYDiffError) & mesh.Sf();
 
 {
     combustion->correct();

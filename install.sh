@@ -23,7 +23,7 @@ if [ $USE_LIBTORCH = true ]; then
     cd build
     cmake ..
     make 
-    cp ./libDNNInferencer.so $DF_ROOT/lib/
+    export LD_LIBRARY_PATH=$DF_SRC/dfChemistryModel/DNNInferencer/build:$LD_LIBRARY_PATH
 fi
 cd $DF_ROOT
 ./Allwmake -j && print_finish

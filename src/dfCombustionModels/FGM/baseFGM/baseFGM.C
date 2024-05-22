@@ -281,12 +281,12 @@ Foam::combustionModels::baseFGM<ReactionThermo>::baseFGM
     cvarMin_(0.0),
     ZcvarMax_(0.25),
     ZcvarMin_(-0.25),
-    rho_(const_cast<volScalarField&>(this->mesh().objectRegistry::template lookupObject<volScalarField>("rho"))),
+    rho_(const_cast<volScalarField&>(this->mesh().objectRegistry::lookupObject<volScalarField>("rho"))),
     p_(this->thermo().p()),
     T_(this->thermo().T()),
-    U_(this->mesh().objectRegistry::template  lookupObject<volVectorField>("U")),
-    dpdt_(this->mesh().objectRegistry::template lookupObject<volScalarField>("dpdt")),        
-    phi_(this->mesh().objectRegistry::template lookupObject<surfaceScalarField>("phi")),
+    U_(this->mesh().objectRegistry::lookupObject<volVectorField>("U")),
+    dpdt_(this->mesh().objectRegistry::lookupObject<volScalarField>("dpdt")),        
+    phi_(this->mesh().objectRegistry::lookupObject<surfaceScalarField>("phi")),
     TCells_(T_.primitiveFieldRef()),
     ignBeginTime_(this->coeffs().lookupOrDefault("ignBeginTime", 0.0)),  
     ignDurationTime_(this->coeffs().lookupOrDefault("ignDurationTime", 0.0)),
@@ -561,9 +561,9 @@ void Foam::combustionModels::baseFGM<ReactionThermo>::initialiseFalmeKernel()
     if(ignition_ && reactFlowTime_ > 0.0 && reactFlowTime_ < ignDurationTime_)
     {
         const vectorField& centre = this->mesh().cellCentres();    
-        const scalarField x = centre.component(vector::X).ref();  
-        const scalarField y = centre.component(vector::Y).ref(); 
-        const scalarField z = centre.component(vector::Z).ref(); 
+        const scalarField x = centre.component(vector::X);  
+        const scalarField y = centre.component(vector::Y); 
+        const scalarField z = centre.component(vector::Z); 
 
         forAll(cCells_,celli) 
         {

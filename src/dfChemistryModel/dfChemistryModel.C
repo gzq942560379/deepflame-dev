@@ -132,8 +132,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     time_DNNinference_ = 0;
     time_updateSolutionBuffer_ = 0;
     time_getProblems_ = 0;
-    time_cvode_ = 0;
-    time_update_RR_ = 0;
 #endif
 
 #ifdef USE_LIBTORCH
@@ -180,8 +178,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     time_vec2ndarray_ = 0;
     time_python_ = 0;
-    time_python_import_module_ = 0;
-    time_python_inference_ = 0;
 #endif
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
@@ -201,8 +197,8 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         {
             label sub_rank;
             MPI_Comm_rank(PstreamGlobals::MPICommunicators_[cvodeComm], &sub_rank);
-            // std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
-            // << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;
+            std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
+            << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;
         }
     }
 #endif

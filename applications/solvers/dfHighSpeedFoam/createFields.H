@@ -56,7 +56,7 @@ volScalarField rho
     thermo.rho()
 );
 
-volScalarField e = (thermo.he() - p/rho).ref();
+volScalarField e = thermo.he() - p/rho;
 volScalarField& ha = thermo.he();
 
 volVectorField rhoU
