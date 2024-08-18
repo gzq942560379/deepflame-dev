@@ -117,15 +117,16 @@ public:
     mutable double PBiCGStab_spmv_time = 0.;
     mutable double PBiCGStab_sumA_time = 0.;
     mutable double PBiCGStab_axpy_time = 0.;
+    mutable double PBiCGStab_reduce_time = 0.;
     mutable double PBiCGStab_reduce_local_time = 0.;
     mutable double PBiCGStab_allreduce_time = 0.;
-    mutable double PBiCGStab_norm_local_time = 0.;
+    mutable double PBiCGStab_norm_time = 0.;
     mutable double PBiCGStab_precondition_time = 0.;
     mutable double PBiCGStab_misc_time = 0.;
 
     void print_time() const {
         double PBiCGStab_other_time = PBiCGStab_time - PBiCGStab_spmv_time - PBiCGStab_sumA_time - PBiCGStab_axpy_time \
-            - PBiCGStab_reduce_local_time - PBiCGStab_allreduce_time - PBiCGStab_norm_local_time - PBiCGStab_precondition_time \
+            - PBiCGStab_reduce_local_time - PBiCGStab_allreduce_time - PBiCGStab_norm_time - PBiCGStab_precondition_time \
             - PBiCGStab_misc_time;
         Info << "DIVPBiCGStab solve profiling ------------------------------------------------------------" << endl;
         Info << "PBiCGStab time : " << PBiCGStab_time << endl;
@@ -134,7 +135,7 @@ public:
         Info << "PBiCGStab axpy time : " << PBiCGStab_axpy_time << ", " << PBiCGStab_axpy_time / PBiCGStab_time * 100 << "%" << endl;
         Info << "PBiCGStab reduce local time : " << PBiCGStab_reduce_local_time << ", " << PBiCGStab_reduce_local_time / PBiCGStab_time * 100 << "%" << endl;
         Info << "PBiCGStab allreduce time : " << PBiCGStab_allreduce_time << ", " << PBiCGStab_allreduce_time / PBiCGStab_time * 100 << "%" << endl;
-        Info << "PBiCGStab norm local time : " << PBiCGStab_norm_local_time << ", " << PBiCGStab_norm_local_time / PBiCGStab_time * 100 << "%" << endl;
+        Info << "PBiCGStab norm local time : " << PBiCGStab_norm_time << ", " << PBiCGStab_norm_time / PBiCGStab_time * 100 << "%" << endl;
         Info << "PBiCGStab misc time : " << PBiCGStab_misc_time << ", " << PBiCGStab_misc_time / PBiCGStab_time * 100 << "%" << endl;
         Info << "PBiCGStab other time : " << PBiCGStab_other_time << ", " << PBiCGStab_other_time / PBiCGStab_time * 100 << "%" << endl;
         Info << "----------------------------------------------------------------------------------------" << endl;

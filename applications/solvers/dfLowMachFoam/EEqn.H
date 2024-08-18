@@ -76,15 +76,34 @@
     check_fvmatrix_equal(EEqn, EEqn_answer, "EEqn");
 #endif
 
-#ifdef _DIV_
     E_convert_start = MPI_Wtime();
+
+#if defined(_LDU_)
+    LDUMatrix ldu(EEqn);
+#elif defined(_CSR_)
+    csrMatrix csr(EEqn);
+#elif defined(_DIV_)
     div.copy_value_from_fvMatrix(EEqn);
-    E_convert_end = MPI_Wtime();
-    E_convert_time += E_convert_end - E_convert_start;
 #endif
 
+    E_convert_end = MPI_Wtime();
+    E_convert_time += E_convert_end - E_convert_start;
+
     E_solve_start = MPI_Wtime();
-#ifdef _DIV_
+
+#if defined(_LDU_)
+    auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(EEqn.psi());
+    auto& source = EEqn.source();
+    auto& internalCoeffs = EEqn.internalCoeffs();
+    auto& boundaryCoeffs = EEqn.boundaryCoeffs();
+    ldu.solve(psi, source, internalCoeffs, boundaryCoeffs); 
+#elif defined(_CSR_)
+    auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(EEqn.psi());
+    auto& source = EEqn.source();
+    auto& internalCoeffs = EEqn.internalCoeffs();
+    auto& boundaryCoeffs = EEqn.boundaryCoeffs();
+    csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#elif defined(_DIV_)
     auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(EEqn.psi());
     auto& source = EEqn.source();
     auto& internalCoeffs = EEqn.internalCoeffs();
@@ -93,6 +112,7 @@
 #else
     EEqn.solve();
 #endif
+
     E_solve_end = MPI_Wtime();
     E_solve_time += E_solve_end - E_solve_start;
 

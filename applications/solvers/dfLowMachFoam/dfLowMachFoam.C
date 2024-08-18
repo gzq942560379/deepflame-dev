@@ -70,12 +70,13 @@ Description
 
 // #define _CSR_
 // #define _ELL_
-#define _DIV_
-// #define _LDU_
-#define OPT_GenMatrix_Y
-#define OPT_GenMatrix_E
-#define OPT_GenMatrix_U
-#define OPT_GenMatrix_p
+// #define _DIV_
+#define _LDU_
+// #define OPT_Scheduler
+// #define OPT_GenMatrix_Y
+// #define OPT_GenMatrix_E
+// #define OPT_GenMatrix_U
+// #define OPT_GenMatrix_p
 // #define OPT_thermo
 // #define OPT_GenMatrix_U_check
 // #define OPT_GenMatrix_Y_check
@@ -278,6 +279,13 @@ int main(int argc, char *argv[])
     // double setInitialDeltaT_time = initClock.timeIncrement();
     // Info << "setInitialDeltaT time : " << setInitialDeltaT_time << endl;
 
+    // csrPattern coarse(mesh);
+    // coarse.write_mtx("coarse");
+
+    // output cell central
+
+    int refine_count = 0;
+
     double refine_time = 0.;
 
     while (runTime.run()){
@@ -287,11 +295,22 @@ int main(int argc, char *argv[])
             #include "Refine.H"
             double refine_once_time = initClock.timeIncrement();
             refine_time += refine_once_time;
+            
+            // csrPattern refine(mesh);
+            // refine.write_mtx("refine_" + std::to_string(refine_count));
+
             Info << "refine once time : " << refine_once_time << endl; 
         }
         break;
     }
     Info << "Refine time : " << refine_time << endl; 
+
+    // Info << "before renumber : " << endl;
+    // tmp<pointField> tPointBeforeRenumber = mesh.cellCentres();
+    // const pointField& pointBeforeRenumber = tPointBeforeRenumber();
+    // for(label i = 0; i < pointBeforeRenumber.size(); ++i){
+    //     Info << i << ", " << pointBeforeRenumber[i].x() << ", " << pointBeforeRenumber[i].y() << ", " << pointBeforeRenumber[i].z() << endl;
+    // }
 
     #include "intializeFields.H"
     double intializeFields_time = initClock.timeIncrement();
@@ -300,6 +319,16 @@ int main(int argc, char *argv[])
     #include "renumberMesh.H"
     double renumber_time = initClock.timeIncrement();
     Info << "Renumber time : " << renumber_time << endl; 
+
+    // csrPattern renumber(mesh);
+    // renumber.write_mtx("after_renumber");
+
+    // Info << "after renumber : " << endl;
+    // tmp<pointField> tPointAfterRenumber = mesh.cellCentres();
+    // const pointField& pointAfterRenumber = tPointAfterRenumber();
+    // for(label i = 0; i < pointAfterRenumber.size(); ++i){
+    //     Info << i << ", " << pointAfterRenumber[i].x() << ", " << pointAfterRenumber[i].y() << ", " << pointAfterRenumber[i].z() << endl;
+    // }
 
     init_const_coeff_ptr(fileName(CanteraTorchProperties.lookup("CanteraMechanismFile")).expand(), Y);
 

@@ -118,6 +118,7 @@ $(LDUMatrix)/preconditioners/LDUDICPreconditioner/LDUDICPreconditioner.C
 $(LDUMatrix)/preconditioners/LDUDILUPreconditioner/LDUDILUPreconditioner.C
 $(LDUMatrix)/preconditioners/LDUGAMGPreconditioner/LDUGAMGPreconditioner.C
 
+$(LDUMatrix)/smoothers/LDUGaussSeidel/LDUGaussSeidelSmoother.C
 $(LDUMatrix)/smoothers/LDUSymGaussSeidel/LDUSymGaussSeidelSmoother.C
 $(LDUMatrix)/smoothers/LDUJacobi/LDUJacobiSmoother.C
 $(LDUMatrix)/smoothers/LDUDIC/LDUDICSmoother.C

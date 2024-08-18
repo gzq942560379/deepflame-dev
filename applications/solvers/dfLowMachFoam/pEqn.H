@@ -112,56 +112,59 @@ p_pre_time += clock.timeIncrement();
 
         p_build_time += clock.timeIncrement();
 
-#ifdef _CSR_
-        csrMatrix csr(pEqn);
-#endif
-#ifdef _ELL_
-        ellMatrix ell(pEqn);
-#endif
-#ifdef _DIV_
-        // divMatrix div(pEqn);
-        div.copy_value_from_fvMatrix(pEqn);
-#endif
-#ifdef _LDU_
+#if defined(_LDU_)
         LDUMatrix LDU(pEqn);
+#elif defined(_CSR_)
+        csrMatrix csr(pEqn);
+#elif defined(_ELL_)
+        ellMatrix ell(pEqn);
+#elif defined(_DIV_)
+        div.copy_value_from_fvMatrix(pEqn);
+#else
 #endif
+
         p_convert_time += clock.timeIncrement();
 
-#ifdef _CSR_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _ELL_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _DIV_
-        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
-        auto& source = pEqn.source();
-        auto& internalCoeffs = pEqn.internalCoeffs();
-        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
-        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _LDU_
+#if defined(_LDU_)
         auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
         auto& source = pEqn.source();
         auto& internalCoeffs = pEqn.internalCoeffs();
         auto& boundaryCoeffs = pEqn.boundaryCoeffs();
         LDU.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-
-#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
+#elif defined(_CSR_)
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#elif defined(_ELL_)
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        ell.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#elif defined(_DIV_)
+        auto& psi = const_cast<GeometricField<scalar, fvPatchField, volMesh>&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
         pEqn.solve();
 #endif
+
         p_solve_time += clock.timeIncrement();
 
+#ifdef OPT_GenMatrix_p
         postProcess_P(p, pEqn, phi, U, rAU, HbyA, K, dpdt, phiHbyA);
+#endif
+
+#ifndef OPT_GenMatrix_p
+        if (pimple.finalNonOrthogonalIter())
+        {
+            phi = phiHbyA + pEqn.flux();
+        }
+#endif
 
 #ifdef OPT_GenMatrix_p_check
         if (pimple.finalNonOrthogonalIter())
@@ -176,7 +179,6 @@ p_pre_time += clock.timeIncrement();
 // }
 
 bool limitedp = pressureControl.limit(p);
-
 // Thermodynamic density update
 thermo.correctRho(psi*p - psip0);
 
@@ -191,6 +193,12 @@ if (limitedp)
 // Explicitly relax pressure for momentum corrector
 p.relax();
 
+#ifndef OPT_GenMatrix_p
+U = HbyA - rAU*fvc::grad(p);
+U.correctBoundaryConditions();
+K = 0.5*magSqr(U);
+#endif
+
 #ifdef OPT_GenMatrix_p_check
 tmp<volVectorField> tUref = HbyAref - rAUref*fvc::grad(p);
 volVectorField& Uref = tUref.ref();
@@ -203,6 +211,19 @@ if (pimple.simpleRho())
 {
     rho = thermo.rho();
 }
+
+#ifndef OPT_GenMatrix_p
+fvc::correctRhoUf(rhoUf, rho, U, phi);
+if (thermo.dpdt())
+{
+    dpdt = fvc::ddt(p);
+
+    if (mesh.moving())
+    {
+        dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
+    }
+}
+#endif
 
 #ifdef OPT_GenMatrix_p_check
 if (thermo.dpdt())

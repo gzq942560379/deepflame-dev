@@ -194,7 +194,9 @@ rAUConstructor
 
     rAU.ref().primitiveFieldRef() = 1.0 / (tdiag / mesh.V());
 
+// #ifdef _OPENMP
     // #pragma omp parallel for
+// #endif
     // for(label i = 0; i < diagD.size(); ++i){
     //     rAU.ref().primitiveFieldRef()[i] = 1.0 / tdiag()[i] / mesh.V()[i];
     // }
@@ -241,7 +243,9 @@ rhorAUfConstructor
     const labelUList& P = mesh.owner();
     const labelUList& N = mesh.neighbour();
 
+#ifdef _OPENMP
     #pragma omp parallel for
+#endif
     for (label fi=0; fi<P.size(); fi++)
     {
         rhorAUfPtr[fi] = (linearWeightsPtr[fi]*(rhorAUPtr[P[fi]] - rhorAUPtr[N[fi]]) + rhorAUPtr[N[fi]]);
@@ -398,8 +402,8 @@ GenMatrix_p(
     const fvMesh& mesh = p.mesh(); 
     assert(mesh.moving() == false);
 
-    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
-    const labelList& face_scheduling = meshSchedule.face_scheduling();
+    const MeshSchedule& meshSchedule = getSchedule();
+
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -727,36 +731,57 @@ GenMatrix_p(
 
     // fvc_div
     // - internal
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for (label j = face_start; j < face_end; ++j) {
-            label owner = own[j];
-            label neighbor = nei[j];
-            scalar issf = phiHbyAPtr[j];
-            sourcePtr[owner] -= issf;
-            sourcePtr[neighbor] += issf;
-        }
-    }
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for (label j = face_start; j < face_end; ++j) {
-            label owner = own[j];
-            label neighbor = nei[j];
-
-            scalar issf = phiHbyAPtr[j];
-            sourcePtr[owner] -= issf;
-            sourcePtr[neighbor] += issf;
-        }
-    }
     
+#ifdef OPT_FACE2CELL_COLORING_SCHEDULE
+
+    {
+        const XYBlock1DColoringStructuredMeshSchedule& coloringSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
+        const labelList& face_scheduling = coloringSchedule.face_scheduling();
+
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+            label face_start = face_scheduling[face_scheduling_i]; 
+            label face_end = face_scheduling[face_scheduling_i+1];
+            for (label j = face_start; j < face_end; ++j) {
+                label owner = own[j];
+                label neighbor = nei[j];
+                scalar issf = phiHbyAPtr[j];
+                sourcePtr[owner] -= issf;
+                sourcePtr[neighbor] += issf;
+            }
+        }
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+            label face_start = face_scheduling[face_scheduling_i]; 
+            label face_end = face_scheduling[face_scheduling_i+1];
+            for (label j = face_start; j < face_end; ++j) {
+                label owner = own[j];
+                label neighbor = nei[j];
+
+                scalar issf = phiHbyAPtr[j];
+                sourcePtr[owner] -= issf;
+                sourcePtr[neighbor] += issf;
+            }
+        }
+        
+    }
+
+#else
+
+    for (label j = 0; j < nFaces; ++j) {
+        label owner = own[j];
+        label neighbor = nei[j];
+        scalar issf = phiHbyAPtr[j];
+        sourcePtr[owner] -= issf;
+        sourcePtr[neighbor] += issf;
+    }
+
+#endif
+ 
     // - boundary
     for (label patchi = 0; patchi < nPatches; ++patchi) {
         for (label f = 0; f < patchSizes[patchi]; ++f) {
@@ -767,38 +792,61 @@ GenMatrix_p(
 
     // fvm_laplacian_surface_scalar_vol_scalar
     // - internal
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for (label j = face_start; j < face_end; ++j) {
-            label owner = own[j];
-            label neighbor = nei[j];
-            scalar face_gamma = rhorAUfPtr[j];
-            scalar value = face_gamma * magSfPtr[j] * deltaCoeffsPtr[j] * -1;
-            upperPtr[j] += value;
-            diagPtr[owner] -= value;
-            diagPtr[neighbor] -= value;
+
+#ifdef OPT_FACE2CELL_COLORING_SCHEDULE
+
+    {
+        const XYBlock1DColoringStructuredMeshSchedule& coloringMeshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
+        const labelList& face_scheduling = coloringMeshSchedule.face_scheduling();
+        
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+            label face_start = face_scheduling[face_scheduling_i]; 
+            label face_end = face_scheduling[face_scheduling_i+1];
+            for (label j = face_start; j < face_end; ++j) {
+                label owner = own[j];
+                label neighbor = nei[j];
+                scalar face_gamma = rhorAUfPtr[j];
+                scalar value = face_gamma * magSfPtr[j] * deltaCoeffsPtr[j] * -1;
+                upperPtr[j] += value;
+                diagPtr[owner] -= value;
+                diagPtr[neighbor] -= value;
+            }
+        }
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+            label face_start = face_scheduling[face_scheduling_i]; 
+            label face_end = face_scheduling[face_scheduling_i+1];
+            for (label j = face_start; j < face_end; ++j) {
+                label owner = own[j];
+                label neighbor = nei[j];
+                scalar face_gamma = rhorAUfPtr[j];
+                scalar value = face_gamma * magSfPtr[j] * deltaCoeffsPtr[j] * -1;
+                upperPtr[j] += value;
+                diagPtr[owner] -= value;
+                diagPtr[neighbor] -= value;
+            }
         }
     }
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for (label j = face_start; j < face_end; ++j) {
-            label owner = own[j];
-            label neighbor = nei[j];
-            scalar face_gamma = rhorAUfPtr[j];
-            scalar value = face_gamma * magSfPtr[j] * deltaCoeffsPtr[j] * -1;
-            upperPtr[j] += value;
-            diagPtr[owner] -= value;
-            diagPtr[neighbor] -= value;
-        }
+
+#else
+
+    for (label j = 0; j < nFaces; ++j) {
+        label owner = own[j];
+        label neighbor = nei[j];
+        scalar face_gamma = rhorAUfPtr[j];
+        scalar value = face_gamma * magSfPtr[j] * deltaCoeffsPtr[j] * -1;
+        upperPtr[j] += value;
+        diagPtr[owner] -= value;
+        diagPtr[neighbor] -= value;
     }
+
+#endif
+
 
     Info << "Gen_p source diag upper : " << clock.timeIncrement() << endl;
 
@@ -887,8 +935,8 @@ void postProcess_P(
     clockTime clock;
     const fvMesh& mesh = p.mesh();
 
-    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
-    const labelList& face_scheduling = meshSchedule.face_scheduling();
+    const MeshSchedule& meshSchedule = getSchedule();
+
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -1083,56 +1131,86 @@ void postProcess_P(
     }
 
     // - fvc_grad_scalar_internal
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for (label j = face_start; j < face_end; ++j) {
-            label owner = own[j];
-            label neighbor = nei[j];
-            scalar w = weightsPtr[j];
-            scalar Sfx = meshSfPtr[j * 3];
-            scalar Sfy = meshSfPtr[j * 3 + 1];
-            scalar Sfz = meshSfPtr[j * 3 + 2];
-            scalar ssf = w * (p[owner] - p[neighbor]) + p[neighbor];
-            scalar grad_x = Sfx * ssf;
-            scalar grad_y = Sfy * ssf;
-            scalar grad_z = Sfz * ssf;
-            UPtr[owner * 3 + 0] += grad_x;
-            UPtr[owner * 3 + 1] += grad_y;
-            UPtr[owner * 3 + 2] += grad_z;
-            UPtr[neighbor * 3 + 0] -= grad_x;
-            UPtr[neighbor * 3 + 1] -= grad_y;
-            UPtr[neighbor * 3 + 2] -= grad_z;
+#ifdef OPT_FACE2CELL_COLORING_SCHEDULE
+
+    {
+        const XYBlock1DColoringStructuredMeshSchedule& coloringSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
+        const labelList& face_scheduling = coloringSchedule.face_scheduling();
+
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
+            label face_start = face_scheduling[face_scheduling_i]; 
+            label face_end = face_scheduling[face_scheduling_i+1];
+            for (label j = face_start; j < face_end; ++j) {
+                label owner = own[j];
+                label neighbor = nei[j];
+                scalar w = weightsPtr[j];
+                scalar Sfx = meshSfPtr[j * 3];
+                scalar Sfy = meshSfPtr[j * 3 + 1];
+                scalar Sfz = meshSfPtr[j * 3 + 2];
+                scalar ssf = w * (p[owner] - p[neighbor]) + p[neighbor];
+                scalar grad_x = Sfx * ssf;
+                scalar grad_y = Sfy * ssf;
+                scalar grad_z = Sfz * ssf;
+                UPtr[owner * 3 + 0] += grad_x;
+                UPtr[owner * 3 + 1] += grad_y;
+                UPtr[owner * 3 + 2] += grad_z;
+                UPtr[neighbor * 3 + 0] -= grad_x;
+                UPtr[neighbor * 3 + 1] -= grad_y;
+                UPtr[neighbor * 3 + 2] -= grad_z;
+            }
+        }
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
+            label face_start = face_scheduling[face_scheduling_i]; 
+            label face_end = face_scheduling[face_scheduling_i+1];
+            for (label j = face_start; j < face_end; ++j) {
+                label owner = own[j];
+                label neighbor = nei[j];
+                scalar w = weightsPtr[j];
+                scalar Sfx = meshSfPtr[j * 3];
+                scalar Sfy = meshSfPtr[j * 3 + 1];
+                scalar Sfz = meshSfPtr[j * 3 + 2];
+                scalar ssf = w * (p[owner] - p[neighbor]) + p[neighbor];
+                scalar grad_x = Sfx * ssf;
+                scalar grad_y = Sfy * ssf;
+                scalar grad_z = Sfz * ssf;
+                UPtr[owner * 3 + 0] += grad_x;
+                UPtr[owner * 3 + 1] += grad_y;
+                UPtr[owner * 3 + 2] += grad_z;
+                UPtr[neighbor * 3 + 0] -= grad_x;
+                UPtr[neighbor * 3 + 1] -= grad_y;
+                UPtr[neighbor * 3 + 2] -= grad_z;
+            }
         }
     }
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
-        label face_start = face_scheduling[face_scheduling_i]; 
-        label face_end = face_scheduling[face_scheduling_i+1];
-        for (label j = face_start; j < face_end; ++j) {
-            label owner = own[j];
-            label neighbor = nei[j];
-            scalar w = weightsPtr[j];
-            scalar Sfx = meshSfPtr[j * 3];
-            scalar Sfy = meshSfPtr[j * 3 + 1];
-            scalar Sfz = meshSfPtr[j * 3 + 2];
-            scalar ssf = w * (p[owner] - p[neighbor]) + p[neighbor];
-            scalar grad_x = Sfx * ssf;
-            scalar grad_y = Sfy * ssf;
-            scalar grad_z = Sfz * ssf;
-            UPtr[owner * 3 + 0] += grad_x;
-            UPtr[owner * 3 + 1] += grad_y;
-            UPtr[owner * 3 + 2] += grad_z;
-            UPtr[neighbor * 3 + 0] -= grad_x;
-            UPtr[neighbor * 3 + 1] -= grad_y;
-            UPtr[neighbor * 3 + 2] -= grad_z;
-        }
+
+#else
+
+    for (label j = 0; j < nFaces; ++j) {
+        label owner = own[j];
+        label neighbor = nei[j];
+        scalar w = weightsPtr[j];
+        scalar Sfx = meshSfPtr[j * 3];
+        scalar Sfy = meshSfPtr[j * 3 + 1];
+        scalar Sfz = meshSfPtr[j * 3 + 2];
+        scalar ssf = w * (p[owner] - p[neighbor]) + p[neighbor];
+        scalar grad_x = Sfx * ssf;
+        scalar grad_y = Sfy * ssf;
+        scalar grad_z = Sfz * ssf;
+        UPtr[owner * 3 + 0] += grad_x;
+        UPtr[owner * 3 + 1] += grad_y;
+        UPtr[owner * 3 + 2] += grad_z;
+        UPtr[neighbor * 3 + 0] -= grad_x;
+        UPtr[neighbor * 3 + 1] -= grad_y;
+        UPtr[neighbor * 3 + 2] -= grad_z;
     }
+
+#endif
 
     // - fvc_grad_scalar_boundary
     for(label patchi = 0; patchi < nPatches; ++patchi) {

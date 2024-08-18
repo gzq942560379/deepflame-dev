@@ -1,6 +1,6 @@
 -include $(GENERAL_RULES)/mplibType
 
-EXE_INC = -std=c++14 \
+EXE_INC = -std=c++17 \
     -g \
     -Wno-unused-variable \
     -Wno-unused-but-set-variable \
@@ -63,7 +63,7 @@ EXE_LIBS = \
     -ldfGenMatrix \
     -ldfMatrices \
     -ldfSchedule \
-    $(CANTERA_ROOT)/lib/libcantera.so \
+    $(CANTERA_ROOT)/lib/libcantera.so -lstdc++fs \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \

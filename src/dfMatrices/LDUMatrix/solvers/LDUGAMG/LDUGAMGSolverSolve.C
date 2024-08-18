@@ -578,8 +578,8 @@ Foam::dictionary Foam::LDUGAMGSolver::PCGsolverDict
     const scalar relTol
 ) const
 {
-    // dictionary dict(IStringStream("solver LDUPCG; preconditioner DIC;")());
-    dictionary dict(IStringStream("solver LDUPCG; preconditioner none;")());
+    dictionary dict(IStringStream("solver LDUPCG; preconditioner DIC;")());
+    // dictionary dict(IStringStream("solver LDUPCG; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 
@@ -593,8 +593,8 @@ Foam::dictionary Foam::LDUGAMGSolver::PBiCGStabSolverDict
     const scalar relTol
 ) const
 {
-    // dictionary dict(IStringStream("solver LDUPBiCGStab; preconditioner DILU;")());
-    dictionary dict(IStringStream("solver LDUPBiCGStab; preconditioner none;")());
+    dictionary dict(IStringStream("solver LDUPBiCGStab; preconditioner DILU;")());
+    // dictionary dict(IStringStream("solver LDUPBiCGStab; preconditioner none;")());
     dict.add("tolerance", tol);
     dict.add("relTol", relTol);
 

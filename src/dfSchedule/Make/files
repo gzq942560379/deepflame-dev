@@ -10,4 +10,6 @@ XBlock2DPartitionStructuredMeshSchedule.C
 UnstructuredMeshSchedule.C
 csrPattern.C
 
+schedule.C
+
 LIB = $(DF_LIBBIN)/libdfSchedule

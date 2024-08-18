@@ -30,7 +30,8 @@ void preProcess_Y(
     const fvMesh& mesh = Y[0].mesh(); 
     assert(mesh.moving() == false);
 
-    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
+    const MeshSchedule& meshSchedule = getSchedule();
+    
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -205,9 +206,9 @@ void preProcess_Y(
 #elif defined(OPT_FACE2CELL_COLORING_SCHEDULE)
 
         {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+            #ifdef _OPENMP
+            #pragma omp parallel for
+            #endif
             for(label c = 0; c < nCells; ++c){
                 gradY_Species[c * 3 + 0] = 0.;
                 gradY_Species[c * 3 + 1] = 0.;
@@ -219,7 +220,9 @@ void preProcess_Y(
             const XYBlock1DColoringStructuredMeshSchedule& schedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
             const labelList& face_scheduling = schedule.face_scheduling();
 
+            #ifdef _OPENMP
             #pragma omp parallel for
+            #endif
             for(label face_scheduling_i = 0; face_scheduling_i < face_scheduling.size()-1; face_scheduling_i += 2){
                 label face_start = face_scheduling[face_scheduling_i]; 
                 label face_end = face_scheduling[face_scheduling_i+1];
@@ -238,7 +241,9 @@ void preProcess_Y(
                     gradY_Species[neighbor * 3 + 2] -= grad_z;
                 }
             }
+            #ifdef _OPENMP
             #pragma omp parallel for
+            #endif
             for(label face_scheduling_i = 1; face_scheduling_i < face_scheduling.size(); face_scheduling_i += 2){
                 label face_start = face_scheduling[face_scheduling_i]; 
                 label face_end = face_scheduling[face_scheduling_i+1];
@@ -258,7 +263,7 @@ void preProcess_Y(
                 }
             }
         }
-        
+
 #elif defined(OPT_FACE2CELL_CELL_CENTERED)
 
         const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
@@ -301,7 +306,7 @@ void preProcess_Y(
             gradY_Species[c * 3 + 1] = gradY_y;
             gradY_Species[c * 3 + 2] = gradY_z;
         }
-
+        
 #elif defined(OPT_FACE2CELL_PARTITION)
 
         const XBlock2DPartitionStructuredMeshSchedule& schedule = XBlock2DPartitionStructuredMeshSchedule::getXBlock2DPartitionStructuredMeshSchedule();
@@ -928,13 +933,12 @@ GenMatrix_Y(
     const label specieI = combustion.chemistry()->species()[Yi.member()];
     const DimensionedField<scalar, volMesh>& su = combustion.chemistry()->RR(specieI);
 
-    scalar* __restrict__ diagPtr = &fvm.diag()[0];
-    scalar* __restrict__ sourcePtr = &fvm.source()[0];
-    scalar* __restrict__ lowerPtr = &fvm.lower()[0];
-    scalar* __restrict__ upperPtr = &fvm.upper()[0];
+    scalar* __restrict__ diagPtr = fvm.diag().begin();
+    scalar* __restrict__ sourcePtr = fvm.source().begin();
+    scalar* __restrict__ lowerPtr = fvm.lower().begin();
+    scalar* __restrict__ upperPtr = fvm.upper().begin();
 
-    const XYBlock1DColoringStructuredMeshSchedule& meshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
-    const labelList& face_scheduling = meshSchedule.face_scheduling();
+    const MeshSchedule& meshSchedule = getSchedule();
     const label nCells = meshSchedule.nCells();
     const label nFaces = meshSchedule.nFaces();
     const label nPatches = meshSchedule.nPatches();
@@ -1062,16 +1066,18 @@ GenMatrix_Y(
 
     Info << "Gen_Y update boundary coeffs : " << clock.timeIncrement() << endl;
 
-    // ddt
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (label i = 0; i < nCells; ++i) {
-        diagPtr[i] += rDeltaT * rhoPtr[i] * meshVPtr[i];
-        sourcePtr[i] += rDeltaT * rhoOldTimePtr[i] * YiOldTimePtr[i] * meshVPtr[i];
+        scalar meshV = meshVPtr[i];
+        diagPtr[i] = rDeltaT * rhoPtr[i] * meshV;
+        sourcePtr[i] = rDeltaT * rhoOldTimePtr[i] * YiOldTimePtr[i] * meshV + suPtr[i] * meshV;
     }
 
-    Info << "Gen_Y ddt : " << clock.timeIncrement() << endl;
+    Info << "Gen_Y diag source : " << clock.timeIncrement() << endl;
+
+
 
     // fvmDiv(phi, Yi)
     // fvmDiv(phiUc, Yi)
@@ -1084,15 +1090,13 @@ GenMatrix_Y(
         scalar upwindWeight = upwindWeights[i];
         scalar phi = phiPtr[i];
         scalar phiUc = phiUcPtr[i];
-
         label owner = own[i];
         label neighbor = nei[i];
         scalar weights = weightsPtr[i];
         scalar face_gamma = weights * rhoDPtr[owner] + (1 - weights) * rhoDPtr[neighbor];
         scalar tmp = -1. * face_gamma * magSfPtr[i] * deltaCoeffsPtr[i];
-
-        lowerPtr[i] += (-upwindWeight) * phi + (-upwindWeight) * phiUc + tmp;
-        upperPtr[i] += (1 - upwindWeight) * phi + (1 - upwindWeight) * phiUc + tmp;
+        lowerPtr[i] = (-upwindWeight) * phi + (-upwindWeight) * phiUc + tmp;
+        upperPtr[i] = (1 - upwindWeight) * phi + (1 - upwindWeight) * phiUc + tmp;
     }
 
     Info << "Gen_Y div phi phiUc laplacian DEff internal : " << clock.timeIncrement() << endl;
@@ -1133,6 +1137,9 @@ GenMatrix_Y(
 #ifdef OPT_FACE2CELL_COLORING_SCHEDULE
 
     {
+        const XYBlock1DColoringStructuredMeshSchedule& coloringMeshSchedule = XYBlock1DColoringStructuredMeshSchedule::getXYBlock1DColoringStructuredMeshSchedule();
+        const labelList& face_scheduling = coloringMeshSchedule.face_scheduling();
+
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -1173,14 +1180,6 @@ GenMatrix_Y(
 #endif
 
     Info << "Gen_Y diag : " << clock.timeIncrement() << endl;
-
-    // add source
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (label i = 0; i < nCells; ++i) {
-        sourcePtr[i] += meshVPtr[i] * suPtr[i];
-    }
 
     // cpoy result to fvm
 #ifdef _OPENMP

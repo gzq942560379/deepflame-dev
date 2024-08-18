@@ -59,6 +59,13 @@ Foam::labelList Foam::geomRenumber::renumber
     const pointField& points
 ) const
 {
+    // Info << "In Foam::geomRenumber::renumber" << endl;
+    // Info << "before renumber : " << endl;
+    // Info << "points.size() : " << points.size() << endl;
+    // for(label i = 0; i < points.size(); ++i){
+    //     Info << i << ", " << points[i].x() << ", " << points[i].y() << ", " << points[i].z() << endl;
+    // }
+
     std::vector<Point> Points(points.size());
     forAll(points, i){
         Points[i].id_ = i;

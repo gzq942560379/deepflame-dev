@@ -67,35 +67,39 @@ if (pimple.momentumPredictor())
 {
     // solve(UEqn_new);
 
-#ifdef _DIV_
     U_convert_start = MPI_Wtime();
-    div.copy_value_from_fvMatrix(UEqn);
-    U_convert_end = MPI_Wtime();
-    U_convert_time += U_convert_end - U_convert_start;
-#endif
-#ifdef _CSR_
-    U_convert_start = MPI_Wtime();
+
+#if defined(_LDU_)
+    LDUMatrix ldu(UEqn);
+#elif defined(_CSR_)
     csrMatrix csr(UEqn);
+#elif defined(_DIV_)
+    div.copy_value_from_fvMatrix(UEqn);
+#endif
     U_convert_end = MPI_Wtime();
     U_convert_time += U_convert_end - U_convert_start;
-#endif
+
     U_solve_start = MPI_Wtime();
-#ifdef _DIV_
+
+#if defined(_LDU_)
     auto& psi = const_cast<volVectorField&>(UEqn.psi());
     auto& source = UEqn.source();
     auto& internalCoeffs = UEqn.internalCoeffs();
     auto& boundaryCoeffs = UEqn.boundaryCoeffs();
-    div.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-#ifdef _CSR_
+    ldu.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#elif defined(_CSR_)
     auto& psi = const_cast<volVectorField&>(UEqn.psi());
     auto& source = UEqn.source();
     auto& internalCoeffs = UEqn.internalCoeffs();
     auto& boundaryCoeffs = UEqn.boundaryCoeffs();
     csr.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#endif
-
-#if !defined(_CSR_) && !defined(_ELL_) && !defined(_LDU_) && !defined(_DIV_)
+#elif defined(_DIV_)
+    auto& psi = const_cast<volVectorField&>(UEqn.psi());
+    auto& source = UEqn.source();
+    auto& internalCoeffs = UEqn.internalCoeffs();
+    auto& boundaryCoeffs = UEqn.boundaryCoeffs();
+    div.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
     UEqn.solve();
 #endif
 

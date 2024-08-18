@@ -62,6 +62,22 @@ Y_total_start = MPI_Wtime();
 
 volScalarField Yt(0.0*Y[0]);
 
+#ifndef OPT_GenMatrix_Y
+Y_build_start = MPI_Wtime();
+tmp<fv::convectionScheme<scalar>> mvConvection
+(
+    fv::convectionScheme<scalar>::New
+    (
+        mesh,
+        fields,
+        phi,
+        mesh.divScheme("div(phi,Yi_h)")
+    )
+);
+Y_build_end = MPI_Wtime();
+Y_build_time += Y_build_end - Y_build_start;
+#endif
+
 forAll(Y, i)
 {
     volScalarField& Yi = Y[i];
@@ -72,17 +88,6 @@ forAll(Y, i)
         Y_build_start = MPI_Wtime();
 #ifndef OPT_GenMatrix_Y
         Y_build_old_start = MPI_Wtime();
-        tmp<fv::convectionScheme<scalar>> mvConvection
-        (
-            fv::convectionScheme<scalar>::New
-            (
-                mesh,
-                fields,
-                phi,
-                mesh.divScheme("div(phi,Yi_h)")
-            )
-        );
-
         tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
         fvScalarMatrix YiEqn
         (
@@ -138,19 +143,40 @@ forAll(Y, i)
         Y_build_old_time += Y_build_old_end - Y_build_old_start;
         check_fvmatrix_equal(YiEqn_answer, YiEqn, "YiEqn");
 #endif
-#ifdef _DIV_
-            Y_convert_start = MPI_Wtime();
-            div.copy_value_from_fvMatrix(YiEqn);
-            Y_convert_end = MPI_Wtime();
-            Y_convert_time += Y_convert_end - Y_convert_start;
+
+        Y_convert_start = MPI_Wtime();
+
+#if defined(_LDU_)
+        LDUMatrix ldu(YiEqn);
+#elif defined(_CSR_)
+        csrMatrix csr(YiEqn);
+#elif defined(_DIV_)
+        div.copy_value_from_fvMatrix(YiEqn);
+#else
 #endif
+        Y_convert_end = MPI_Wtime();
+        Y_convert_time += Y_convert_end - Y_convert_start;
+
         Y_solve_start = MPI_Wtime();
-#ifdef _DIV_
-            auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
-            auto& source = YiEqn.source();
-            auto& internalCoeffs = YiEqn.internalCoeffs();
-            auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
-            div.solve(psi, source, internalCoeffs, boundaryCoeffs, Yi.name());
+
+#if defined(_LDU_)
+        auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
+        auto& source = YiEqn.source();
+        auto& internalCoeffs = YiEqn.internalCoeffs();
+        auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+        ldu.solve(psi, source, internalCoeffs, boundaryCoeffs, Yi.name());
+#elif defined(_CSR_)
+        auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
+        auto& source = YiEqn.source();
+        auto& internalCoeffs = YiEqn.internalCoeffs();
+        auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+        csr.solve(psi, source, internalCoeffs, boundaryCoeffs, Yi.name());
+#elif defined(_DIV_)
+        auto& psi = const_cast<GeometricField<double, fvPatchField, volMesh>&>(YiEqn.psi());
+        auto& source = YiEqn.source();
+        auto& internalCoeffs = YiEqn.internalCoeffs();
+        auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+        div.solve(psi, source, internalCoeffs, boundaryCoeffs, Yi.name());
 #else
         YiEqn.solve(Yi.name());
 #endif

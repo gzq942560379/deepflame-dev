@@ -13,9 +13,8 @@
 #include <mpi.h>
 // #include <algorithm>
 // #include "PstreamGlobals.H"
-#include "XYBlock1DColoringStructuredMeshSchedule.H"
-#include "XBlock2DPartitionStructuredMeshSchedule.H"
 #include "processorFvPatchField.H"
+#include "schedule.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

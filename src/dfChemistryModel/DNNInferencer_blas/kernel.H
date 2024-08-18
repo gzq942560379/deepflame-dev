@@ -64,8 +64,8 @@ void gelu_navie(int64_t len, T* data){
     #pragma omp parallel for
 #endif
     for(int64_t i = 0; i < len; ++i){
-        float x = data[i];
-        data[i] = 0.5 * x * (1. + std::tanh(std::sqrt(2. / M_PI) * (x + 0.044715 * std::pow(x, 3.))));
+        T x = data[i];
+        data[i] = 0.5 * x * (1. + std::tanh(std::sqrt(2. / M_PI) * (x + 0.044715 * x * x * x)));
     }
 }
 

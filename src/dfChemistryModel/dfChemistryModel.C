@@ -326,6 +326,15 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     // set normalization parameters
 
 #ifdef USE_BLASDNN
+    int mpisize, mpirank;
+    int flag_mpi_init;
+    MPI_Initialized(&flag_mpi_init);
+
+    if(flag_mpi_init){
+        MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
+        MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
+    }
+
     torchSwitch_ = this->subDict("TorchSettings").lookupOrDefault("torch", false);
     useDNN = true;
     useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
@@ -336,6 +345,58 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     if(torchSwitch_){
         BLASDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("BLASDNNModelPath", string(""));
         DNNInferencer_blas_.load_models(BLASDNNModelPath_);
+
+        int count;
+        std::string norm_str;
+        char* buffer;
+
+        if (mpirank == 0 || !flag_mpi_init){
+            std::ifstream fin(BLASDNNModelPath_ + "/norm.yaml");
+            if (!fin) {
+                SeriousError << "open norm error , norm path : " << BLASDNNModelPath_ + "/norm.yaml" << endl;
+                MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+            }
+            std::ostringstream oss;
+            oss.str("");
+            oss << fin.rdbuf();
+            norm_str = oss.str();
+            count = norm_str.size();
+            fin.close();
+
+            buffer = new char[count];
+            std::copy(norm_str.begin(), norm_str.end(), buffer);
+        }
+
+        if(flag_mpi_init){
+            MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+            if (mpirank != 0)   
+                buffer = new char[count];
+            MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
+            if (mpirank != 0) {
+                norm_str = std::string(buffer, count);
+            }
+            delete[] buffer;
+        }
+
+        // chemistry norm
+        YAML::Node norm = YAML::Load(norm_str);
+        YAML::Node XmuNode = norm["Xmu"];
+        for (size_t i = 0; i < XmuNode.size(); i++){
+            Xmu_.push_back(XmuNode[i].as<double>());
+        }
+        YAML::Node XstdNode = norm["Xstd"];
+        for (size_t i = 0; i < XstdNode.size(); i++){
+            Xstd_.push_back(XstdNode[i].as<double>());
+        }
+        YAML::Node YmuNode = norm["Ymu"];
+        for (size_t i = 0; i < YmuNode.size(); i++){
+            Ymu_.push_back(YmuNode[i].as<double>());
+        }
+        YAML::Node YstdNode = norm["Ystd"];
+        for (size_t i = 0; i < YstdNode.size(); i++){
+            Ystd_.push_back(YstdNode[i].as<double>());
+        }
+
     }
 
     if(useThermoTranNN)
@@ -343,125 +404,52 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         thermoDNNModelPath_ = this->subDict("TorchSettings").lookupOrDefault("thermoDNNModelPath", string(""));
         DNNThermo_blas_.load_models(thermoDNNModelPath_);
         Info << "ThermoDNN was loaded." << endl;
-    } 
 
-    int mpisize, mpirank;
-    int flag_mpi_init;
-    MPI_Initialized(&flag_mpi_init);
+        int count;
+        std::string thermo_norm_str;
+        char* buffer;
 
-    if(flag_mpi_init){
-        MPI_Comm_rank(PstreamGlobals::MPI_COMM_FOAM, &mpirank);
-        MPI_Comm_size(PstreamGlobals::MPI_COMM_FOAM, &mpisize);
-    }
+        if (mpirank == 0 || !flag_mpi_init){
+            // thermo norm
+            std::ifstream fin = std::ifstream(thermoDNNModelPath_ + "/norm.yaml");
+            if (!fin) {
+                SeriousError << "open norm error , norm path : " << thermoDNNModelPath_ + "/norm.yaml" << endl;
+                MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+            }
+            std::ostringstream oss;
+            oss.str("");         
+            oss << fin.rdbuf();
+            thermo_norm_str = oss.str();
+            count = thermo_norm_str.size();
+            fin.close();
 
-    int* count = new int[2];
-    std::string norm_str, thermo_norm_str;
-    char* buffer;
-
-    if (mpirank == 0 || !flag_mpi_init){
-        std::ifstream fin(BLASDNNModelPath_ + "/norm.yaml");
-        if (!fin) {
-            SeriousError << "open norm error , norm path : " << BLASDNNModelPath_ + "/norm.yaml" << endl;
-            MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+            buffer = new char[count];
+            std::copy(thermo_norm_str.begin(), thermo_norm_str.end(), buffer);
         }
-        std::ostringstream oss;
-        oss.str("");
-        oss << fin.rdbuf();
-        norm_str = oss.str();
-        count[0] = norm_str.size();
-        fin.close();
+
+        if(flag_mpi_init){
+            MPI_Bcast(&count, 1, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
+            if (mpirank != 0)   
+                buffer = new char[count];
+            MPI_Bcast(buffer, count, MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
+            if (mpirank != 0) {
+                thermo_norm_str = std::string(buffer, count);
+            }
+            delete[] buffer;
+        }
 
         // thermo norm
-        fin = std::ifstream(thermoDNNModelPath_ + "/norm.yaml");
-        if (!fin) {
-            SeriousError << "open norm error , norm path : " << thermoDNNModelPath_ + "/norm.yaml" << endl;
-            MPI_Abort(PstreamGlobals::MPI_COMM_FOAM, -1);
+        YAML::Node thermoNorm = YAML::Load(thermo_norm_str);
+        YAML::Node thermoMuNode = thermoNorm["mean"];
+
+        for (size_t i = 0; i < thermoMuNode.size(); i++){
+            thermomu_.push_back(thermoMuNode[i].as<double>());
         }
-        oss.str("");
-        oss << fin.rdbuf();
-        thermo_norm_str = oss.str();
-        count[1] = thermo_norm_str.size();
-        fin.close();
-
-        buffer = new char[count[0] + count[1]];
-        std::copy(norm_str.begin(), norm_str.end(), buffer);
-        std::copy(thermo_norm_str.begin(), thermo_norm_str.end(), buffer + count[0]);
-    }
-
-    if(flag_mpi_init){
-        MPI_Bcast(count, 2, MPI_INT, 0, PstreamGlobals::MPI_COMM_FOAM);
-        if (mpirank != 0)   buffer = new char[count[0] + count[1]];
-        MPI_Bcast(buffer, count[0] + count[1], MPI_CHAR, 0, PstreamGlobals::MPI_COMM_FOAM);
-        if (mpirank != 0) {
-            norm_str = std::string(buffer, count[0]);
-            thermo_norm_str = std::string(buffer + count[0], count[1]);
+        YAML::Node thermoStdNode = thermoNorm["std"];
+        for (size_t i = 0; i < thermoStdNode.size(); i++){
+            thermostd_.push_back(thermoStdNode[i].as<double>());
         }
-        delete[] buffer;
-    }
-
-    // thermo norm
-    YAML::Node thermoNorm = YAML::Load(thermo_norm_str);
-    YAML::Node thermoMuNode = thermoNorm["mean"];
-
-    for (size_t i = 0; i < thermoMuNode.size(); i++){
-        thermomu_.push_back(thermoMuNode[i].as<double>());
-    }
-    YAML::Node thermoStdNode = thermoNorm["std"];
-    for (size_t i = 0; i < thermoStdNode.size(); i++){
-        thermostd_.push_back(thermoStdNode[i].as<double>());
-    }
-
-    // chemistry norm
-    YAML::Node norm = YAML::Load(norm_str);
-    YAML::Node XmuNode = norm["Xmu"];
-    for (size_t i = 0; i < XmuNode.size(); i++){
-        Xmu_.push_back(XmuNode[i].as<double>());
-    }
-    YAML::Node XstdNode = norm["Xstd"];
-    for (size_t i = 0; i < XstdNode.size(); i++){
-        Xstd_.push_back(XstdNode[i].as<double>());
-    }
-    YAML::Node YmuNode = norm["Ymu"];
-    for (size_t i = 0; i < YmuNode.size(); i++){
-        Ymu_.push_back(YmuNode[i].as<double>());
-    }
-    YAML::Node YstdNode = norm["Ystd"];
-    for (size_t i = 0; i < YstdNode.size(); i++){
-        Ystd_.push_back(YstdNode[i].as<double>());
-    }
-
-    // YAML::Node Xmu1Node = norm["Xmu1"];
-    // for (size_t i = 0; i < Xmu1Node.size(); i++){
-    //     Xmu1_.push_back(Xmu1Node[i].as<double>());
-    // }
-    // YAML::Node Xstd1Node = norm["Xstd1"];
-    // for (size_t i = 0; i < Xstd1Node.size(); i++){
-    //     Xstd1_.push_back(Xstd1Node[i].as<double>());
-    // }
-    // YAML::Node Ymu1Node = norm["Ymu1"];
-    // for (size_t i = 0; i < Ymu1Node.size(); i++){
-    //     Ymu1_.push_back(Ymu1Node[i].as<double>());
-    // }
-    // YAML::Node Ystd1Node = norm["Ystd1"];
-    // for (size_t i = 0; i < Ystd1Node.size(); i++){
-    //     Ystd1_.push_back(Ystd1Node[i].as<double>());
-    // }
-    // YAML::Node Xmu2Node = norm["Xmu2"];
-    // for (size_t i = 0; i < Xmu2Node.size(); i++){
-    //     Xmu2_.push_back(Xmu2Node[i].as<double>());
-    // }
-    // YAML::Node Xstd2Node = norm["Xstd2"];
-    // for (size_t i = 0; i < Xstd2Node.size(); i++){
-    //     Xstd2_.push_back(Xstd2Node[i].as<double>());
-    // }
-    // YAML::Node Ymu2Node = norm["Ymu2"];
-    // for (size_t i = 0; i < Ymu2Node.size(); i++){
-    //     Ymu2_.push_back(Ymu2Node[i].as<double>());
-    // }
-    // YAML::Node Ystd2Node = norm["Ystd2"];
-    // for (size_t i = 0; i < Ystd2Node.size(); i++){
-    //     Ystd2_.push_back(Ystd2Node[i].as<double>());
-    // }
+    } 
 
 #endif
 }
