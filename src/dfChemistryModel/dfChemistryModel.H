@@ -177,9 +177,9 @@ public IOdictionary
 
 #ifdef USE_BLASDNN
 
-// #define USE_BLASDNN_HALF
+#define USE_BLASDNN_HALF
 // #define USE_BLASDNN_FLOAT
-#define USE_BLASDNN_DOUBLE
+// #define USE_BLASDNN_DOUBLE
 
 #if defined(USE_BLASDNN_HALF)
         DNNInferencer_blas<__fp16> DNNInferencer_blas_;

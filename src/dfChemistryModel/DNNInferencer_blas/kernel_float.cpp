@@ -82,11 +82,15 @@ void gelu_lookup<float>(int64_t len, float* data){
 #endif
     for(int64_t i = 0; i < len; ++i){
         float x = data[i];
-        x = df_max(x, range_start);
-        x = df_min(x, range_end);
-        uint32_t index = (uint32_t)((x - range_start) * fit_split);
-        float c0 = fast_gelu_poly_table_float[index];
-        data[i] = c0;
+        if(x < range_start){
+            data[i] = 0;
+        }else if(x > range_end){
+            data[i] = x;
+        }else{
+            uint32_t index = (uint32_t)((x - range_start) * fit_split);
+            float c0 = fast_gelu_poly_table_float[index];
+            data[i] = c0;
+        }
     }
 }
 
@@ -102,13 +106,17 @@ void bias_gelu_lookup_fusion<float>(Tensor<float>& input, const Tensor<float>& b
 #endif
     for(int64_t r = 0; r < row; ++r){
         float* input_data_row = &input_data[r * ld];
-        for(int64_t c = 0; c < col; ++c){
+            for(int64_t c = 0; c < col; ++c){
             float x = input_data_row[c] + bias_data[c];
-            x = df_max(x, range_start);
-            x = df_min(x, range_end);
-            uint32_t index = (uint32_t)((x - range_start) * fit_split);
-            float c0 = fast_gelu_poly_table_float[index];
-            input_data_row[c] = c0;
+            if(x < range_start){
+                input_data_row[c] = 0;
+            }else if(x > range_end){
+                input_data_row[c] = x;
+            }else{
+                uint32_t index = (uint32_t)((x - range_start) * fit_split);
+                float c0 = fast_gelu_poly_table_float[index];
+                input_data_row[c] = c0;
+            }
         }
     }
 }

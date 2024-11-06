@@ -175,11 +175,15 @@ void gelu_lookup<__fp16>(int64_t len, __fp16* data){
 #endif
     for(int64_t i = 0; i < len; ++i){
         __fp16 x = data[i];
-        x = df_max(x, range_start);
-        x = df_min(x, range_end);
-        uint16_t index = (uint16_t)((x - range_start) * fit_split);
-        __fp16 c0 = fast_gelu_poly_table_half[index];
-        data[i] = c0;
+        if(x < range_start){
+            data[i] = 0;
+        }else if(x > range_end){
+            data[i] = x;
+        }else{
+            uint32_t index = (uint32_t)((x - range_start) * fit_split);
+            __fp16 c0 = fast_gelu_poly_table_half[index];
+            data[i] = c0;
+        }
     }
 }
 
@@ -197,11 +201,15 @@ void bias_gelu_lookup_fusion<__fp16>(Tensor<__fp16>& input, const Tensor<__fp16>
         __fp16* input_data_row = &input_data[r * ld];
         for(int64_t c = 0; c < col; ++c){
             __fp16 x = input_data_row[c] + bias_data[c];
-            x = df_max(x, range_start);
-            x = df_min(x, range_end);
-            uint16_t index = (uint16_t)((x - range_start) * fit_split);
-            __fp16 c0 = fast_gelu_poly_table_half[index];
-            input_data_row[c] = c0;
+            if(x < range_start){
+                input_data_row[c] = 0;
+            }else if(x > range_end){
+                input_data_row[c] = x;
+            }else{
+                uint32_t index = (uint32_t)((x - range_start) * fit_split);
+                __fp16 c0 = fast_gelu_poly_table_half[index];
+                input_data_row[c] = c0;
+            }
         }
     }
 }

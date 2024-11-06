@@ -227,14 +227,14 @@ void LinearGELU<DataType>::forward(const Tensor<DataType>& input, Tensor<DataTyp
 
     double time1 = MPI_Wtime();
 
-    bias_naive(output, Linear<DataType>::bias_);
+    // bias_naive(output, Linear<DataType>::bias_);
 
     double time2 = MPI_Wtime();
 
     // GELU
-    gelu_navie(output.element_num(), output.data());
+    // gelu_navie(output.element_num(), output.data());
     // gelu_exp(output.element_num(), output.data());
-    // gelu_lookup(output.element_num(), output.data());
+    gelu_lookup(output.element_num(), output.data());
     // gelu_fastexp_fusion(output.element_num(), output.data());
     // gelu_fastexp_simd(output.element_num(), output.data());
 

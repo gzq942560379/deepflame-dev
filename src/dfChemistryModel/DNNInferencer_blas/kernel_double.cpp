@@ -116,11 +116,15 @@ void bias_gelu_lookup_fusion<double>(Tensor<double>& input, const Tensor<double>
         double* input_data_row = &input_data[r * ld];
         for(int64_t c = 0; c < col; ++c){
             double x = input_data_row[c] + bias_data[c];
-            x = df_max(x, range_start);
-            x = df_min(x, range_end);
-            uint64_t index = (uint64_t)((x - range_start) * fit_split);
-            double c0 = fast_gelu_poly_table_double[index];
-            input_data_row[c] = c0;
+            if(x < range_start){
+                input_data_row[c] = 0;
+            }else if(x > range_end){
+                input_data_row[c] = x;
+            }else{
+                uint32_t index = (uint32_t)((x - range_start) * fit_split);
+                double c0 = fast_gelu_poly_table_double[index];
+                input_data_row[c] = c0;
+            }
         }
     }
 }
