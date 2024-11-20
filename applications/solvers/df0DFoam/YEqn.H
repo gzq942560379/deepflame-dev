@@ -55,5 +55,5 @@ tmp<fv::convectionScheme<scalar>> mvConvection
     Y[inertIndex].max(0.0);
 
     end = std::clock();
-    time_monitor_Y += double(end - start) / double(CLOCKS_PER_SEC);
+    time_monitor_Y += double(end - start);
 }

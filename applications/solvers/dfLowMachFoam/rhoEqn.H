@@ -86,21 +86,21 @@ Description
 #endif
 #else
 {
-    start1 = std::clock();
+    start1 = MPI_Wtime();
     fvScalarMatrix rhoEqn
     (
         fvm::ddt(rho)
       + fvc::div(phi)
     );
-    end1 = std::clock();
-    time_monitor_rhoEqn += double(end1 - start1) / double(CLOCKS_PER_SEC);
-    time_monitor_rhoEqn_mtxAssembly += double(end1 - start1) / double(CLOCKS_PER_SEC);
+    end1 = MPI_Wtime();
+    time_monitor_rhoEqn += double(end1 - start1);
+    time_monitor_rhoEqn_mtxAssembly += double(end1 - start1);
 
-    start1 = std::clock();
+    start1 = MPI_Wtime();
     rhoEqn.solve();
-    end1 = std::clock();
-    time_monitor_rhoEqn += double(end1 - start1) / double(CLOCKS_PER_SEC);
-    time_monitor_rhoEqn_solve += double(end1 - start1) / double(CLOCKS_PER_SEC);
+    end1 = MPI_Wtime();
+    time_monitor_rhoEqn += double(end1 - start1);
+    time_monitor_rhoEqn_solve += double(end1 - start1);
 }
 #endif
 // ************************************************************************* //

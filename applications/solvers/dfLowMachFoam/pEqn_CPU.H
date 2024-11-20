@@ -31,7 +31,7 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 
 // Update the pressure BCs to ensure flux consistency
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
-//start = std::clock();
+//start = MPI_Wtime();
 if (pimple.transonic())
 {
     surfaceScalarField phid

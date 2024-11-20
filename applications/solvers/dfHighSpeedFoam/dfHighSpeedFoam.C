@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
             start = std::clock();
             mesh.update();
             end = std::clock();
-            time_monitor_AMR += double(end - start) / double(CLOCKS_PER_SEC);
+            time_monitor_AMR += double(end - start);
             
         }
 
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
                 // --- Solve momentum
                 #include "rhoUEqn.H"
                 end = std::clock();
-                time_monitor_flow += double(end - start) / double(CLOCKS_PER_SEC);
+                time_monitor_flow += double(end - start);
 
                 // --- Solve species
                 #include "rhoYEqn.H"
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
                 // --- Solve energy
                 #include "rhoEEqn.H"
                 end = std::clock();
-                time_monitor_E += double(end - start) / double(CLOCKS_PER_SEC);
+                time_monitor_E += double(end - start);
 
                 if ((nrk == rk-1) && (chemScheme == "ode"))
                 {
@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
             // --- Solve momentum
             #include "rhoUEqn.H"
             end = std::clock();
-            time_monitor_flow += double(end - start) / double(CLOCKS_PER_SEC);
+            time_monitor_flow += double(end - start);
 
             // --- Solve species
             #include "rhoYEqn.H"
@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
             // --- Solve energy
             #include "rhoEEqn.H"
             end = std::clock();
-            time_monitor_E += double(end - start) / double(CLOCKS_PER_SEC);
+            time_monitor_E += double(end - start);
         }
 
         turbulence->correct();

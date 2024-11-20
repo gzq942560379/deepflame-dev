@@ -6,7 +6,7 @@ int flag_mpi_init;
 MPI_Initialized(&flag_mpi_init);
 if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 end = std::clock();
-time_monitor_chem += double(end - start) / double(CLOCKS_PER_SEC);
+time_monitor_chem += double(end - start);
 
 volScalarField Yt(0.0*Y[0]);
 
@@ -34,7 +34,7 @@ Y[inertIndex].max(0.0);
 rhoYi[inertIndex] = rho*Y[inertIndex];
 
 end = std::clock();
-time_monitor_Y += double(end - start) / double(CLOCKS_PER_SEC);
+time_monitor_Y += double(end - start);
 
 chemistry->correctThermo();
 Info<< "min/max(T) = "

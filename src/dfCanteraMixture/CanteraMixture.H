@@ -49,6 +49,7 @@ SourceFiles
 #include "fvPatchField.H"
 #include "hashedWordList.H"
 #include "physicoChemicalConstants.H"
+#include <cassert>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -174,6 +175,7 @@ public:
         {
             if(energyName_=="ha") return CanteraGas_->enthalpy_mass(); // J/kg
             if(energyName_=="ea") return CanteraGas_->intEnergy_mass(); // J/kg
+            return CanteraGas_->enthalpy_mass();
         }
 
         scalar Hc() const; // J/kg

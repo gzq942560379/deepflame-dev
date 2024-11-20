@@ -38,6 +38,8 @@ Description
 // #include "hePsiThermo.H"
 #include "heRhoThermo.H"
 
+#include "common.H"
+
 #ifdef USE_PYTORCH
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -106,10 +108,10 @@ int offset;
 
 #ifdef TIME
     #define TICK_START \
-        start_new = std::clock(); 
+        start_new = MPI_Wtime(); 
     #define TICK_STOP(prefix) \
-        stop_new = std::clock(); \
-        Foam::Info << #prefix << " time = " << double(stop_new - start_new) / double(CLOCKS_PER_SEC) << " s" << Foam::endl;
+        stop_new = MPI_Wtime(); \
+        Foam::Info << #prefix << " time = " << double(stop_new - start_new) << " s" << Foam::endl;
 #else
     #define TICK_START
     #define TICK_STOP(prefix)
@@ -196,8 +198,8 @@ int main(int argc, char *argv[])
     double time_monitor_pEqn_solve = 0;
 
     label timeIndex = 0;
-    clock_t start, end, start1, end1, start2, end2;
-    clock_t start_new, stop_new;
+    double start, end, start1, end1, start2, end2;
+    double start_new, stop_new;
     double time_new = 0;
 
     turbulence->validate();
@@ -208,7 +210,7 @@ int main(int argc, char *argv[])
         #include "setInitialDeltaT.H"
     }
 
-    start1 = std::clock();
+    start1 = MPI_Wtime();
 #ifdef GPUSolverNew_
     int mpi_init_flag;
     checkMpiErrors(MPI_Initialized(&mpi_init_flag));
@@ -235,8 +237,31 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    end1 = std::clock();
-    time_monitor_init += double(end1 - start1) / double(CLOCKS_PER_SEC);
+    end1 = MPI_Wtime();
+    time_monitor_init += double(end1 - start1);
+
+    int mpirank = 0, mpisize = 1;
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
+
+    label nCell = mesh.nCells();
+    std::vector<label> nCells(mpisize);
+    MPI_Gather(&nCell, 1, MPI_LABEL, nCells.data(), 1, MPI_LABEL, 0, MPI_COMM_WORLD);
+    label total_nCell = 0;
+    label min_nCell = std::numeric_limits<label>::max();
+    label max_nCell = 0;
+    Info << "nCells : " << endl;
+    for(int i = 0; i < mpisize; ++i){
+        total_nCell += nCells[i];
+        min_nCell = std::min(min_nCell, nCells[i]);
+        max_nCell = std::max(max_nCell, nCells[i]);
+        Info <<  "\t" << i << " : " << nCells[i] << endl;
+    }
+    Info << endl;
+    Info << "total nCell : " << total_nCell << endl;
+    Info << "avg nCell : " << static_cast<double>(total_nCell) / mpisize << endl;
+    Info << "min nCell : " << min_nCell << endl;
+    Info << "max nCell : " << max_nCell << endl;
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -266,11 +291,11 @@ int main(int argc, char *argv[])
 #ifdef GPUSolverNew_
         dfDataBase.preTimeStep();
 #endif
-        clock_t loop_start = std::clock();
+        double loop_start = MPI_Wtime();
         // --- Pressure-velocity PIMPLE corrector loop
         while (pimple.loop())
         {
-            start = std::clock();
+            start = MPI_Wtime();
             if (splitting)
             {
                 #include "YEqn_RR.H"
@@ -284,47 +309,47 @@ int main(int argc, char *argv[])
                     rhoU = new volVectorField("rhoU", rho*U);
                 }
             }
-            end = std::clock();
-            time_monitor_other += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_other += double(end - start);
 
-            start = std::clock();
+            start = MPI_Wtime();
             if (pimple.firstPimpleIter() && !pimple.simpleRho())
             {
                 #include "rhoEqn.H"
             }
-            end = std::clock();
-            time_monitor_rho += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_rho += double(end - start);
             
-            start = std::clock();
+            start = MPI_Wtime();
             #ifdef GPUSolver_
             #include "UEqn_GPU.H"
             #else
             #include "UEqn.H"
             #endif
-            end = std::clock();
-            time_monitor_U += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_U += double(end - start);
 
             if(combModelName!="ESF" && combModelName!="flareFGM" && combModelName!="DeePFGM")
             {
-                start = std::clock();
+                start = MPI_Wtime();
                 #ifdef GPUSolver_
                 #include "YEqn_GPU.H"
                 #else
                 #include "YEqn.H"
                 #endif
-                end = std::clock();
-                time_monitor_Y += double(end - start) / double(CLOCKS_PER_SEC);
+                end = MPI_Wtime();
+                time_monitor_Y += double(end - start);
 
-                start = std::clock();
+                start = MPI_Wtime();
                 #ifdef GPUSolver_
                 #include "EEqn_GPU.H"
                 #else
                 #include "EEqn.H"
                 #endif
-                end = std::clock();
-                time_monitor_E += double(end - start) / double(CLOCKS_PER_SEC);
+                end = MPI_Wtime();
+                time_monitor_E += double(end - start);
 
-            start = std::clock();
+            start = MPI_Wtime();
             #ifdef GPUSolverNew_
                 thermo_GPU.correctThermo();
                 thermo_GPU.sync();
@@ -425,8 +450,8 @@ int main(int argc, char *argv[])
             #else
                 chemistry->correctThermo();
             #endif
-            end = std::clock();
-            time_monitor_chemistry_correctThermo += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_chemistry_correctThermo += double(end - start);
             }
             else
             {
@@ -458,7 +483,7 @@ int main(int argc, char *argv[])
 
             // --- Pressure corrector loop
 
-            start = std::clock();
+            start = MPI_Wtime();
             int num_pimple_loop = pimple.nCorrPimple();
             while (pimple.correct())
             {
@@ -478,19 +503,19 @@ int main(int argc, char *argv[])
                 }
                 num_pimple_loop --;
             }
-            end = std::clock();
-            time_monitor_p += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_p += double(end - start);
 
-            start = std::clock();
+            start = MPI_Wtime();
             if (pimple.turbCorr())
             {
                 turbulence->correct();
             }
-            end = std::clock();
-            time_monitor_turbulence_correct += double(end - start) / double(CLOCKS_PER_SEC);
+            end = MPI_Wtime();
+            time_monitor_turbulence_correct += double(end - start);
         }
-        clock_t loop_end = std::clock();
-        double loop_time = double(loop_end - loop_start) / double(CLOCKS_PER_SEC);
+        double loop_end = MPI_Wtime();
+        double loop_time = double(loop_end - loop_start);
 
 #ifdef GPUSolverNew_
         thermo_GPU.updateRho();
@@ -567,8 +592,8 @@ int main(int argc, char *argv[])
 
         Info<< "============================================"<<nl<< endl;
 
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
+        // Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+        //     << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;
 
 #ifdef GPUSolverNew_
 #ifdef SHOW_MEMINFO

@@ -101,7 +101,7 @@
 #endif
 
 #else
-    start1 = std::clock();
+    start1 = MPI_Wtime();
     fvScalarMatrix EEqn
     (
 
@@ -123,15 +123,15 @@
             )
         )
     );
-    end1 = std::clock();
-    time_monitor_EEqn += double(end1 - start1) / double(CLOCKS_PER_SEC);
-    time_monitor_EEqn_mtxAssembly += double(end1 - start1) / double(CLOCKS_PER_SEC);
+    end1 = MPI_Wtime();
+    time_monitor_EEqn += double(end1 - start1);
+    time_monitor_EEqn_mtxAssembly += double(end1 - start1);
 
     // EEqn.relax();
-    start1 = std::clock();
+    start1 = MPI_Wtime();
     EEqn.solve("ha");
-    end1 = std::clock();
-    time_monitor_EEqn += double(end1 - start1) / double(CLOCKS_PER_SEC);
-    time_monitor_EEqn_solve += double(end1 - start1) / double(CLOCKS_PER_SEC);
+    end1 = MPI_Wtime();
+    time_monitor_EEqn += double(end1 - start1);
+    time_monitor_EEqn_solve += double(end1 - start1);
 #endif
 }

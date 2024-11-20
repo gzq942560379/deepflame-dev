@@ -51,16 +51,16 @@
     // const surfaceScalarField& weights = tweights();
     // Info << "CPU weights\n" << weights << endl;
 
-    start1 = std::clock();
+    start1 = MPI_Wtime();
     forAll(Y, i)
     {
         sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
     }
     // Info << "sumYDiffError\n" << sumYDiffError << endl;
     const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
-    start1 = std::clock();
-    time_monitor_YEqn += double(end1 - start1) / double(CLOCKS_PER_SEC);
-    time_monitor_YEqn_solve += double(end1 - start1) / double(CLOCKS_PER_SEC);  
+    start1 = MPI_Wtime();
+    time_monitor_YEqn += double(end1 - start1);
+    time_monitor_YEqn_solve += double(end1 - start1);  
 #endif
 
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
@@ -82,7 +82,7 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
         diffAlphaD += fvc::laplacian(thermo.alpha()*chemistry->hai(i), Yi);
         if (i != inertIndex)
         {
-            start1 = std::clock();
+            start1 = MPI_Wtime();
             tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
 
             #ifdef ODE_GPU_SOLVER
@@ -121,14 +121,14 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
             );
             #endif
             
-            end1 = std::clock();
-            time_monitor_YEqn_mtxAssembly += double(end1 - start1) / double(CLOCKS_PER_SEC);
+            end1 = MPI_Wtime();
+            time_monitor_YEqn_mtxAssembly += double(end1 - start1);
             // YiEqn.relax();
 
-            start1 = std::clock();
+            start1 = MPI_Wtime();
             YiEqn.solve("Yi");
-            end1 = std::clock();
-            time_monitor_YEqn_solve += double(end1 - start1) / double(CLOCKS_PER_SEC);
+            end1 = MPI_Wtime();
+            time_monitor_YEqn_solve += double(end1 - start1);
 
             Yi.max(0.0);
             Yt += Yi;
@@ -328,7 +328,7 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
         time_monitor_chem += processingTime.count();
     }
 
-    start2 = std::clock();
+    start2 = MPI_Wtime();
     volScalarField Yt(0.0*Y[0]);
     forAll(Y, i)
     {
@@ -337,7 +337,7 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
         diffAlphaD += fvc::laplacian(thermo.alpha()*chemistry->hai(i), Yi);
         if (i != inertIndex)
         {
-            start1 = std::clock();
+            start1 = MPI_Wtime();
             tmp<volScalarField> DEff = chemistry->rhoD(i) + turbulence->mut()/Sct;
 
             fvScalarMatrix YiEqn
@@ -357,14 +357,14 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
                     )
             );
             
-            end1 = std::clock();
-            time_monitor_YEqn_mtxAssembly += double(end1 - start1) / double(CLOCKS_PER_SEC);
+            end1 = MPI_Wtime();
+            time_monitor_YEqn_mtxAssembly += double(end1 - start1);
             // YiEqn.relax();
 
-            start1 = std::clock();
+            start1 = MPI_Wtime();
             YiEqn.solve("Yi");
-            end1 = std::clock();
-            time_monitor_YEqn_solve += double(end1 - start1) / double(CLOCKS_PER_SEC);
+            end1 = MPI_Wtime();
+            time_monitor_YEqn_solve += double(end1 - start1);
 
             Yi.max(0.0);
             Yt += Yi;
@@ -373,7 +373,7 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 
     Y[inertIndex] = scalar(1) - Yt;
     Y[inertIndex].max(0.0);
-    end2 = std::clock();
-    time_monitor_YEqn += double(end2 - start2) / double(CLOCKS_PER_SEC);
+    end2 = MPI_Wtime();
+    time_monitor_YEqn += double(end2 - start2);
 #endif
 }
