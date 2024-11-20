@@ -39,7 +39,7 @@ EXE_LIBS = \
     -ldfCanteraMixture \
     -ldfChemistryModel \
     -ldfCombustionModels  \
-    $(CANTERA_ROOT)/lib/libcantera.so \
+    $(CANTERA_ROOT)/lib/libcantera.so -lstdc++fs \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \

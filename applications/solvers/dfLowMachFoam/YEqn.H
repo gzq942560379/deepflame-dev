@@ -57,14 +57,14 @@
         sumYDiffError += chemistry->rhoD(i)*fvc::grad(Y[i]);
     }
     // Info << "sumYDiffError\n" << sumYDiffError << endl;
-    const surfaceScalarField phiUc = linearInterpolate(sumYDiffError) & mesh.Sf();
+    const surfaceScalarField phiUc = (linearInterpolate(sumYDiffError) & mesh.Sf()).ref();
     start1 = std::clock();
     time_monitor_YEqn += double(end1 - start1) / double(CLOCKS_PER_SEC);
     time_monitor_YEqn_solve += double(end1 - start1) / double(CLOCKS_PER_SEC);  
 #endif
 
 //MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
-label flag_mpi_init;
+int flag_mpi_init;
 MPI_Initialized(&flag_mpi_init);
 if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 
@@ -320,7 +320,7 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
         #else
         combustion->correct();
         #endif
-        //label flag_mpi_init;
+        //int flag_mpi_init;
         //MPI_Initialized(&flag_mpi_init);
         if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
         std::chrono::steady_clock::time_point stop = std::chrono::steady_clock::now();

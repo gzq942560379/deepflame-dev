@@ -41,7 +41,7 @@ time_monitor_corrDiff += double(end - start) / double(CLOCKS_PER_SEC);
         combustion->correct();
     }
 
-    label flag_mpi_init;
+    int flag_mpi_init;
     MPI_Initialized(&flag_mpi_init);
     if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
     end = std::clock();

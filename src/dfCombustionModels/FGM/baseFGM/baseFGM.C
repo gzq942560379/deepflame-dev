@@ -333,14 +333,14 @@ Foam::combustionModels::baseFGM<ReactionThermo>::baseFGM
     cvarMin_(0.0),
     ZcvarMax_(0.25),
     ZcvarMin_(-0.25),
-    rho_(const_cast<volScalarField&>(this->mesh().objectRegistry::lookupObject<volScalarField>("rho"))),
+    rho_(const_cast<volScalarField&>(this->mesh().objectRegistry::template lookupObject<volScalarField>("rho"))),
     rho_inRhoThermo_(dynamic_cast<rhoThermo&>(thermo).rho()),
     p_(this->thermo().p()),
     T_(this->thermo().T()),
     Y_(this->chemistryPtr_->Y()),
-    U_(this->mesh().objectRegistry::lookupObject<volVectorField>("U")),
-    dpdt_(this->mesh().objectRegistry::lookupObject<volScalarField>("dpdt")),        
-    phi_(this->mesh().objectRegistry::lookupObject<surfaceScalarField>("phi")),
+    U_(this->mesh().objectRegistry::template lookupObject<volVectorField>("U")),
+    dpdt_(this->mesh().objectRegistry::template lookupObject<volScalarField>("dpdt")),        
+    phi_(this->mesh().objectRegistry::template lookupObject<surfaceScalarField>("phi")),
     TCells_(T_.primitiveFieldRef()),
     ignBeginTime_(this->coeffs().lookupOrDefault("ignBeginTime", 0.0)),  
     ignDurationTime_(this->coeffs().lookupOrDefault("ignDurationTime", 0.0)),
@@ -369,11 +369,11 @@ Foam::combustionModels::baseFGM<ReactionThermo>::baseFGM
     }
 
     //- LES
-    this->isLES_ = this->mesh().objectRegistry::foundObject<compressible::LESModel>(turbulenceModel::propertiesName);
+    this->isLES_ = this->mesh().objectRegistry::template foundObject<compressible::LESModel>(turbulenceModel::propertiesName);
 
     if (this->isLES_)
     {
-        const Foam::compressible::LESModel& lesModel = this->mesh().objectRegistry::lookupObject<compressible::LESModel>(turbulenceModel::propertiesName);
+        const Foam::compressible::LESModel& lesModel = this->mesh().objectRegistry::template lookupObject<compressible::LESModel>(turbulenceModel::propertiesName);
             
         const scalarField& LESdeltaCells=lesModel.delta().internalField();
 
@@ -450,14 +450,14 @@ void Foam::combustionModels::baseFGM<ReactionThermo>::transport()
     );
 
 
-    if (this->mesh().objectRegistry::foundObject<sprayCloud>(Foam::sprayCloud::typeName))
+    if (this->mesh().objectRegistry::template foundObject<sprayCloud>(Foam::sprayCloud::typeName))
 
     {
         Info << "Solve Spray Z" << endl;
  
         //- create spray object 
         basicSprayCloud& spray = dynamic_cast<basicSprayCloud&>
-        (this->mesh().objectRegistry::lookupObjectRef<sprayCloud>(Foam::sprayCloud::typeName));        
+        (this->mesh().objectRegistry::template lookupObjectRef<sprayCloud>(Foam::sprayCloud::typeName));        
 
         tmp<fvScalarMatrix> tZSource(new fvScalarMatrix(this->Z_, dimMass/dimTime));
         fvScalarMatrix& SZ = tZSource.ref();
@@ -626,13 +626,13 @@ void Foam::combustionModels::baseFGM<ReactionThermo>::transport()
    // solve the total enthalpy transport equation
     if(solveEnthalpy_)
     {
-        if (this->mesh().objectRegistry::foundObject<sprayCloud>(Foam::sprayCloud::typeName))
+        if (this->mesh().objectRegistry::template foundObject<sprayCloud>(Foam::sprayCloud::typeName))
         {
 
             Info << "Solve Spray He" << endl;
             //- create spray object 
             basicSprayCloud& spray = dynamic_cast<basicSprayCloud&>
-            (this->mesh().objectRegistry::lookupObjectRef<sprayCloud>(Foam::sprayCloud::typeName));     
+            (this->mesh().objectRegistry::template lookupObjectRef<sprayCloud>(Foam::sprayCloud::typeName));     
                       
             tmp<fvScalarMatrix> thSource(new fvScalarMatrix(this->He_, dimEnergy/dimTime));
             fvScalarMatrix& hSource = thSource.ref();
@@ -797,9 +797,9 @@ void Foam::combustionModels::baseFGM<ReactionThermo>::initialiseFalmeKernel()
     if(ignition_ && reactFlowTime_ > 0.0 && reactFlowTime_ < ignDurationTime_)
     {
         const vectorField& centre = this->mesh().cellCentres();    
-        const scalarField x = centre.component(vector::X);  
-        const scalarField y = centre.component(vector::Y); 
-        const scalarField z = centre.component(vector::Z); 
+        const scalarField x = centre.component(vector::X).ref();  
+        const scalarField y = centre.component(vector::Y).ref(); 
+        const scalarField z = centre.component(vector::Z).ref(); 
 
         forAll(cCells_,celli) 
         {

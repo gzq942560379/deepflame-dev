@@ -41,7 +41,7 @@ EXE_LIBS = \
     -ldfCompressibleTurbulenceModels \
     -ldfCanteraMixture \
     -ldfChemistryModel \
-    $(CANTERA_ROOT)/lib/libcantera.so \
+    $(CANTERA_ROOT)/lib/libcantera.so -lstdc++fs \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \

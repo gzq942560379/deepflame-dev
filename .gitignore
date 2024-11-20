@@ -36,6 +36,7 @@ linux*Gcc*/
 linux*Icc*/
 solaris*Gcc*/
 SunOS*Gcc*/
+linuxArm64*/
 platforms/
 build/
 

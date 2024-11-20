@@ -223,7 +223,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         cvodeComm = UPstream::allocateCommunicator(UPstream::worldComm, subRank, true);
         if(Pstream::myProcNo() % cores_)
         {
-            label sub_rank;
+            int sub_rank;
             MPI_Comm_rank(PstreamGlobals::MPICommunicators_[cvodeComm], &sub_rank);
             std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
             << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;

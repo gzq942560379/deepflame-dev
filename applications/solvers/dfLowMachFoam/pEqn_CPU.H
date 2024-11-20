@@ -25,7 +25,7 @@ surfaceScalarField phiHbyA
 
 fvc::makeRelative(phiHbyA, rho, U);
 
-label flag_mpi_init;
+int flag_mpi_init;
 MPI_Initialized(&flag_mpi_init);
 if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 
