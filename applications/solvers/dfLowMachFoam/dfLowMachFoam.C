@@ -66,6 +66,29 @@ Description
 #include "basicThermo.H"
 #include "CombustionModel.H"
 
+// renumber
+#include "dynamicFvMesh.H"
+#include "argList.H"
+#include "IOobjectList.H"
+#include "fvMesh.H"
+#include "polyTopoChange.H"
+#include "ReadFields.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "SortableList.H"
+#include "decompositionMethod.H"
+#include "renumberMethod.H"
+#include "zeroGradientFvPatchFields.H"
+#include "CuthillMcKeeRenumber.H"
+#include "geomRenumber.H"
+#include "fvMeshSubset.H"
+#include "cellSet.H"
+#include "faceSet.H"
+#include "pointSet.H"
+#include <omp.h>
+#include <typeinfo>
+#include "renumberMeshFuncs.H"
+
 // #define GPUSolverNew_
 // #define TIME
 // #define DEBUG_
@@ -117,6 +140,8 @@ int offset;
     #define TICK_STOP(prefix)
 #endif
 
+#include "csrPattern.H"
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
@@ -137,7 +162,8 @@ int main(int argc, char *argv[])
     #include "listOutput.H"
 
     #include "createTime.H"
-    #include "createMesh.H"
+    // #include "createMesh.H"
+    #include "createDynamicFvMesh.H"
     #include "createDyMControls.H"
     #include "initContinuityErrs.H"
     #include "createFields.H"
@@ -262,6 +288,18 @@ int main(int argc, char *argv[])
     Info << "avg nCell : " << static_cast<double>(total_nCell) / mpisize << endl;
     Info << "min nCell : " << min_nCell << endl;
     Info << "max nCell : " << max_nCell << endl;
+
+    if(mpirank == 0 || mpirank == 1){
+        csrPattern pattern_before(mesh);
+        pattern_before.write_mtx("pattern_before");
+    }
+
+    #include "renumberMesh.H"
+
+    if(mpirank == 0 || mpirank == 1){
+        csrPattern pattern_after(mesh);
+        pattern_after.write_mtx("pattern_after");
+    }
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

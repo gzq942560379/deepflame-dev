@@ -18,6 +18,12 @@ wmake src/dfCombustionModels
 wmake src/dynamicMesh
 wmake src/dynamicFvMesh
 
+wmake src/dfUtils
+wmake src/dfRenumber
+wmake src/dfSchedule
+# wmake src/dfGenMatrix
+# wmake src/dfMatrices
+
 # wmake applications/solvers/df0DFoam
 wmake applications/solvers/dfLowMachFoam
 # wmake applications/solvers/dfHighSpeedFoam
