@@ -141,6 +141,9 @@ int offset;
 #endif
 
 #include "csrPattern.H"
+#include "dfMatrix.H"
+
+#define USE_DF_MATRIX
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -265,7 +268,8 @@ int main(int argc, char *argv[])
 
     end1 = MPI_Wtime();
     time_monitor_init += double(end1 - start1);
-
+    
+    // print cells per proc
     int mpirank = 0, mpisize = 1;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
     MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
@@ -288,6 +292,8 @@ int main(int argc, char *argv[])
     Info << "avg nCell : " << static_cast<double>(total_nCell) / mpisize << endl;
     Info << "min nCell : " << min_nCell << endl;
     Info << "max nCell : " << max_nCell << endl;
+
+    // mesh renumbering
 
     if(mpirank == 0 || mpirank == 1){
         csrPattern pattern_before(mesh);

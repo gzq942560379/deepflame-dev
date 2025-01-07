@@ -1,3 +1,4 @@
+Info << "Enter UEqn" << endl;
 // Solve the Momentum equation
 #ifdef GPUSolverNew_
 
@@ -137,8 +138,26 @@
     // UEqn.relax();
     start1 = MPI_Wtime();
     if (pimple.momentumPredictor())
-    {
-        solve(UEqn == -fvc::grad(p));
+    {   
+        // solve(UEqn == -fvc::grad(p));
+        auto tUEqnSolve = (UEqn == -fvc::grad(p));
+        auto& UEqnSolve = tUEqnSolve.ref();
+        // tmp<fvVectorMatrix> tUEqnSolve
+        // (
+        //     UEqn == -fvc::grad(p)
+        // );
+        // fvVectorMatrix& UEqnSolve = tUEqnSolve.ref();
+#ifdef USE_DF_MATRIX
+        dfMatrix df_UEqnSolve(tUEqnSolve.ref());
+        auto& psi = const_cast<volVectorField&>(UEqnSolve.psi());
+        auto& source = UEqnSolve.source();
+        auto& internalCoeffs = UEqnSolve.internalCoeffs();
+        auto& boundaryCoeffs = UEqnSolve.boundaryCoeffs();
+        df_UEqnSolve.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
+        // UEqnSolve.solve();
+        UEqnSolve.solve();
+#endif
         K.oldTime();
         K = 0.5*magSqr(U);
     }
@@ -146,3 +165,5 @@
     time_monitor_UEqn += double(end1 - start1);
     time_monitor_UEqn_solve += double(end1 - start1);
 #endif
+
+Info << "Exit UEqn" << endl;

@@ -33,6 +33,7 @@ EXE_INC = -std=c++14 \
     -I$(DF_SRC)/dfRenumber/lnInclude \
     -I$(DF_SRC)/dfSchedule/lnInclude \
     -I$(DF_SRC)/dfUtils/lnInclude \
+    -I$(DF_SRC)/dfMatrices/lnInclude \
     -I$(CANTERA_ROOT)/include \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include,) \
     $(if $(LIBTORCH_ROOT),-I$(LIBTORCH_ROOT)/include/torch/csrc/api/include,) \
@@ -79,4 +80,5 @@ EXE_LIBS = \
     -L$(FOAM_LIBBIN)/$(FOAM_MPI) -lPstream \
     -L$(FOAM_LIBBIN)/dummy -lscotchDecomp -lptscotchDecomp \
     -ldfSchedule \
-    -ldfUtils
+    -ldfMatrices \
+    -ldfUtils 

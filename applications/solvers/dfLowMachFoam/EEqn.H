@@ -1,3 +1,5 @@
+Info << "Enter EEqn" << endl;
+
 {
     volScalarField& he = thermo.he();
 #if defined GPUSolverNew_
@@ -129,9 +131,22 @@
 
     // EEqn.relax();
     start1 = MPI_Wtime();
+
+#ifdef USE_DF_MATRIX
+    dfMatrix df_EEqn(EEqn);
+    auto& psi = const_cast<volScalarField&>(EEqn.psi());
+    auto& source = EEqn.source();
+    auto& internalCoeffs = EEqn.internalCoeffs();
+    auto& boundaryCoeffs = EEqn.boundaryCoeffs();
+    df_EEqn.solve(psi, source, internalCoeffs, boundaryCoeffs, "ha");
+#else
     EEqn.solve("ha");
+#endif
+
     end1 = MPI_Wtime();
     time_monitor_EEqn += double(end1 - start1);
     time_monitor_EEqn_solve += double(end1 - start1);
 #endif
 }
+
+Info << "Exit EEqn" << endl;

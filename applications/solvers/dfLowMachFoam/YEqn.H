@@ -1,3 +1,5 @@
+Info << "Enter YEqn" << endl;
+
 #ifdef GPUSolverNew_
 #if defined DEBUG_
     hDiffCorrFlux = Zero;
@@ -362,7 +364,16 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
             // YiEqn.relax();
 
             start1 = MPI_Wtime();
+#ifdef USE_DF_MATRIX
+            dfMatrix df_YiEqn(YiEqn);
+            auto& psi = const_cast<volScalarField&>(YiEqn.psi());
+            auto& source = YiEqn.source();
+            auto& internalCoeffs = YiEqn.internalCoeffs();
+            auto& boundaryCoeffs = YiEqn.boundaryCoeffs();
+            df_YiEqn.solve(psi, source, internalCoeffs, boundaryCoeffs, "Yi");
+#else
             YiEqn.solve("Yi");
+#endif
             end1 = MPI_Wtime();
             time_monitor_YEqn_solve += double(end1 - start1);
 
@@ -377,3 +388,5 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
     time_monitor_YEqn += double(end2 - start2);
 #endif
 }
+
+Info << "Exit YEqn" << endl;

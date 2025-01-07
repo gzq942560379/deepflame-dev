@@ -28,6 +28,8 @@ Description
     Solve the continuity for density.
 
 \*---------------------------------------------------------------------------*/
+Info << "Enter rhoEqn " << endl;
+
 #ifdef GPUSolverNew_
     double *h_rho = dfDataBase.getFieldPointer("rho", location::cpu, position::internal);
     double *h_boundary_rho = dfDataBase.getFieldPointer("rho", location::cpu, position::boundary);
@@ -97,10 +99,21 @@ Description
     time_monitor_rhoEqn_mtxAssembly += double(end1 - start1);
 
     start1 = MPI_Wtime();
+#ifdef USE_DF_MATRIX
+    dfMatrix df_rhoEqn(rhoEqn);
+    auto& psi = const_cast<volScalarField&>(rhoEqn.psi());
+    auto& source = rhoEqn.source();
+    auto& internalCoeffs = rhoEqn.internalCoeffs();
+    auto& boundaryCoeffs = rhoEqn.boundaryCoeffs();
+    df_rhoEqn.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
     rhoEqn.solve();
+#endif
     end1 = MPI_Wtime();
     time_monitor_rhoEqn += double(end1 - start1);
     time_monitor_rhoEqn_solve += double(end1 - start1);
 }
 #endif
 // ************************************************************************* //
+
+Info << "Exit rhoEqn " << endl;

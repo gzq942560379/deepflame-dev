@@ -1,3 +1,5 @@
+Info << "Enter YEqn_RR" << endl;
+
 if (!(timeIndex % 2))
 {
     volScalarField Yt(0.0*Y[0]);
@@ -59,3 +61,5 @@ if (!(timeIndex % 2))
 
     runTime.setDeltaT(dtSave);
 }
+
+Info << "Exit YEqn_RR" << endl;

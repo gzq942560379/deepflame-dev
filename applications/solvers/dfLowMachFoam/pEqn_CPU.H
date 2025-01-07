@@ -1,3 +1,5 @@
+Info << "Enter pEqn_CPU" << endl;
+
 if (!pimple.simpleRho())
 {
     rho = thermo.rho();
@@ -54,7 +56,8 @@ if (pimple.transonic())
 
         // Relax the pressure equation to ensure diagonal-dominance
         pEqn.relax();
-
+        
+        assert(false);
         pEqn.solve();
 
         if (pimple.finalNonOrthogonalIter())
@@ -76,9 +79,16 @@ else
     {
         fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
         
- 
+#ifdef USE_DF_MATRIX
+        dfMatrix df_pEqn(pEqn);
+        auto& psi = const_cast<volScalarField&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        df_pEqn.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
         pEqn.solve();
-
+#endif
         
         if (pimple.finalNonOrthogonalIter())
         {
@@ -127,3 +137,5 @@ if (thermo.dpdt())
         dpdt -= fvc::div(fvc::meshPhi(rho, U), p);
     }
 }
+
+Info << "Exit pEqn_CPU" << endl;

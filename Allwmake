@@ -21,8 +21,8 @@ wmake src/dynamicFvMesh
 wmake src/dfUtils
 wmake src/dfRenumber
 wmake src/dfSchedule
+wmake src/dfMatrices
 # wmake src/dfGenMatrix
-# wmake src/dfMatrices
 
 # wmake applications/solvers/df0DFoam
 wmake applications/solvers/dfLowMachFoam
