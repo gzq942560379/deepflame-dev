@@ -36,6 +36,7 @@ SourceFiles
 #define blockRenumber_H
 
 #include "renumberMethod.H"
+#include <vector>
 
 namespace Foam
 {
@@ -48,6 +49,9 @@ class blockRenumber
 :
     public renumberMethod
 {
+private:
+    mutable std::vector<label> block_size_vector_;
+
 public:
 
     //- Runtime type information
@@ -100,58 +104,10 @@ public:
         //- Disallow default bitwise assignment
         void operator=(const blockRenumber&) = delete;
 
-    class Point{
-    public:
-        label id_;
-        scalar x_;
-        scalar y_;
-        scalar z_;
-        Point(){}
-        Point(label id,scalar x, scalar y, scalar z):id_(id), x_(x), y_(y), z_(z){}
-        ~Point(){}
-        // bool operator <(const Point& other) const{
-        //     if(z_ < other.z_){
-        //         return true;
-        //     }
-        //     if(z_ > other.z_){
-        //         return false;
-        //     }
-        //     if(y_ < other.y_){
-        //         return true;
-        //     }
-        //     if(y_ > other.y_){
-        //         return false;
-        //     }
-        //     if(x_ < other.x_){
-        //         return true;
-        //     }
-        //     if(x_ > other.x_){
-        //         return false;
-        //     }
-        //     return id_ < other.id_;
-        // }
-        // bool operator >(const Point& other) const {
-        //     if(z_ > other.z_){
-        //         return true;
-        //     }
-        //     if(z_ < other.z_){
-        //         return false;
-        //     }
-        //     if(y_ > other.y_){
-        //         return true;
-        //     }
-        //     if(y_ < other.y_){
-        //         return false;
-        //     }
-        //     if(x_ > other.x_){
-        //         return true;
-        //     }
-        //     if(x_ < other.x_){
-        //         return false;
-        //     }
-        //     return id_ > other.id_;
-        // }
-    };
+    const std::vector<label>& block_size_vector() const {
+        return this->block_size_vector_;
+    }
+
 };
 
 

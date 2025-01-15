@@ -32,7 +32,7 @@ Description
     read system/renumberMeshDict if -dict option is present
 
 \*---------------------------------------------------------------------------*/
-{
+// {
 
 argList::addNote
 (
@@ -120,12 +120,16 @@ Info<< endl;
 bool sortCoupledFaceCells = false;
 bool writeMaps = false;
 bool orderPoints = false;
+label nBlocks = 1;
 label blockSize = 0;
 bool renumberSets = true;
+labelList regionPtr;
 
 // Construct renumberMethod
 autoPtr<IOdictionary> renumberDictPtr;
 autoPtr<renumberMethod> renumberPtr;
+
+
 
 if (readDict)
 {
@@ -149,22 +153,23 @@ if (readDict)
     }
 
     blockSize = renumberDict.lookupOrDefault("blockSize", 0);
-    if (blockSize > 0)
-    {
-        Info<< "Ordering cells into regions of size " << blockSize
-            << " (using decomposition);"
-            << " ordering faces into region-internal and region-external."
-            << nl << endl;
+    nBlocks = renumberDict.lookupOrDefault("nBlocks", 1); 
+    // if (blockSize > 0)
+    // {
+    //     Info<< "Ordering cells into regions of size " << blockSize
+    //         << " (using decomposition);"
+    //         << " ordering faces into region-internal and region-external."
+    //         << nl << endl;
 
-        if (blockSize < 0 || blockSize >= mesh.nCells())
-        {
-            FatalErrorInFunction
-                << "Block size " << blockSize
-                << " should be positive integer"
-                << " and less than the number of cells in the mesh."
-                << exit(FatalError);
-        }
-    }
+    //     if (blockSize < 0 || blockSize >= mesh.nCells())
+    //     {
+    //         FatalErrorInFunction
+    //             << "Block size " << blockSize
+    //             << " should be positive integer"
+    //             << " and less than the number of cells in the mesh."
+    //             << exit(FatalError);
+    //     }
+    // }
 
     orderPoints = renumberDict.lookupOrDefault("orderPoints", false);
     if (orderPoints)
@@ -173,7 +178,7 @@ if (readDict)
             << endl;
     }
 
-    renumberDict.lookup("writeMaps") >> writeMaps;
+    writeMaps = renumberDict.lookupOrDefault("writeMaps", false);
     if (writeMaps)
     {
         Info<< "Writing renumber maps (new to old) to polyMesh." << nl
@@ -190,7 +195,6 @@ else
 }
 
 Info<< "Selecting renumberMethod : " << renumberPtr().type() << nl << endl;
-
 
 
 // Read parallel reconstruct maps
@@ -266,13 +270,17 @@ labelIOList boundaryProcAddressing
 labelList cellOrder;
 labelList faceOrder;
 
-if (blockSize > 0)
+if (blockSize > 0 || nBlocks > 1)
 {
     // Renumbering in two phases. Should be done in one so mapping of
     // renumberFields is done correctly!
 
-    label nBlocks = mesh.nCells()/blockSize;
-    Info<< "nBlocks   = " << nBlocks << endl;
+    // 如果设置了nBlocks，用设置的，如果没有就用blockSize算。
+    if(nBlocks == 1){
+        nBlocks = mesh.nCells() / blockSize;
+    }
+    // label nBlocks = mesh.nCells() / blockSize;
+    Info<< "nBlocks = " << nBlocks << endl;
 
     // Read decompositionMethod dictionary
     dictionary decomposeDict(renumberDictPtr().subDict("blockCoeffs"));
@@ -299,19 +307,21 @@ if (blockSize > 0)
     UPstream::parRun() = oldParRun;
 
     // For debugging: write out region
-    createScalarField
-    (
-        mesh,
-        "cellDist",
-        cellToRegion
-    )().write();
+    // createScalarField
+    // (
+    //     mesh,
+    //     "cellDist",
+    //     cellToRegion
+    // )().write();
 
-    Info<< nl << "Written decomposition as volScalarField to "
-        << "cellDist for use in postprocessing."
-        << nl << endl;
+    // Info<< nl << "Written decomposition as volScalarField to "
+    //     << "cellDist for use in postprocessing."
+    //     << nl << endl;
+    
 
+    // labelList newCellToRegion;
 
-    cellOrder = regionRenumber(renumberPtr(), mesh, cellToRegion);
+    cellOrder = regionRenumber(renumberPtr(), mesh, cellToRegion, regionPtr);
 
     // Determine new to old face order with new cell numbering
     faceOrder = getRegionFaceOrder
@@ -320,6 +330,26 @@ if (blockSize > 0)
         cellOrder,
         cellToRegion
     );
+
+    // label nRegions = newCellToRegion.last() + 1;
+
+    // labelListList regionToNewCells(invertOneToMany(nRegions, newCellToRegion));
+
+    // assert(regionToNewCells.size() == nRegions);
+    
+    // Info << "RegionID : regionStart, regionSize" << endl;
+    // label regionStart = 0;
+    // for(label regionI = 0; regionI < nRegions; ++regionI){
+    //     Info << regionI << " : " << regionStart << ", " << regionToNewCells[regionI].size() << endl;
+    //     regionStart += regionToNewCells[regionI].size();
+    // }
+
+    Info << "RegionID : regionStart, regionSize" << endl;
+    for(label regionI = 0; regionI < regionPtr.size() - 1; ++regionI){
+        Info << regionI << " : " << regionPtr[regionI] << ", " << regionPtr[regionI+1] - regionPtr[regionI] << endl;
+    }
+
+
 }
 else
 {
@@ -418,6 +448,7 @@ else
 // {
 //     runTime++;
 // }
+// runTime++;
 
 
 // Change the mesh.
@@ -724,20 +755,20 @@ if (orderPoints)
     //         << " for use in postprocessing."
     //         << nl << endl;
 
-        // labelIOList
-        // (
-        //     IOobject
-        //     (
-        //         "cellMap",
-        //         mesh.facesInstance(),
-        //         polyMesh::meshSubDir,
-        //         mesh,
-        //         IOobject::NO_READ,
-        //         IOobject::NO_WRITE,
-        //         false
-        //     ),
-        //     map().cellMap()
-        // ).write();
+    //     labelIOList
+    //     (
+    //         IOobject
+    //         (
+    //             "cellMap",
+    //             mesh.facesInstance(),
+    //             polyMesh::meshSubDir,
+    //             mesh,
+    //             IOobject::NO_READ,
+    //             IOobject::NO_WRITE,
+    //             false
+    //         ),
+    //         map().cellMap()
+    //     ).write();
 
     //     labelIOList
     //     (
@@ -771,62 +802,62 @@ if (orderPoints)
     // }
 
 
-    // // Renumber sets if required
-    // if (renumberSets)
-    // {
-    //     Info<< endl;
+    // Renumber sets if required
+    if (renumberSets)
+    {
+        Info<< endl;
 
-    //     // Read sets
-    //     IOobjectList objects(mesh, mesh.facesInstance(), "polyMesh/sets");
+        // Read sets
+        IOobjectList objects(mesh, mesh.facesInstance(), "polyMesh/sets");
 
-    //     {
-    //         IOobjectList cSets(objects.lookupClass(cellSet::typeName));
-    //         if (cSets.size())
-    //         {
-    //             Info<< "Renumbering cellSets:" << endl;
-    //             forAllConstIter(IOobjectList, cSets, iter)
-    //             {
-    //                 cellSet cs(*iter());
-    //                 Info<< "    " << cs.name() << endl;
-    //                 cs.updateMesh(map());
-    //                 cs.instance() = mesh.facesInstance();
-    //                 cs.write();
-    //             }
-    //         }
-    //     }
+        {
+            IOobjectList cSets(objects.lookupClass(cellSet::typeName));
+            if (cSets.size())
+            {
+                Info<< "Renumbering cellSets:" << endl;
+                forAllConstIter(IOobjectList, cSets, iter)
+                {
+                    cellSet cs(*iter());
+                    Info<< "    " << cs.name() << endl;
+                    cs.updateMesh(map());
+                    cs.instance() = mesh.facesInstance();
+                    // cs.write();
+                }
+            }
+        }
 
-    //     {
-    //         IOobjectList fSets(objects.lookupClass(faceSet::typeName));
-    //         if (fSets.size())
-    //         {
-    //             Info<< "Renumbering faceSets:" << endl;
-    //             forAllConstIter(IOobjectList, fSets, iter)
-    //             {
-    //                 faceSet fs(*iter());
-    //                 Info<< "    " << fs.name() << endl;
-    //                 fs.updateMesh(map());
-    //                 fs.instance() = mesh.facesInstance();
-    //                 fs.write();
-    //             }
-    //         }
-    //     }
+        {
+            IOobjectList fSets(objects.lookupClass(faceSet::typeName));
+            if (fSets.size())
+            {
+                Info<< "Renumbering faceSets:" << endl;
+                forAllConstIter(IOobjectList, fSets, iter)
+                {
+                    faceSet fs(*iter());
+                    Info<< "    " << fs.name() << endl;
+                    fs.updateMesh(map());
+                    fs.instance() = mesh.facesInstance();
+                    // fs.write();
+                }
+            }
+        }
 
-    //     {
-    //         IOobjectList pSets(objects.lookupClass(pointSet::typeName));
-    //         if (pSets.size())
-    //         {
-    //             Info<< "Renumbering pointSets:" << endl;
-    //             forAllConstIter(IOobjectList, pSets, iter)
-    //             {
-    //                 pointSet ps(*iter());
-    //                 Info<< "    " << ps.name() << endl;
-    //                 ps.updateMesh(map());
-    //                 ps.instance() = mesh.facesInstance();
-    //                 ps.write();
-    //             }
-    //         }
-    //     }
-    // }
+        {
+            IOobjectList pSets(objects.lookupClass(pointSet::typeName));
+            if (pSets.size())
+            {
+                Info<< "Renumbering pointSets:" << endl;
+                forAllConstIter(IOobjectList, pSets, iter)
+                {
+                    pointSet ps(*iter());
+                    Info<< "    " << ps.name() << endl;
+                    ps.updateMesh(map());
+                    ps.instance() = mesh.facesInstance();
+                    // ps.write();
+                }
+            }
+        }
+    }
 
     // Info<< "End\n" << endl;
 
@@ -836,4 +867,4 @@ if (orderPoints)
 
 // ************************************************************************* //
 
-}
+// }

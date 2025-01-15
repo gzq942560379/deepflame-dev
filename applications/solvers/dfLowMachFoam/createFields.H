@@ -193,6 +193,8 @@ volScalarField UEqn_A
     extrapolatedCalculatedFvPatchScalarField::typeName
 );
 
+const surfaceScalarField linear_weights = mesh.surfaceInterpolation::weights(); // interpolation weight (linear)
+
 const Switch splitting = CanteraTorchProperties.lookupOrDefault("splittingStrategy", false);
 #ifdef USE_PYTORCH
     const Switch log_ = CanteraTorchProperties.subDict("TorchSettings").lookupOrDefault("log", false);

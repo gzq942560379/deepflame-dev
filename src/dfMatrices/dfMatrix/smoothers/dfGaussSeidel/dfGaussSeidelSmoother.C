@@ -82,17 +82,17 @@ void Foam::dfGaussSeidelSmoother::smooth
     scalarField bPrime(nCells);
     scalar* __restrict__ bPrimePtr = bPrime.begin();
 
-    const scalar* const __restrict__ diagPtr = matrix_.diag().begin();
-    const scalar* const __restrict__ upperPtr =
-        matrix_.upper().begin();
-    const scalar* const __restrict__ lowerPtr =
-        matrix_.lower().begin();
+    // const scalar* const __restrict__ diagPtr = matrix_.diag().begin();
+    // const scalar* const __restrict__ upperPtr =
+    //     matrix_.upper().begin();
+    // const scalar* const __restrict__ lowerPtr =
+    //     matrix_.lower().begin();
 
-    const label* const __restrict__ uPtr =
-        matrix_.lduAddr().upperAddr().begin();
+    // const label* const __restrict__ uPtr =
+    //     matrix_.lduAddr().upperAddr().begin();
 
-    const label* const __restrict__ ownStartPtr =
-        matrix_.lduAddr().ownerStartAddr().begin();
+    // const label* const __restrict__ ownStartPtr =
+    //     matrix_.lduAddr().ownerStartAddr().begin();
 
 
     // Parallel boundary initialisation.  The parallel boundary is treated
@@ -144,36 +144,37 @@ void Foam::dfGaussSeidelSmoother::smooth
             cmpt
         );
 
-        scalar psii;
-        label fStart;
-        label fEnd = ownStartPtr[0];
+        // scalar psii;
+        // label fStart;
+        // label fEnd = ownStartPtr[0];
 
-        for (label celli=0; celli<nCells; celli++)
-        {
-            // Start and end of this row
-            fStart = fEnd;
-            fEnd = ownStartPtr[celli + 1];
+        // for (label celli=0; celli<nCells; celli++)
+        // {
+        //     // Start and end of this row
+        //     fStart = fEnd;
+        //     fEnd = ownStartPtr[celli + 1];
 
-            // Get the accumulated neighbour side
-            psii = bPrimePtr[celli];
+        //     // Get the accumulated neighbour side
+        //     psii = bPrimePtr[celli];
 
-            // Accumulate the owner product side
-            for (label facei=fStart; facei<fEnd; facei++)
-            {
-                psii -= upperPtr[facei]*psiPtr[uPtr[facei]];
-            }
+        //     // Accumulate the owner product side
+        //     for (label facei=fStart; facei<fEnd; facei++)
+        //     {
+        //         psii -= upperPtr[facei]*psiPtr[uPtr[facei]];
+        //     }
 
-            // Finish psi for this cell
-            psii /= diagPtr[celli];
+        //     // Finish psi for this cell
+        //     psii /= diagPtr[celli];
 
-            // Distribute the neighbour side using psi for this cell
-            for (label facei=fStart; facei<fEnd; facei++)
-            {
-                bPrimePtr[uPtr[facei]] -= lowerPtr[facei]*psii;
-            }
+        //     // Distribute the neighbour side using psi for this cell
+        //     for (label facei=fStart; facei<fEnd; facei++)
+        //     {
+        //         bPrimePtr[uPtr[facei]] -= lowerPtr[facei]*psii;
+        //     }
 
-            psiPtr[celli] = psii;
-        }
+        //     psiPtr[celli] = psii;
+        // }
+        matrix_.GaussSeidel(psi, bPrime);
     }
 
     // Restore interfaceBouCoeffs_

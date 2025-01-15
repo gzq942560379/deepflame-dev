@@ -33,6 +33,11 @@ public:
 
     ~csrPattern(){};
 
+    label n() const {return n_;};
+    label nnz() const {return nnz_;};
+    const labelList rowptr() const {return rowptr_;};
+    const labelList colidx() const {return colidx_;};
+
     void coloring();
 
     label color(label index){

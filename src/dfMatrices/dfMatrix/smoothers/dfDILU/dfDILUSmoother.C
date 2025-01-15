@@ -105,15 +105,13 @@ void Foam::dfDILUSmoother::smooth
         label nFaces = matrix_.upper().size();
         for (label face=0; face<nFaces; face++)
         {
-            label u = uPtr[face];
-            rAPtr[u] -= rDPtr[u]*lowerPtr[face]*rAPtr[lPtr[face]];
+            rAPtr[u] -= rDPtr[uPtr[face]]*lowerPtr[face]*rAPtr[lPtr[face]];
         }
 
         label nFacesM1 = nFaces - 1;
         for (label face=nFacesM1; face>=0; face--)
         {
-            label l = lPtr[face];
-            rAPtr[l] -= rDPtr[l]*upperPtr[face]*rAPtr[uPtr[face]];
+            rAPtr[l] -= rDPtr[lPtr[face]]*upperPtr[face]*rAPtr[uPtr[face]];
         }
 
         // scalarField rACopy(rA);

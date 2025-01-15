@@ -141,9 +141,14 @@ int offset;
 #endif
 
 #include "csrPattern.H"
+#include "BCSR.H"
 #include "dfMatrix.H"
+#include "GenFvMatrix.H"
+#include "MeshSchedule.H"
 
 #define USE_DF_MATRIX
+// #define OPT_GenMatrix_E
+// #define OPT_GenMatrix_E_check
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -295,17 +300,33 @@ int main(int argc, char *argv[])
 
     // mesh renumbering
 
+    csrPattern pattern_before(mesh);
     if(mpirank == 0 || mpirank == 1){
-        csrPattern pattern_before(mesh);
         pattern_before.write_mtx("pattern_before");
     }
-
+    
     #include "renumberMesh.H"
 
+    csrPattern pattern_after(mesh);
     if(mpirank == 0 || mpirank == 1){
-        csrPattern pattern_after(mesh);
         pattern_after.write_mtx("pattern_after");
     }
+
+    if (nBlocks > 1){
+        BCSR bcsr(pattern_after, regionPtr);
+    }else if(nBlocks == 1){
+        regionPtr.resize(17);
+        // partition nCells into 16 regions
+        for(label i = 0; i < 16; ++i){
+            label regionStart = nCell * i / label(16);
+            regionPtr[i] = regionStart;
+        }
+        regionPtr[16] = nCell;
+        BCSR bcsr(pattern_after, regionPtr);
+    }
+
+    // init_const_coeff_ptr(Y);
+    // MeshSchedule::buildMeshSchedule(mesh);
 
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

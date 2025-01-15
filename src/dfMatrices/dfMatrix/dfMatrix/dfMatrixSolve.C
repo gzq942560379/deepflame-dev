@@ -38,7 +38,9 @@ SolverPerformance<Type> dfMatrix::solve(
 
         // copy field and source
         scalarField psiCmpt(psi.primitiveField().component(cmpt));
+        
         addBoundaryDiag(diag(), internalCoeffs, cmpt);
+        const_cast<scalarField&>(ldu().diag()) = diag();
 
         scalarField sourceCmpt(sourceCpy.component(cmpt));
 
@@ -98,7 +100,9 @@ SolverPerformance<Type> dfMatrix::solve(
         solverPerfVec.solverName() = solverPerf.solverName();
 
         psi.primitiveFieldRef().replace(cmpt, psiCmpt);
+
         diag() = saveDiag;
+        const_cast<scalarField&>(ldu().diag()) = saveDiag;;
     }
 
     psi.correctBoundaryConditions();
@@ -119,6 +123,7 @@ solverPerformance dfMatrix::solve
 )
 {
     scalarField saveDiag(diag());
+    // addBoundaryDiag(diag(), internalCoeffs, 0);
     addBoundaryDiag(diag(), internalCoeffs, 0);
     const_cast<scalarField&>(ldu().diag()) = diag();
 

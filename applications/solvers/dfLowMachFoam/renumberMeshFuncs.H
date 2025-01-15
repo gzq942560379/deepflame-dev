@@ -487,7 +487,8 @@ labelList regionRenumber
 (
     const renumberMethod& method,
     const fvMesh& mesh,
-    const labelList& cellToRegion
+    const labelList& cellToRegion,
+    labelList& regionPtr
 )
 {
     Info<< "Determining cell order:" << endl;
@@ -498,11 +499,14 @@ labelList regionRenumber
 
     labelListList regionToCells(invertOneToMany(nRegions, cellToRegion));
 
+    // newCellToRegion.resize(cellToRegion.size());
+
     label celli = 0;
 
     forAll(regionToCells, regionI)
     {
         Info<< "    region " << regionI << " starts at " << celli << endl;
+        regionPtr.append(celli);
 
         // Make sure no parallel comms
         bool oldParRun = UPstream::parRun();
@@ -527,10 +531,14 @@ labelList regionRenumber
 
         forAll(subCellOrder, i)
         {
-            cellOrder[celli++] = cellMap[subCellOrder[i]];
+            cellOrder[celli] = cellMap[subCellOrder[i]];
+            // newCellToRegion[celli] = regionI;
+            celli += 1;
         }
     }
     Info<< endl;
+    
+    regionPtr.append(cellToRegion.size());
 
     return cellOrder;
 }

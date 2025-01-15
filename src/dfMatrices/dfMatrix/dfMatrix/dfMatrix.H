@@ -20,13 +20,76 @@
 
 namespace Foam{
 
+
 class dfMatrix{
+public:
+    class InnerMatrix{
+    protected:
+        scalarField diag_;
+        bool diagonal_;
+        bool symmetric_;
+    public:
+        InnerMatrix(const lduMatrix& ldu):
+            diagonal_(ldu.diagonal()),
+            symmetric_(ldu.symmetric())
+        {
+            if(ldu.hasDiag())
+            {
+                diag_ = ldu.diag();
+            }
+        };
+        virtual ~InnerMatrix(){};
+        scalarField& diag(){return diag_;};
+        const scalarField& diag() const {return diag_;};
+        bool diagonal() const {return diagonal_;};
+        bool symmetric() const {return symmetric_;};
+        bool asymmetric() const {return !symmetric_;};
+        virtual void SpMV
+        (
+            scalarField& Apsi,
+            const scalarField& psi
+        ) const = 0;
+        virtual void GaussSeidel
+        (
+            scalarField& psi,
+            scalarField& bPrime
+        ) const = 0;
+
+        virtual void calcDILUReciprocalD(
+            scalarField& rD
+        ) const = 0;
+
+        virtual void DILUPrecondition(
+            scalarField& wA,
+            const scalarField& rA,
+            const scalarField& rD
+        ) const = 0;
+        
+        virtual void DILUPreconditionT(
+            scalarField& wT,
+            const scalarField& rT,
+            const scalarField& rD
+        ) const = 0;
+
+        virtual void calcDICReciprocalD(
+            scalarField& rD
+        ) const = 0;
+
+        virtual void DICPrecondition(
+            scalarField& wA,
+            const scalarField& rA,
+            const scalarField& rD
+        ) const = 0;
+
+    };
 private:
     // const fvMesh& mesh_;
     const lduMatrix& lduMatrix_;
 
+    InnerMatrix* innerMatrixPtr_;
+
     //- Coefficients (not including interfaces)
-    scalarField *lowerPtr_, *diagPtr_, *upperPtr_;
+    // scalarField *lowerPtr_, *diagPtr_, *upperPtr_;
 
 public:
     // Static data
@@ -57,46 +120,23 @@ public:
 
     // Access to coefficients
 
-    scalarField& lower();
-    scalarField& diag();
-    scalarField& upper();
+    scalarField& diag() {return innerMatrixPtr_->diag();};
 
-    scalarField& lower(const label size);
-    scalarField& diag(const label nCoeffs);
-    scalarField& upper(const label nCoeffs);
-
-    const scalarField& lower() const;
-    const scalarField& diag() const;
-    const scalarField& upper() const;
-
-    bool hasDiag() const
-    {
-        return (diagPtr_);
-    }
-
-    bool hasUpper() const
-    {
-        return (upperPtr_);
-    }
-
-    bool hasLower() const
-    {
-        return (lowerPtr_);
-    }
+    const scalarField& diag() const {return innerMatrixPtr_->diag();};
 
     bool diagonal() const
     {
-        return (diagPtr_ && !lowerPtr_ && !upperPtr_);
+        return innerMatrixPtr_->diagonal();
     }
 
     bool symmetric() const
     {
-        return (diagPtr_ && (!lowerPtr_ && upperPtr_));
+        return innerMatrixPtr_->symmetric();
     }
 
     bool asymmetric() const
     {
-        return (diagPtr_ && lowerPtr_ && upperPtr_);
+        return innerMatrixPtr_->asymmetric();
     }
 
     mutable double Amul_time_ = 0.;
@@ -133,36 +173,53 @@ public:
     ) const;
     void SpMV
     (
-        scalarField&,
-        const scalarField&
-    ) const;
-    void SpMV_naive
+        scalarField& Apsi,
+        const scalarField& psi
+    ) const { innerMatrixPtr_->SpMV(Apsi, psi); };
+    void GaussSeidel
     (
-        scalarField&,
-        const scalarField&
-    ) const;
+        scalarField& psi,
+        scalarField& bPrime
+    ) const { innerMatrixPtr_->GaussSeidel(psi, bPrime); };
+
+    void calcDILUReciprocalD(
+        scalarField& rD
+    ) const { innerMatrixPtr_->calcDILUReciprocalD(rD); };
+
+    void DILUPrecondition(
+        scalarField& wA,
+        const scalarField& rA,
+        const scalarField& rD
+    ) const { innerMatrixPtr_->DILUPrecondition(wA, rA, rD); };
+
+    void DILUPreconditionT(
+        scalarField& wT,
+        const scalarField& rT,
+        const scalarField& rD
+    ) const { innerMatrixPtr_->DILUPreconditionT(wT, rT, rD); };
+
+    void calcDICReciprocalD(
+        scalarField& rD
+    ) const { innerMatrixPtr_->calcDICReciprocalD(rD); };
+
+    void DICPrecondition(
+        scalarField& wA,
+        const scalarField& rA,
+        const scalarField& rD
+    ) const { innerMatrixPtr_->DICPrecondition(wA, rA, rD); };
+
     void Jacobi
     (
-        scalarField&,
-        scalarField&
-    ) const;
-    void Jacobi_naive
-    (
-        scalarField&,
-        scalarField&
-    ) const;
-    void SymGaussSeidel
-    (
-        scalarField&,
-        scalarField&
+        scalarField& psi,
+        scalarField& bPrime
     ) const;
 
-    void SymGaussSeidel_naive
+    void SymGaussSeidel
     (
-        scalarField&,
-        scalarField&
+        scalarField& psi,
+        scalarField& bPrime
     ) const;
-    
+
     //- Sum the coefficients on each row of the matrix
     void sumA
     (
@@ -273,6 +330,7 @@ public:
         const FieldField<Field, Type>& internalCoeffs,
         const direction solveCmpt
     ) const;
+
 
     class solver{
     protected:

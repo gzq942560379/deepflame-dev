@@ -31,6 +31,7 @@ License
 #include "Residuals.H"
 #include <vector>
 #include "env.H"
+#include "dfLduMatrix.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -42,191 +43,159 @@ namespace Foam
 const Foam::label Foam::dfMatrix::solver::defaultMaxIter_ = 1000;
 
 
-Foam::dfMatrix::dfMatrix(const lduMatrix& ldu)
-:
-    lduMatrix_(ldu),
-    lowerPtr_(nullptr),
-    diagPtr_(nullptr),
-    upperPtr_(nullptr)
+Foam::dfMatrix::dfMatrix(const lduMatrix& ldu):lduMatrix_(ldu),innerMatrixPtr_(new dfLduMatrix(ldu))
 {
-    if (ldu.hasLower())
-    {
-        lowerPtr_ = new scalarField(ldu.lower());
-    }
-
-    if (ldu.hasDiag())
-    {
-        diagPtr_ = new scalarField(ldu.diag());
-    }
-
-    if (ldu.hasUpper())
-    {
-        upperPtr_ = new scalarField(ldu.upper());
-    }
 }
 
 
 Foam::dfMatrix::~dfMatrix()
 {
-    if (lowerPtr_)
-    {
-        delete lowerPtr_;
-    }
-
-    if (diagPtr_)
-    {
-        delete diagPtr_;
-    }
-
-    if (upperPtr_)
-    {
-        delete upperPtr_;
-    }
+    delete innerMatrixPtr_;
 }
 
 
-Foam::scalarField& Foam::dfMatrix::lower()
-{
-    if (!lowerPtr_)
-    {
-        if (upperPtr_)
-        {
-            lowerPtr_ = new scalarField(*upperPtr_);
-        }
-        else
-        {
-            lowerPtr_ = new scalarField(lduAddr().lowerAddr().size(), 0.0);
-        }
-    }
+// Foam::scalarField& Foam::dfMatrix::lower()
+// {
+//     if (!lowerPtr_)
+//     {
+//         if (upperPtr_)
+//         {
+//             lowerPtr_ = new scalarField(*upperPtr_);
+//         }
+//         else
+//         {
+//             lowerPtr_ = new scalarField(lduAddr().lowerAddr().size(), 0.0);
+//         }
+//     }
 
-    return *lowerPtr_;
-}
-
-
-Foam::scalarField& Foam::dfMatrix::diag()
-{
-    if (!diagPtr_)
-    {
-        diagPtr_ = new scalarField(lduAddr().size(), 0.0);
-    }
-
-    return *diagPtr_;
-}
+//     return *lowerPtr_;
+// }
 
 
-Foam::scalarField& Foam::dfMatrix::upper()
-{
-    if (!upperPtr_)
-    {
-        if (lowerPtr_)
-        {
-            upperPtr_ = new scalarField(*lowerPtr_);
-        }
-        else
-        {
-            upperPtr_ = new scalarField(lduAddr().lowerAddr().size(), 0.0);
-        }
-    }
+// Foam::scalarField& Foam::dfMatrix::diag()
+// {
+//     if (!diagPtr_)
+//     {
+//         diagPtr_ = new scalarField(lduAddr().size(), 0.0);
+//     }
 
-    return *upperPtr_;
-}
+//     return *diagPtr_;
+// }
 
 
-Foam::scalarField& Foam::dfMatrix::lower(const label nCoeffs)
-{
-    if (!lowerPtr_)
-    {
-        if (upperPtr_)
-        {
-            lowerPtr_ = new scalarField(*upperPtr_);
-        }
-        else
-        {
-            lowerPtr_ = new scalarField(nCoeffs, 0.0);
-        }
-    }
+// Foam::scalarField& Foam::dfMatrix::upper()
+// {
+//     if (!upperPtr_)
+//     {
+//         if (lowerPtr_)
+//         {
+//             upperPtr_ = new scalarField(*lowerPtr_);
+//         }
+//         else
+//         {
+//             upperPtr_ = new scalarField(lduAddr().lowerAddr().size(), 0.0);
+//         }
+//     }
 
-    return *lowerPtr_;
-}
-
-
-Foam::scalarField& Foam::dfMatrix::diag(const label size)
-{
-    if (!diagPtr_)
-    {
-        diagPtr_ = new scalarField(size, 0.0);
-    }
-
-    return *diagPtr_;
-}
+//     return *upperPtr_;
+// }
 
 
-Foam::scalarField& Foam::dfMatrix::upper(const label nCoeffs)
-{
-    if (!upperPtr_)
-    {
-        if (lowerPtr_)
-        {
-            upperPtr_ = new scalarField(*lowerPtr_);
-        }
-        else
-        {
-            upperPtr_ = new scalarField(nCoeffs, 0.0);
-        }
-    }
+// Foam::scalarField& Foam::dfMatrix::lower(const label nCoeffs)
+// {
+//     if (!lowerPtr_)
+//     {
+//         if (upperPtr_)
+//         {
+//             lowerPtr_ = new scalarField(*upperPtr_);
+//         }
+//         else
+//         {
+//             lowerPtr_ = new scalarField(nCoeffs, 0.0);
+//         }
+//     }
 
-    return *upperPtr_;
-}
-
-
-const Foam::scalarField& Foam::dfMatrix::lower() const
-{
-    if (!lowerPtr_ && !upperPtr_)
-    {
-        FatalErrorInFunction
-            << "lowerPtr_ or upperPtr_ unallocated"
-            << abort(FatalError);
-    }
-
-    if (lowerPtr_)
-    {
-        return *lowerPtr_;
-    }
-    else
-    {
-        return *upperPtr_;
-    }
-}
+//     return *lowerPtr_;
+// }
 
 
-const Foam::scalarField& Foam::dfMatrix::diag() const
-{
-    if (!diagPtr_)
-    {
-        FatalErrorInFunction
-            << "diagPtr_ unallocated"
-            << abort(FatalError);
-    }
+// Foam::scalarField& Foam::dfMatrix::diag(const label size)
+// {
+//     if (!diagPtr_)
+//     {
+//         diagPtr_ = new scalarField(size, 0.0);
+//     }
 
-    return *diagPtr_;
-}
+//     return *diagPtr_;
+// }
 
 
-const Foam::scalarField& Foam::dfMatrix::upper() const
-{
-    if (!lowerPtr_ && !upperPtr_)
-    {
-        FatalErrorInFunction
-            << "lowerPtr_ or upperPtr_ unallocated"
-            << abort(FatalError);
-    }
+// Foam::scalarField& Foam::dfMatrix::upper(const label nCoeffs)
+// {
+//     if (!upperPtr_)
+//     {
+//         if (lowerPtr_)
+//         {
+//             upperPtr_ = new scalarField(*lowerPtr_);
+//         }
+//         else
+//         {
+//             upperPtr_ = new scalarField(nCoeffs, 0.0);
+//         }
+//     }
 
-    if (upperPtr_)
-    {
-        return *upperPtr_;
-    }
-    else
-    {
-        return *lowerPtr_;
-    }
-}
+//     return *upperPtr_;
+// }
+
+
+// const Foam::scalarField& Foam::dfMatrix::lower() const
+// {
+//     if (!lowerPtr_ && !upperPtr_)
+//     {
+//         FatalErrorInFunction
+//             << "lowerPtr_ or upperPtr_ unallocated"
+//             << abort(FatalError);
+//     }
+
+//     if (lowerPtr_)
+//     {
+//         return *lowerPtr_;
+//     }
+//     else
+//     {
+//         return *upperPtr_;
+//     }
+// }
+
+
+// const Foam::scalarField& Foam::dfMatrix::diag() const
+// {
+//     if (!diagPtr_)
+//     {
+//         FatalErrorInFunction
+//             << "diagPtr_ unallocated"
+//             << abort(FatalError);
+//     }
+
+//     return *diagPtr_;
+// }
+
+
+// const Foam::scalarField& Foam::dfMatrix::upper() const
+// {
+//     if (!lowerPtr_ && !upperPtr_)
+//     {
+//         FatalErrorInFunction
+//             << "lowerPtr_ or upperPtr_ unallocated"
+//             << abort(FatalError);
+//     }
+
+//     if (upperPtr_)
+//     {
+//         return *upperPtr_;
+//     }
+//     else
+//     {
+//         return *lowerPtr_;
+//     }
+// }

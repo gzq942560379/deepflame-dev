@@ -42,6 +42,10 @@ public:
     const labelUList& reverseNeighbour() const {return reverseNeighbour_;};
     const labelUList& faceIndexMapping() const {return faceIndexMapping_;};
 
+    static MeshSchedule* meshSchedule_;
+
+    static void buildMeshSchedule(const fvMesh& mesh);
+
     virtual void show() const {
         Info << "MeshSchedule show ---------------------------" << endl;
         Info << "nCells : " << nCells_ << endl;
@@ -49,6 +53,11 @@ public:
         Info << "nPatches : " << nPatches_ << endl;
         Info << "patchSizes_ : " << patchSizes_ << endl;
         Info << "---------------------------------------------" << endl;
+    };
+
+    static const MeshSchedule& getMeshSchedule() {
+        assert(meshSchedule_ != nullptr); 
+        return *meshSchedule_;
     };
 
 };

@@ -109,33 +109,35 @@ Foam::labelList Foam::blockRenumber::renumber
     Info << "block_unit_y : " << block_unit_y << endl; 
     Info << "block_unit_z : " << block_unit_z << endl; 
 
-    std::vector<std::vector<Point>> blocks(block_count);
+    std::vector<std::vector<label>> blocks(block_count);
 
     for(label i = 0; i < points.size(); ++i){
-        Point p(i, points[i].x(), points[i].y(), points[i].z());
-        label block_id_x = (p.x_) / block_unit_x;
-        label block_id_y = (p.y_) / block_unit_y;
-        label block_id_z = (p.z_) / block_unit_z;
+        label block_id_x = (points[i].x()) / block_unit_x;
+        label block_id_y = (points[i].y()) / block_unit_y;
+        label block_id_z = (points[i].z()) / block_unit_z;
         assert(block_id_x >= 0 && block_id_x < block_dim_x);
         assert(block_id_y >= 0 && block_id_y < block_dim_y);
         assert(block_id_z >= 0 && block_id_z < block_dim_z);
         label block_id = block_id_z * block_dim_x * block_dim_y + block_id_y * block_dim_x + block_id_x;
         assert(block_id >= 0 && block_id < block_count);
-        blocks[block_id].push_back(p);
+        blocks[block_id].push_back(i);
     }
 
+    block_size_vector_.resize(block_count);
     for(size_t i = 0; i < blocks.size(); ++i){
+        block_size_vector_[i] = blocks[i].size();
         Info << "block " << i << " : " << blocks[i].size() << endl;
     }
 
     labelList newToOld(points.size());
     label new_id = 0;
     for(size_t bid = 0; bid < blocks.size(); ++bid){
-        for(auto& p : blocks[bid]){
-            newToOld[new_id] = p.id_;
+        for(auto& pid : blocks[bid]){
+            newToOld[new_id] = pid;
             new_id += 1;
         }
     }
+    
     Info << "Foam::blockRenumber::renumber end" << endl;
     return newToOld;
 }
