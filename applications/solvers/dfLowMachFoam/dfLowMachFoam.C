@@ -325,9 +325,10 @@ int main(int argc, char *argv[])
         BCSR bcsr(pattern_after, regionPtr);
     }
 
-    // init_const_coeff_ptr(Y);
-    // MeshSchedule::buildMeshSchedule(mesh);
-
+#if defined(OPT_GenMatrix_E)
+    init_const_coeff_ptr(Y);
+    MeshSchedule::buildMeshSchedule(mesh);
+#endif
     // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
     Info<< "\nStarting time loop\n" << endl;

@@ -9,6 +9,7 @@ $(dfMatrix)/dfMatrix/dfMatrix.C
 $(dfMatrix)/dfMatrix/dfMatrixSmoother.C
 
 $(dfMatrix)/dfMatrix/dfLduMatrix/dfLduMatrix.C
+$(dfMatrix)/dfMatrix/dfCSRMatrix/dfCSRMatrix.C
 
 $(dfMatrix)/preconditioners/dfNoPreconditioner/dfNoPreconditioner.C
 $(dfMatrix)/preconditioners/dfDILUPreconditioner/dfDILUPreconditioner.C
@@ -16,6 +17,7 @@ $(dfMatrix)/preconditioners/dfDICPreconditioner/dfDICPreconditioner.C
 $(dfMatrix)/preconditioners/dfGAMGPreconditioner/dfGAMGPreconditioner.C
 
 $(dfMatrix)/smoothers/dfGaussSeidel/dfGaussSeidelSmoother.C
+$(dfMatrix)/smoothers/dfJacobi/dfJacobiSmoother.C
 
 $(dfMatrix)/solvers/dfDiagonalSolver/dfDiagonalSolver.C
 $(dfMatrix)/solvers/dfPCG/dfPCG.C

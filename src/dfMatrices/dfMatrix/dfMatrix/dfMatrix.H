@@ -12,19 +12,27 @@
 #include "InfoProxy.H"
 #include "volFields.H"
 #include "surfaceFields.H"
-#include "tmp.H"
+#include "tmp.H" 
 #include "className.H"
+#include <cassert>
 
 #include "lduMatrix.H"
 
 
 namespace Foam{
 
+// InnerMatrix 枚举类型
+
+enum InnerMatrixFormat{
+    LDU,
+    CSR,
+};
 
 class dfMatrix{
 public:
     class InnerMatrix{
     protected:
+        label n_;
         scalarField diag_;
         bool diagonal_;
         bool symmetric_;
@@ -33,54 +41,61 @@ public:
             diagonal_(ldu.diagonal()),
             symmetric_(ldu.symmetric())
         {
+            assert(ldu.hasDiag());
             if(ldu.hasDiag())
             {
                 diag_ = ldu.diag();
+                n_ = ldu.diag().size();
             }
         };
         virtual ~InnerMatrix(){};
+
+        label n() const {return n_;};
         scalarField& diag(){return diag_;};
         const scalarField& diag() const {return diag_;};
         bool diagonal() const {return diagonal_;};
         bool symmetric() const {return symmetric_;};
         bool asymmetric() const {return !symmetric_;};
+
+        virtual InnerMatrixFormat getFormat() const = 0;
+        virtual const std::string getFormatName() const = 0;
+
         virtual void SpMV
         (
-            scalarField& Apsi,
-            const scalarField& psi
+            scalar* const __restrict__ ApsiPtr,
+            const scalar* const __restrict__ psiPtr
         ) const = 0;
         virtual void GaussSeidel
         (
-            scalarField& psi,
-            scalarField& bPrime
+            scalar* const __restrict__ psiPtr,
+            scalar* const __restrict__ bPrimePtr
         ) const = 0;
-
+        virtual void Jacobi
+        (
+            scalar* const __restrict__ psiPtr,
+            scalar* const __restrict__ bPrimePtr
+        ) const = 0;
         virtual void calcDILUReciprocalD(
-            scalarField& rD
+            scalar* const __restrict__ rDPtr
         ) const = 0;
-
         virtual void DILUPrecondition(
-            scalarField& wA,
-            const scalarField& rA,
-            const scalarField& rD
+            scalar* const __restrict__ wAPtr,
+            const scalar* const __restrict__ rAPtr,
+            const scalar* const __restrict__ rDPtr
         ) const = 0;
-        
         virtual void DILUPreconditionT(
-            scalarField& wT,
-            const scalarField& rT,
-            const scalarField& rD
+            scalar* const __restrict__ wTPtr,
+            const scalar* const __restrict__ rTPtr,
+            const scalar* const __restrict__ rDPtr
         ) const = 0;
-
         virtual void calcDICReciprocalD(
-            scalarField& rD
+            scalar* const __restrict__ rDPtr
         ) const = 0;
-
         virtual void DICPrecondition(
-            scalarField& wA,
-            const scalarField& rA,
-            const scalarField& rD
+            scalar* const __restrict__ wAPtr,
+            const scalar* const __restrict__ rAPtr,
+            const scalar* const __restrict__ rDPtr
         ) const = 0;
-
     };
 private:
     // const fvMesh& mesh_;
@@ -171,48 +186,54 @@ public:
         const lduInterfaceFieldPtrsList&,
         const direction cmpt
     ) const;
+
+    InnerMatrixFormat getFormat() const {return innerMatrixPtr_->getFormat();};
+    const std::string getFormatName() const {return innerMatrixPtr_->getFormatName();};
+
     void SpMV
     (
         scalarField& Apsi,
         const scalarField& psi
-    ) const { innerMatrixPtr_->SpMV(Apsi, psi); };
+    ) const { innerMatrixPtr_->SpMV(Apsi.begin(), psi.begin()); };
+
     void GaussSeidel
     (
         scalarField& psi,
         scalarField& bPrime
-    ) const { innerMatrixPtr_->GaussSeidel(psi, bPrime); };
-
-    void calcDILUReciprocalD(
-        scalarField& rD
-    ) const { innerMatrixPtr_->calcDILUReciprocalD(rD); };
-
-    void DILUPrecondition(
-        scalarField& wA,
-        const scalarField& rA,
-        const scalarField& rD
-    ) const { innerMatrixPtr_->DILUPrecondition(wA, rA, rD); };
-
-    void DILUPreconditionT(
-        scalarField& wT,
-        const scalarField& rT,
-        const scalarField& rD
-    ) const { innerMatrixPtr_->DILUPreconditionT(wT, rT, rD); };
-
-    void calcDICReciprocalD(
-        scalarField& rD
-    ) const { innerMatrixPtr_->calcDICReciprocalD(rD); };
-
-    void DICPrecondition(
-        scalarField& wA,
-        const scalarField& rA,
-        const scalarField& rD
-    ) const { innerMatrixPtr_->DICPrecondition(wA, rA, rD); };
+    ) const { innerMatrixPtr_->GaussSeidel(psi.begin(), bPrime.begin()); };
 
     void Jacobi
     (
         scalarField& psi,
         scalarField& bPrime
-    ) const;
+    ) const { innerMatrixPtr_->Jacobi(psi.begin(), bPrime.begin()); };
+
+    void calcDILUReciprocalD(
+        scalarField& rD
+    ) const { innerMatrixPtr_->calcDILUReciprocalD(rD.begin()); };
+
+    void DILUPrecondition(
+        scalarField& wA,
+        const scalarField& rA,
+        const scalarField& rD
+    ) const { innerMatrixPtr_->DILUPrecondition(wA.begin(), rA.begin(), rD.begin()); };
+
+    void DILUPreconditionT(
+        scalarField& wT,
+        const scalarField& rT,
+        const scalarField& rD
+    ) const { innerMatrixPtr_->DILUPreconditionT(wT.begin(), rT.begin(), rD.begin()); };
+
+    void calcDICReciprocalD(
+        scalarField& rD
+    ) const { innerMatrixPtr_->calcDICReciprocalD(rD.begin()); };
+
+    void DICPrecondition(
+        scalarField& wA,
+        const scalarField& rA,
+        const scalarField& rD
+    ) const { innerMatrixPtr_->DICPrecondition(wA.begin(), rA.begin(), rD.begin()); };
+
 
     void SymGaussSeidel
     (

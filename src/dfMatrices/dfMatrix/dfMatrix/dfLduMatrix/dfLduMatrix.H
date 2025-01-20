@@ -13,11 +13,6 @@ private:
     labelList ownerStartAddr_;
     labelList losortAddr_;
 
-public:
-    dfLduMatrix(const lduMatrix& ldu);
-
-    ~dfLduMatrix(){};
-
     scalarField& lower() {return symmetric_ ? upper_ : lower_;};
     scalarField& upper() {return upper_;};
     const scalarField& lower() const {return symmetric_ ? upper_ : lower_;};
@@ -31,16 +26,25 @@ public:
     labelList& losortAddr() {return losortAddr_;};
     const labelList& losortAddr() const {return losortAddr_;};
 
-    void SpMV(scalarField& Apsi, const scalarField& psi) const;
+public:
+    dfLduMatrix(const lduMatrix& ldu);
+
+    ~dfLduMatrix(){};
+
+    InnerMatrixFormat getFormat() const {return InnerMatrixFormat::LDU;};
+    const std::string getFormatName() const {return "LDU";};
+
+    void SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr) const;
     
-    void GaussSeidel(scalarField& psi, scalarField& bPrime) const;
+    void GaussSeidel(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr) const;
+    void Jacobi(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr) const;
 
-    void calcDILUReciprocalD(scalarField& rD) const;
-    void DILUPrecondition(scalarField& wA, const scalarField& rA, const scalarField& rD) const;
-    void DILUPreconditionT(scalarField& wT, const scalarField& rT, const scalarField& rD) const;
+    void calcDILUReciprocalD(scalar* const __restrict__ rDPtr) const;
+    void DILUPrecondition(scalar* const __restrict__ wAPtr, const scalar* const __restrict__ rAPtr, const scalar* const __restrict__ rDPtr) const;
+    void DILUPreconditionT(scalar* const __restrict__ wTPtr, const scalar* const __restrict__ rTPtr, const scalar* const __restrict__ rDPtr) const;
 
-    void calcDICReciprocalD(scalarField& rD) const;
-    void DICPrecondition(scalarField& wA, const scalarField& rA, const scalarField& rD) const;
+    void calcDICReciprocalD(scalar* const __restrict__ rDPtr) const;
+    void DICPrecondition(scalar* const __restrict__ wAPtr, const scalar* const __restrict__ rAPtr, const scalar* const __restrict__ rDPtr) const;
     
 };
 

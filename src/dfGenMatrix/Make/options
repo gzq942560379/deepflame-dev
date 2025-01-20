@@ -2,7 +2,6 @@
 
 EXE_INC = -std=c++17\
 	-g \
-    -DOPT_FACE2CELL_COLORING_SCHEDULE \
     $(PFLAGS) $(PINC) \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \

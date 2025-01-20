@@ -32,6 +32,7 @@ License
 #include <vector>
 #include "env.H"
 #include "dfLduMatrix.H"
+#include "dfCSRMatrix.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -43,8 +44,10 @@ namespace Foam
 const Foam::label Foam::dfMatrix::solver::defaultMaxIter_ = 1000;
 
 
-Foam::dfMatrix::dfMatrix(const lduMatrix& ldu):lduMatrix_(ldu),innerMatrixPtr_(new dfLduMatrix(ldu))
+Foam::dfMatrix::dfMatrix(const lduMatrix& ldu):lduMatrix_(ldu)
 {
+    innerMatrixPtr_ = new dfLduMatrix(ldu);
+    // innerMatrixPtr_ = new dfCSRMatrix(ldu);
 }
 
 

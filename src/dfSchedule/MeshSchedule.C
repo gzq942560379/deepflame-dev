@@ -14,7 +14,7 @@ void MeshSchedule::buildMeshSchedule(const fvMesh& mesh){
 }
 
 MeshSchedule::MeshSchedule(const fvMesh& mesh) : mesh_(mesh){
-    Pout << "MeshSchedule::MeshSchedule start" << endl;
+    Info << "MeshSchedule::MeshSchedule start" << endl;
     nCells_ = mesh.nCells();
     nFaces_ = mesh.neighbour().size();
     nPatches_ = mesh.boundary().size();
@@ -25,13 +25,13 @@ MeshSchedule::MeshSchedule(const fvMesh& mesh) : mesh_(mesh){
         const fvPatch& patch = mesh.boundary()[patchi];
         // const labelUList& pFaceCells = patch.faceCells();
         patchSizes_[patchi] = patch.size();
-        Pout << "patch.type() == " << patch.type() << endl << flush;
+        Info << "patch.type() == " << patch.type() << endl << flush;
         if(patch.type() == "wall"){
             patchTypes_[patchi] = PatchType::wall;
         }else if(patch.type() == "processor"){
             patchTypes_[patchi] = PatchType::processor;
         }else{
-            Pout << "patch.type() : " << patch.type() << "is not supported !!!" << endl << flush;
+            Pout << "patch.type() : " << patch.type() << " is not supported !!!" << endl << flush;
             assert(false);
             MPI_Abort(MPI_COMM_WORLD, -1);
         }

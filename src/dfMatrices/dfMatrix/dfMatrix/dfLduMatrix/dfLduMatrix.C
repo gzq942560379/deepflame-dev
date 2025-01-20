@@ -19,18 +19,15 @@ dfLduMatrix::dfLduMatrix(const lduMatrix& ldu):dfMatrix::InnerMatrix(ldu){
 }
 
 
-void dfLduMatrix::SpMV(scalarField& Apsi, const scalarField& psi) const {
-    scalar* ApsiPtr = Apsi.begin();
-    const scalar* const __restrict__ psiPtr = psi.begin();
-    const scalar* const __restrict__ diagPtr = diag_.begin();
-
+void dfLduMatrix::SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr) const {
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ lPtr = lowerAddr().begin();
 
+    const scalar* const __restrict__ diagPtr = diag().begin();
     const scalar* const __restrict__ upperPtr = upper().begin();
     const scalar* const __restrict__ lowerPtr = lower().begin();
 
-    const label nCells = diag_.size();
+    const label nCells = diag().size();
     for (label cell=0; cell<nCells; cell++)
     {
         ApsiPtr[cell] = diagPtr[cell]*psiPtr[cell];
@@ -45,33 +42,27 @@ void dfLduMatrix::SpMV(scalarField& Apsi, const scalarField& psi) const {
     }
 }
 
-void dfLduMatrix::GaussSeidel(scalarField& psi, scalarField& bPrime) const {
-    const label nCells = psi.size();
-    scalar* __restrict__ psiPtr = psi.begin();
-    scalar* __restrict__ bPrimePtr = bPrime.begin();
+void dfLduMatrix::GaussSeidel(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr) const {
+    const label nCells = diag().size();
 
-    const scalar* const __restrict__ diagPtr = diag_.begin();
+    const scalar* const __restrict__ diagPtr = diag().begin();
     const scalar* const __restrict__ upperPtr = upper().begin();
     const scalar* const __restrict__ lowerPtr = lower().begin();
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ ownStartPtr = ownerStartAddr().begin();
 
-    scalar psii;
-    label fStart;
-    label fEnd = ownStartPtr[0];
-
     for (label celli=0; celli<nCells; celli++)
     {   
         // Start and end of this row
-        fStart = fEnd;
-        fEnd = ownStartPtr[celli + 1];
+        label fStart = ownStartPtr[celli];
+        label fEnd = ownStartPtr[celli + 1];
         // Get the accumulated neighbour side
-        psii = bPrimePtr[celli];
+        scalar psii = bPrimePtr[celli];
 
         // Accumulate the owner product side
         for (label facei=fStart; facei<fEnd; facei++)
         {
-            psii -= upperPtr[facei]*psiPtr[uPtr[facei]];
+            psii -= upperPtr[facei] * psiPtr[uPtr[facei]];
         }
 
         // Finish psi for this cell
@@ -87,10 +78,45 @@ void dfLduMatrix::GaussSeidel(scalarField& psi, scalarField& bPrime) const {
     }
 }
 
-void dfLduMatrix::calcDILUReciprocalD(scalarField& rD) const {
-    assert(this->asymmetric());
+void dfLduMatrix::Jacobi(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr) const {
+    const label nCells = diag().size();
 
-    scalar* __restrict__ rDPtr = rD.begin();
+    const scalar* const __restrict__ diagPtr = diag().begin();
+    const scalar* const __restrict__ upperPtr = upper().begin();
+    const scalar* const __restrict__ lowerPtr = lower().begin();
+    const label* const __restrict__ uPtr = upperAddr().begin();
+    const label* const __restrict__ ownStartPtr = ownerStartAddr().begin();
+
+    for (label celli=0; celli<nCells; celli++)
+    {   
+        // Start and end of this row
+        label fStart = ownStartPtr[celli];
+        label fEnd = ownStartPtr[celli + 1];
+        // Get the accumulated neighbour side
+
+        // Distribute the neighbour side using psi for this cell
+        for (label facei=fStart; facei<fEnd; facei++)
+        {
+            bPrimePtr[uPtr[facei]] -= lowerPtr[facei] * psiPtr[celli];
+        }
+
+        scalar psii = bPrimePtr[celli];
+
+        // Accumulate the owner product side
+        for (label facei=fStart; facei<fEnd; facei++)
+        {
+            psii -= upperPtr[facei] * psiPtr[uPtr[facei]];
+        }
+
+        // Finish psi for this cell
+        psii /= diagPtr[celli];
+
+        psiPtr[celli] = psii;
+    }
+}
+
+void dfLduMatrix::calcDILUReciprocalD(scalar* const __restrict__ rDPtr) const {
+    assert(this->asymmetric());
 
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ lPtr = lowerAddr().begin();
@@ -106,7 +132,7 @@ void dfLduMatrix::calcDILUReciprocalD(scalarField& rD) const {
     }
 
     // Calculate the reciprocal of the preconditioned diagonal
-    label nCells = rD.size();
+    label nCells = diag().size();
 
     for (label cell=0; cell<nCells; cell++)
     {
@@ -114,12 +140,8 @@ void dfLduMatrix::calcDILUReciprocalD(scalarField& rD) const {
     }
 }
 
-void dfLduMatrix::DILUPrecondition(scalarField& wA, const scalarField& rA, const scalarField& rD) const {
+void dfLduMatrix::DILUPrecondition(scalar* const __restrict__ wAPtr, const scalar* const __restrict__ rAPtr, const scalar* const __restrict__ rDPtr) const {
     assert(this->asymmetric());
-    scalar* __restrict__ wAPtr = wA.begin();
-    const scalar* __restrict__ rAPtr = rA.begin();
-    const scalar* __restrict__ rDPtr = rD.begin();
-
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ lPtr = lowerAddr().begin();
     const label* const __restrict__ losortPtr = losortAddr().begin();
@@ -127,7 +149,7 @@ void dfLduMatrix::DILUPrecondition(scalarField& wA, const scalarField& rA, const
     const scalar* const __restrict__ upperPtr = upper().begin();
     const scalar* const __restrict__ lowerPtr = lower().begin();
 
-    label nCells = wA.size();
+    label nCells = diag().size();
     label nFaces = upper().size();
     label nFacesM1 = nFaces - 1;
 
@@ -152,11 +174,8 @@ void dfLduMatrix::DILUPrecondition(scalarField& wA, const scalarField& rA, const
     }
 }
 
-void dfLduMatrix::DILUPreconditionT(scalarField& wT, const scalarField& rT, const scalarField& rD) const{
+void dfLduMatrix::DILUPreconditionT(scalar* const __restrict__ wTPtr, const scalar* const __restrict__ rTPtr, const scalar* const __restrict__ rDPtr) const{
     assert(this->asymmetric());
-    scalar* __restrict__ wTPtr = wT.begin();
-    const scalar* __restrict__ rTPtr = rT.begin();
-    const scalar* __restrict__ rDPtr = rD.begin();
 
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ lPtr = lowerAddr().begin();
@@ -165,7 +184,7 @@ void dfLduMatrix::DILUPreconditionT(scalarField& wT, const scalarField& rT, cons
     const scalar* const __restrict__ upperPtr = upper().begin();
     const scalar* const __restrict__ lowerPtr = lower().begin();
 
-    label nCells = wT.size();
+    label nCells = diag().size();
     label nFaces = upper().size();
     label nFacesM1 = nFaces - 1;
 
@@ -190,10 +209,8 @@ void dfLduMatrix::DILUPreconditionT(scalarField& wT, const scalarField& rT, cons
     }
 }
 
-void dfLduMatrix::calcDICReciprocalD(scalarField& rD) const {
+void dfLduMatrix::calcDICReciprocalD(scalar* const __restrict__ rDPtr) const {
     assert(this->symmetric());
-
-    scalar* __restrict__ rDPtr = rD.begin();
 
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ lPtr = lowerAddr().begin();
@@ -207,7 +224,7 @@ void dfLduMatrix::calcDICReciprocalD(scalarField& rD) const {
     }
 
     // Calculate the reciprocal of the preconditioned diagonal
-    const label nCells = rD.size();
+    const label nCells = diag().size();
 
     for (label cell=0; cell<nCells; cell++)
     {
@@ -215,18 +232,14 @@ void dfLduMatrix::calcDICReciprocalD(scalarField& rD) const {
     }
 }
 
-void dfLduMatrix::DICPrecondition(scalarField& wA, const scalarField& rA, const scalarField& rD) const {
+void dfLduMatrix::DICPrecondition(scalar* const __restrict__ wAPtr, const scalar* const __restrict__ rAPtr, const scalar* const __restrict__ rDPtr) const {
     assert(this->symmetric());
-
-    scalar* __restrict__ wAPtr = wA.begin();
-    const scalar* __restrict__ rAPtr = rA.begin();
-    const scalar* __restrict__ rDPtr = rD.begin();
 
     const label* const __restrict__ uPtr = upperAddr().begin();
     const label* const __restrict__ lPtr = lowerAddr().begin();
     const scalar* const __restrict__ upperPtr = upper().begin();
 
-    label nCells = wA.size();
+    label nCells = diag().size();
     label nFaces = upper().size();
     label nFacesM1 = nFaces - 1;
 
