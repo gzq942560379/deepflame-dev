@@ -1,7 +1,4 @@
 Info << "Enter pEqn_CPU" << endl;
-assert(!pimple.transonic());
-
-clockTime pEqnClock;
 
 if (!pimple.simpleRho())
 {
@@ -36,44 +33,69 @@ if(flag_mpi_init) MPI_Barrier(PstreamGlobals::MPI_COMM_FOAM);
 
 // Update the pressure BCs to ensure flux consistency
 constrainPressure(p, rho, U, phiHbyA, rhorAUf);
-
-fvScalarMatrix pDDtEqn
-(
-    fvc::ddt(rho) + 
-    psi*correction(fvm::ddt(p))
-    + fvc::div(phiHbyA)
-);
-
-time_monitor_pEqn_pre += pEqnClock.timeIncrement();
-
-while (pimple.correctNonOrthogonal())
+//start = MPI_Wtime();
+if (pimple.transonic())
 {
-    fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
+    surfaceScalarField phid
+    (
+        "phid",
+        (fvc::interpolate(psi)/fvc::interpolate(rho))*phiHbyA
+    );
 
-    time_monitor_pEqn_pre += pEqnClock.timeIncrement();
-    
-#ifdef USE_DF_MATRIX
-    dfMatrix df_pEqn(pEqn, regionPtr);
-    auto& psi = const_cast<volScalarField&>(pEqn.psi());
-    auto& source = pEqn.source();
-    auto& internalCoeffs = pEqn.internalCoeffs();
-    auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+    phiHbyA -= fvc::interpolate(psi*p)*phiHbyA/fvc::interpolate(rho);
 
-    time_monitor_pEqn_convert += pEqnClock.timeIncrement();
-    
-    df_pEqn.solve(psi, source, internalCoeffs, boundaryCoeffs);
-#else
-    pEqn.solve();
-#endif
+    fvScalarMatrix pDDtEqn
+    (
+        fvc::ddt(rho) + psi*correction(fvm::ddt(p))
+      + fvc::div(phiHbyA) + fvm::div(phid, p)
+    );
 
-    time_monitor_pEqn_solve += pEqnClock.timeIncrement(); 
-    
-    if (pimple.finalNonOrthogonalIter())
+    while (pimple.correctNonOrthogonal())
     {
-        phi = phiHbyA + pEqn.flux();
+        fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
+
+        // Relax the pressure equation to ensure diagonal-dominance
+        pEqn.relax();
+        
+        assert(false);
+        pEqn.solve();
+
+        if (pimple.finalNonOrthogonalIter())
+        {
+            phi = phiHbyA + pEqn.flux();
+        }
+    }
+}
+else
+{
+    fvScalarMatrix pDDtEqn
+    (
+        fvc::ddt(rho) + 
+        psi*correction(fvm::ddt(p))
+        + fvc::div(phiHbyA)
+    );
+
+    while (pimple.correctNonOrthogonal())
+    {
+        fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
+        
+#ifdef USE_DF_MATRIX
+        dfMatrix df_pEqn(pEqn, regionPtr);
+        auto& psi = const_cast<volScalarField&>(pEqn.psi());
+        auto& source = pEqn.source();
+        auto& internalCoeffs = pEqn.internalCoeffs();
+        auto& boundaryCoeffs = pEqn.boundaryCoeffs();
+        df_pEqn.solve(psi, source, internalCoeffs, boundaryCoeffs);
+#else
+        pEqn.solve();
+#endif
+        
+        if (pimple.finalNonOrthogonalIter())
+        {
+            phi = phiHbyA + pEqn.flux();
+        }
     }
 
-    time_monitor_pEqn_post += pEqnClock.timeIncrement();
 }
 
 
@@ -116,6 +138,4 @@ if (thermo.dpdt())
     }
 }
 
-time_monitor_pEqn_post += pEqnClock.timeIncrement();
-time_monitor_pEqn += pEqnClock.elapsedTime(); 
 Info << "Exit pEqn_CPU" << endl;

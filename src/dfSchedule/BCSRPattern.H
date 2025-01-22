@@ -8,7 +8,7 @@
 
 namespace Foam{
 
-class BCSRPattern{
+class BlockPattern{
 private:
     
     label n_;
@@ -23,9 +23,9 @@ private:
 
 public:
 
-    BCSRPattern(const csrPattern csr, const labelList& regionPtr);
+    BlockPattern(const csrPattern csr, const labelList& regionPtr);
 
-    ~BCSRPattern(){};
+    ~BlockPattern(){};
 
     void show() const;
 

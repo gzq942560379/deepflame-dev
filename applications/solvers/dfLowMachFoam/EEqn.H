@@ -1,8 +1,9 @@
 Info << "Enter EEqn" << endl;
 
-{
+{   
+    clockTime EEqnClock;
+
     volScalarField& he = thermo.he();
-    start1 = MPI_Wtime();
     fvScalarMatrix EEqn
     (
 
@@ -24,12 +25,9 @@ Info << "Enter EEqn" << endl;
             )
         )
     );
-    end1 = MPI_Wtime();
-    time_monitor_EEqn += double(end1 - start1);
-    time_monitor_EEqn_mtxAssembly += double(end1 - start1);
 
-    // EEqn.relax();
-    start1 = MPI_Wtime();
+    time_monitor_EEqn_pre += EEqnClock.timeIncrement();
+
 
 #ifdef USE_DF_MATRIX
     dfMatrix df_EEqn(EEqn, regionPtr);
@@ -37,14 +35,17 @@ Info << "Enter EEqn" << endl;
     auto& source = EEqn.source();
     auto& internalCoeffs = EEqn.internalCoeffs();
     auto& boundaryCoeffs = EEqn.boundaryCoeffs();
+
+    time_monitor_EEqn_convert += EEqnClock.timeIncrement();
+
     df_EEqn.solve(psi, source, internalCoeffs, boundaryCoeffs, "ha");
 #else
     EEqn.solve("ha");
 #endif
 
-    end1 = MPI_Wtime();
-    time_monitor_EEqn += double(end1 - start1);
-    time_monitor_EEqn_solve += double(end1 - start1);
+    time_monitor_EEqn_solve += EEqnClock.timeIncrement();
+
+    time_monitor_EEqn += EEqnClock.elapsedTime();
 }
 
 Info << "Exit EEqn" << endl;

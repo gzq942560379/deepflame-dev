@@ -6,7 +6,7 @@
 
 namespace Foam{
 
-BCSRPattern::BCSRPattern(const csrPattern csr, const labelList& regionPtr){
+BlockPattern::BlockPattern(const csrPattern csr, const labelList& regionPtr){
 
     n_ = csr.n();
     rowBlockCount_ = regionPtr.size() - 1; 
@@ -32,12 +32,12 @@ BCSRPattern::BCSRPattern(const csrPattern csr, const labelList& regionPtr){
     show();
 }
 
-void BCSRPattern::show() const {
+void BlockPattern::show() const {
     int mpirank, mpisize;
     MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
     MPI_Comm_size(MPI_COMM_WORLD, &mpisize);
 
-    Info << "BCSRPattern Info : " << endl;
+    Info << "BlockPattern Info : " << endl;
     Info << "rowBlockCount_ : " << rowBlockCount_ << endl;
     Info << "rowBlockPtr_ : " << rowBlockPtr_ << endl;
     if(mpirank == 0){

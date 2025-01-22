@@ -30,90 +30,34 @@ Description
 \*---------------------------------------------------------------------------*/
 Info << "Enter rhoEqn " << endl;
 
-#ifdef GPUSolverNew_
-    double *h_rho = dfDataBase.getFieldPointer("rho", location::cpu, position::internal);
-    double *h_boundary_rho = dfDataBase.getFieldPointer("rho", location::cpu, position::boundary);
-
-    TICK_START;
-    rhoEqn_GPU.process();
-    rhoEqn_GPU.sync();
-    TICK_STOP(GPU process time);
-
-    // rhoEqn_GPU.postProcess(h_rho);
-    // rho.oldTime();
-    // memcpy(&rho[0], h_rho, dfDataBase.cell_value_bytes);
-    // rho.correctBoundaryConditions();
-
-
-#ifdef DEBUG_
-    // checkValue
-    TICK_START;
-    fvScalarMatrix rhoEqn
-    (
-        fvm::ddt(rho)
-      + fvc::div(phi)
-    );
-    rhoEqn.solve();
-    TICK_STOP(CPU process time);
-
-    int rank = -1;
-    if (mpi_init_flag) {
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    }
-
-    // if (!mpi_init_flag || rank == 0) {
-    //     rhoEqn_GPU.compareResult(&rhoEqn.diag()[0], &rhoEqn.source()[0], false);
-    // }
-
-    offset = 0;
-    forAll(rho.boundaryField(), patchi)
-    {
-        const fvPatchScalarField& patchRho = rho.boundaryField()[patchi];
-        int patchsize = patchRho.size();
-        if (patchRho.type() == "processor"
-            || patchRho.type() == "processorCyclic") {
-            memcpy(h_boundary_rho + offset, &patchRho[0], patchsize * sizeof(double));
-            scalarField patchRhoInternal = 
-                    dynamic_cast<const processorFvPatchField<scalar>&>(patchRho).patchInternalField()();
-            memcpy(h_boundary_rho + offset + patchsize, &patchRhoInternal[0], patchsize * sizeof(double));
-            offset += patchsize * 2;
-        } else {
-            memcpy(h_boundary_rho + offset, &patchRho[0], patchsize * sizeof(double));
-            offset += patchsize;
-        }
-    }
-    // if (!mpi_init_flag || rank == 0) {
-    //     rhoEqn_GPU.compareRho(&rho[0], h_boundary_rho, false);
-    // }
-#endif
-#else
 {
-    start1 = MPI_Wtime();
+    clockTime rhoEqnClock;
+
     fvScalarMatrix rhoEqn
     (
         fvm::ddt(rho)
       + fvc::div(phi)
     );
-    end1 = MPI_Wtime();
-    time_monitor_rhoEqn += double(end1 - start1);
-    time_monitor_rhoEqn_mtxAssembly += double(end1 - start1);
 
-    start1 = MPI_Wtime();
+    time_monitor_rhoEqn_pre += rhoEqnClock.timeIncrement();
+
 #ifdef USE_DF_MATRIX
     dfMatrix df_rhoEqn(rhoEqn, regionPtr);
     auto& psi = const_cast<volScalarField&>(rhoEqn.psi());
     auto& source = rhoEqn.source();
     auto& internalCoeffs = rhoEqn.internalCoeffs();
     auto& boundaryCoeffs = rhoEqn.boundaryCoeffs();
+
+    time_monitor_rhoEqn_convert += rhoEqnClock.timeIncrement();
+
     df_rhoEqn.solve(psi, source, internalCoeffs, boundaryCoeffs);
 #else
     rhoEqn.solve();
 #endif
-    end1 = MPI_Wtime();
-    time_monitor_rhoEqn += double(end1 - start1);
-    time_monitor_rhoEqn_solve += double(end1 - start1);
+
+    time_monitor_rhoEqn_solve += rhoEqnClock.timeIncrement();
+    time_monitor_rhoEqn += rhoEqnClock.elapsedTime();
 }
-#endif
 // ************************************************************************* //
 
 Info << "Exit rhoEqn " << endl;
