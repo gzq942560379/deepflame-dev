@@ -17,94 +17,20 @@
 #include <cassert>
 
 #include "lduMatrix.H"
-
+#include "dfInnerMatrix.H"
+#include <memory>
 
 namespace Foam{
 
-// InnerMatrix 枚举类型
-
-enum InnerMatrixFormat{
-    LDU,
-    CSR,
-};
 
 class dfMatrix{
-public:
-    class InnerMatrix{
-    protected:
-        label n_;
-        scalarField diag_;
-        bool diagonal_;
-        bool symmetric_;
-    public:
-        InnerMatrix(const lduMatrix& ldu):
-            diagonal_(ldu.diagonal()),
-            symmetric_(ldu.symmetric())
-        {
-            assert(ldu.hasDiag());
-            if(ldu.hasDiag())
-            {
-                diag_ = ldu.diag();
-                n_ = ldu.diag().size();
-            }
-        };
-        virtual ~InnerMatrix(){};
-
-        label n() const {return n_;};
-        scalarField& diag(){return diag_;};
-        const scalarField& diag() const {return diag_;};
-        bool diagonal() const {return diagonal_;};
-        bool symmetric() const {return symmetric_;};
-        bool asymmetric() const {return !symmetric_;};
-
-        virtual InnerMatrixFormat getFormat() const = 0;
-        virtual const std::string getFormatName() const = 0;
-
-        virtual void SpMV
-        (
-            scalar* const __restrict__ ApsiPtr,
-            const scalar* const __restrict__ psiPtr
-        ) const = 0;
-        virtual void GaussSeidel
-        (
-            scalar* const __restrict__ psiPtr,
-            scalar* const __restrict__ bPrimePtr
-        ) const = 0;
-        virtual void Jacobi
-        (
-            scalar* const __restrict__ psiPtr,
-            scalar* const __restrict__ bPrimePtr
-        ) const = 0;
-        virtual void calcDILUReciprocalD(
-            scalar* const __restrict__ rDPtr
-        ) const = 0;
-        virtual void DILUPrecondition(
-            scalar* const __restrict__ wAPtr,
-            const scalar* const __restrict__ rAPtr,
-            const scalar* const __restrict__ rDPtr
-        ) const = 0;
-        virtual void DILUPreconditionT(
-            scalar* const __restrict__ wTPtr,
-            const scalar* const __restrict__ rTPtr,
-            const scalar* const __restrict__ rDPtr
-        ) const = 0;
-        virtual void calcDICReciprocalD(
-            scalar* const __restrict__ rDPtr
-        ) const = 0;
-        virtual void DICPrecondition(
-            scalar* const __restrict__ wAPtr,
-            const scalar* const __restrict__ rAPtr,
-            const scalar* const __restrict__ rDPtr
-        ) const = 0;
-    };
 private:
     // const fvMesh& mesh_;
     const lduMatrix& lduMatrix_;
 
-    InnerMatrix* innerMatrixPtr_;
+    std::unique_ptr<dfInnerMatrix> innerMatrixPtr_;
 
-    //- Coefficients (not including interfaces)
-    // scalarField *lowerPtr_, *diagPtr_, *upperPtr_;
+    static InnerMatrixFormat getInnerMatrixTypeFromEnv();
 
 public:
     // Static data
@@ -114,6 +40,8 @@ public:
 
     dfMatrix(const lduMatrix& lduMatrix);
 
+    dfMatrix(const lduMatrix& lduMatrix, const labelList& regionPtr);
+
     // Copy constructor
     dfMatrix(const dfMatrix& other) = delete;
 
@@ -121,7 +49,7 @@ public:
     // void init_value_from_lduMatrix(const lduMatrix& lduMatrix);
 
     //- Destructor
-    ~dfMatrix();
+    ~dfMatrix(){};
 
     const lduMatrix& ldu() const {return lduMatrix_;}
 

@@ -27,12 +27,14 @@ License
 #include <cassert>
 #include <sstream>
 #include <cstdio>
+#include <cstdlib>
 #include "PstreamGlobals.H"
 #include "Residuals.H"
 #include <vector>
 #include "env.H"
 #include "dfLduMatrix.H"
 #include "dfCSRMatrix.H"
+#include "dfBlockMatrix.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -43,19 +45,70 @@ namespace Foam
 
 const Foam::label Foam::dfMatrix::solver::defaultMaxIter_ = 1000;
 
+Foam::InnerMatrixFormat Foam::dfMatrix::getInnerMatrixTypeFromEnv(){
+    const char* tmp = std::getenv("DFMATRIX_INNERMATRIX_TYPE");
+    if(tmp == NULL){
+        return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_LDU;
+    }
+    if(std::strcmp(tmp, "LDU") == 0){
+        return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_LDU;
+    }else if(std::strcmp(tmp, "CSR") == 0){
+        return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_CSR;
+    }else if(std::strcmp(tmp, "BLOCK_CSR") == 0){
+        return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR;
+    }else{
+        SeriousError << "Invalid DFMATRIX_INNERMATRIX_TYPE: " << tmp << endl << flush;
+        std::exit(1);
+    }
+}
 
 Foam::dfMatrix::dfMatrix(const lduMatrix& ldu):lduMatrix_(ldu)
 {
-    innerMatrixPtr_ = new dfLduMatrix(ldu);
-    // innerMatrixPtr_ = new dfCSRMatrix(ldu);
+    // innerMatrixPtr_ = new dfLduMatrix(ldu);
+    InnerMatrixFormat format = getInnerMatrixTypeFromEnv();
+    switch(format){
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_LDU:
+            Info << "Building LDU matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfLduMatrix>(ldu);
+            break;
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_CSR:
+            Info << "Building CSR matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfCSRMatrix>(ldu);
+            break;
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR:
+            Info << "Building CSR matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfCSRMatrix>(ldu);
+            break;
+        default:
+            // error:
+            SeriousError << "Invalid InnerMatrixFormat: " << format << endl << flush;
+            std::exit(1);
+    }
 }
 
-
-Foam::dfMatrix::~dfMatrix()
+Foam::dfMatrix::dfMatrix(const lduMatrix& ldu, const labelList& regionPtr):lduMatrix_(ldu)
 {
-    delete innerMatrixPtr_;
+    // innerMatrixPtr_ = new dfLduMatrix(ldu);
+    InnerMatrixFormat format = getInnerMatrixTypeFromEnv();
+    switch(format){
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_LDU:
+            Info << "Building LDU matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfLduMatrix>(ldu);
+            break;
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_CSR:
+            Info << "Building CSR matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfCSRMatrix>(ldu);
+            break;
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR:
+            Info << "Building Block CSR matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfBlockMatrix>(ldu, regionPtr);
+            break;
+        default:
+            // error:
+            SeriousError << "Invalid InnerMatrixFormat: " << format << endl << flush;
+            std::exit(1);
+    }
 }
-
 
 // Foam::scalarField& Foam::dfMatrix::lower()
 // {

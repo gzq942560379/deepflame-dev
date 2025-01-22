@@ -8,9 +8,50 @@
 #include <arm_sve.h> 
 #endif
 
-bool env_get_bool(const char* name, bool default_value){
-    char* tmp = getenv(name);
-    if(tmp == NULL){
+namespace Foam{
+
+// int env::REGION_DECOMPOSE_NBLOCKS = env::get_int_default("REGION_DECOMPOSE_NBLOCKS", 16);
+const int env::DNN_BATCH_SIZE = env::get_int_default("DNN_BATCH_SIZE", 32768);
+const std::string env::DFMATRIX_INNERMATRIX_TYPE = env::get_string_default("DFMATRIX_INNERMATRIX_TYPE", "LDU");
+
+
+bool env::get_bool(const std::string& name){
+    const char* tmp = std::getenv(name.c_str());
+    if(tmp == nullptr){
+        // print error
+        SeriousError << "env " << name << " not set" << endl << flush;
+        std::exit(-1);
+    }
+    if(std::strcmp(tmp, "true") == 0){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+int env::get_int(const std::string& name){
+    const char* tmp = std::getenv(name.c_str());
+    if(tmp == nullptr){
+        // print error
+        SeriousError << "env " << name << " not set" << endl << flush;
+        std::exit(-1);
+    }
+    return std::atoi(tmp);
+}
+
+const std::string& env::get_string(const std::string& name){
+    const char* tmp = std::getenv(name.c_str());
+    if(tmp == nullptr){
+        // print error
+        SeriousError << "env " << name << " not set" << endl << flush;
+        std::exit(-1);
+    }
+    return std::string(tmp);
+}
+
+bool env::get_bool_default(const std::string& name, bool default_value){
+    const char* tmp = std::getenv(name.c_str());
+    if(tmp == nullptr){
         return default_value;
     }
     if(std::strcmp(tmp, "true") == 0){
@@ -20,35 +61,34 @@ bool env_get_bool(const char* name, bool default_value){
     }
 }
 
-int env_get_int(const char* name, int default_value){
-    char* tmp = getenv(name);
-    if(tmp == NULL){
+int env::get_int_default(const std::string& name, int default_value){
+    const char* tmp = std::getenv(name.c_str());
+    if(tmp == nullptr){
         return default_value;
     }
     return std::atoi(tmp);
 }
 
-int dnn_batch_size = env_get_int("DNN_BATCH_SIZE", 16384);
-int row_block_bit = env_get_int("ROW_BLOCK_BIT", 5);
-
-void env_show(){
-    int mpirank;
-    int flag_mpi_init;
-    MPI_Initialized(&flag_mpi_init);
-    if (flag_mpi_init) {
-        MPI_Comm_rank(MPI_COMM_WORLD, &mpirank);
+const std::string& env::get_string_default(const std::string& name, const std::string& default_value){
+    const char* tmp = std::getenv(name.c_str());
+    if(tmp == nullptr){
+        return default_value;
     }
-    
-    if(mpirank != 0) return;
-    
-    std::cout << std::endl;
-    std::cout << "env show --------------------------------" << std::endl;
-    std::cout << "dnn_batch_size : " << dnn_batch_size << std::endl;
-    std::cout << "row_block_bit : " << row_block_bit << std::endl;
-    std::cout << "max_threads : " << omp_get_max_threads() << std::endl;
-    #ifdef __ARM_FEATURE_SVE
-    std::cout << "simd width : " << svcntd() * 64 << std::endl;
-    #endif
-    std::cout << "-----------------------------------------" << std::endl;
+    return std::string(tmp);
 }
 
+void env::show(){
+    Info << endl;
+    Info << "env show --------------------------------" << endl;
+    Info << "dnn_batch_size : " << DNN_BATCH_SIZE << endl;
+    // Info << "region_decompose_nblocks : " << REGION_DECOMPOSE_NBLOCKS << endl;
+    Info << "dfmatrix_innermatrix_type : " << DFMATRIX_INNERMATRIX_TYPE << endl;
+    Info << "max_threads : " << omp_get_max_threads() << endl;
+    #ifdef __ARM_FEATURE_SVE
+    Info << "simd width : " << svcntd() * 64 << endl;
+    #endif
+    Info << "-----------------------------------------" << endl;
+}
+
+
+}

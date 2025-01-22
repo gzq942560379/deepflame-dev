@@ -148,7 +148,7 @@ Info << "Enter UEqn" << endl;
         // );
         // fvVectorMatrix& UEqnSolve = tUEqnSolve.ref();
 #ifdef USE_DF_MATRIX
-        dfMatrix df_UEqnSolve(tUEqnSolve.ref());
+        dfMatrix df_UEqnSolve(tUEqnSolve.ref(), regionPtr);
         auto& psi = const_cast<volVectorField&>(UEqnSolve.psi());
         auto& source = UEqnSolve.source();
         auto& internalCoeffs = UEqnSolve.internalCoeffs();

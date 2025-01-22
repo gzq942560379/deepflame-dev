@@ -3,7 +3,7 @@
 
 namespace Foam{
 
-dfLduMatrix::dfLduMatrix(const lduMatrix& ldu):dfMatrix::InnerMatrix(ldu){
+dfLduMatrix::dfLduMatrix(const lduMatrix& ldu):dfInnerMatrix(ldu){
     lowerAddr_ = ldu.lduAddr().lowerAddr();
     upperAddr_ = ldu.lduAddr().upperAddr();
     ownerStartAddr_ = ldu.lduAddr().ownerStartAddr();

@@ -140,8 +140,9 @@ int offset;
     #define TICK_STOP(prefix)
 #endif
 
+#include "env.H"
 #include "csrPattern.H"
-#include "BCSR.H"
+#include "BCSRPattern.H"
 #include "dfMatrix.H"
 #include "GenFvMatrix.H"
 #include "MeshSchedule.H"
@@ -273,6 +274,8 @@ int main(int argc, char *argv[])
 
     end1 = MPI_Wtime();
     time_monitor_init += double(end1 - start1);
+
+    env::show();
     
     // print cells per proc
     int mpirank = 0, mpisize = 1;
@@ -313,7 +316,7 @@ int main(int argc, char *argv[])
     }
 
     if (nBlocks > 1){
-        BCSR bcsr(pattern_after, regionPtr);
+        BCSRPattern bcsr(pattern_after, regionPtr);
     }else if(nBlocks == 1){
         regionPtr.resize(17);
         // partition nCells into 16 regions
@@ -322,7 +325,7 @@ int main(int argc, char *argv[])
             regionPtr[i] = regionStart;
         }
         regionPtr[16] = nCell;
-        BCSR bcsr(pattern_after, regionPtr);
+        BCSRPattern bcsr(pattern_after, regionPtr);
     }
 
 #if defined(OPT_GenMatrix_E)

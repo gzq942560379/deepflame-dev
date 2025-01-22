@@ -100,7 +100,7 @@ Info << "Enter rhoEqn " << endl;
 
     start1 = MPI_Wtime();
 #ifdef USE_DF_MATRIX
-    dfMatrix df_rhoEqn(rhoEqn);
+    dfMatrix df_rhoEqn(rhoEqn, regionPtr);
     auto& psi = const_cast<volScalarField&>(rhoEqn.psi());
     auto& source = rhoEqn.source();
     auto& internalCoeffs = rhoEqn.internalCoeffs();

@@ -1,10 +1,10 @@
 #pragma once
-#include "dfMatrix.H"
+#include "dfInnerMatrix.H"
 
 
 namespace Foam{
 
-class dfLduMatrix : public dfMatrix::InnerMatrix{
+class dfLduMatrix : public dfInnerMatrix{
 private:
     // - Coefficients (not including interfaces)
     scalarField lower_, upper_;
@@ -31,7 +31,7 @@ public:
 
     ~dfLduMatrix(){};
 
-    InnerMatrixFormat getFormat() const {return InnerMatrixFormat::LDU;};
+    InnerMatrixFormat getFormat() const {return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_LDU;};
     const std::string getFormatName() const {return "LDU";};
 
     void SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr) const;

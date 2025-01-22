@@ -83,7 +83,7 @@ tmp<fv::convectionScheme<scalar>> mvConvection
 
             start1 = MPI_Wtime();
 #ifdef USE_DF_MATRIX
-            dfMatrix df_YiEqn(YiEqn);
+            dfMatrix df_YiEqn(YiEqn, regionPtr);
             auto& psi = const_cast<volScalarField&>(YiEqn.psi());
             auto& source = YiEqn.source();
             auto& internalCoeffs = YiEqn.internalCoeffs();

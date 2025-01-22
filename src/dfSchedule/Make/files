@@ -9,7 +9,7 @@ XYBlock1DColoringStructuredMeshSchedule.C
 XBlock2DPartitionStructuredMeshSchedule.C
 UnstructuredMeshSchedule.C
 csrPattern.C
-BCSR.C
+BCSRPattern.C
 
 schedule.C
 

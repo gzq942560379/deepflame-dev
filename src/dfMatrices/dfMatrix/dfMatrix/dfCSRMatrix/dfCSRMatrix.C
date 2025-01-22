@@ -4,7 +4,7 @@
 
 namespace Foam{
 
-dfCSRMatrix::dfCSRMatrix(const lduMatrix& ldu):dfMatrix::InnerMatrix(ldu){
+dfCSRMatrix::dfCSRMatrix(const lduMatrix& ldu):dfInnerMatrix(ldu){
     // Pout << "Enter dfCSRMatrix::dfCSRMatrix(lduMatrix& ldu)" << endl << flush;
     this->rowPtr_.resize(n_ + 1);
     
@@ -87,8 +87,10 @@ dfCSRMatrix::dfCSRMatrix(const lduMatrix& ldu):dfMatrix::InnerMatrix(ldu){
 
 void dfCSRMatrix::SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr) const {
     // Pout << "Enter dfCSRMatrix::SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr)" << endl << flush;
+    const scalar* const __restrict__ diagPtr = diag().begin(); 
+    
     for(label r = 0; r < n_; ++r){
-        scalar sum = 0.0;
+        scalar sum = diagPtr[r] * psiPtr[r];
         for(label j = rowPtr_[r]; j < rowPtr_[r + 1]; ++j){
             sum += values_[j] * psiPtr[colIdx_[j]];
         }
@@ -97,20 +99,25 @@ void dfCSRMatrix::SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const _
     // Pout << "Exit dfCSRMatrix::SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr)" << endl << flush;
 }
 
+// block Jacobi
 void dfCSRMatrix::GaussSeidel(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr) const {
     // Pout << "Enter dfCSRMatrix::GaussSeidel(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr)" << endl << flush;
+    const scalar* const __restrict__ diagPtr = diag().begin();
+
     for(label r = 0; r < n_; ++r){
         scalar sum = bPrimePtr[r];
         for(label j = rowPtr_[r]; j < rowPtr_[r + 1]; ++j){
             sum -= values_[j] * psiPtr[colIdx_[j]];
         }
-        psiPtr[r] = sum / diag_[r];
+        psiPtr[r] = sum / diagPtr[r];
     }
     // Pout << "Exit dfCSRMatrix::GaussSeidel(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr)" << endl << flush;
 }
 
 void dfCSRMatrix::Jacobi(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr) const {
     // Pout << "Enter dfCSRMatrix::Jacobi(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr)" << endl << flush;
+    const scalar* const __restrict__ diagPtr = diag().begin();
+
     scalar* psiOldPtr = new scalar[n_];
     std::copy(psiPtr, psiPtr + n_, psiOldPtr);
     for(label r = 0; r < n_; ++r){
@@ -118,7 +125,7 @@ void dfCSRMatrix::Jacobi(scalar* const __restrict__ psiPtr, scalar* const __rest
         for(label j = rowPtr_[r]; j < rowPtr_[r + 1]; ++j){
             sum -= values_[j] * psiOldPtr[colIdx_[j]];
         }
-        psiPtr[r] = sum / diag_[r];
+        psiPtr[r] = sum / diagPtr[r];
     }
     delete [] psiOldPtr;
     // Pout << "Exit dfCSRMatrix::Jacobi(scalar* const __restrict__ psiPtr, scalar* const __restrict__ bPrimePtr)" << endl << flush;

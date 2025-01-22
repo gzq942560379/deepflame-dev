@@ -80,7 +80,7 @@ else
         fvScalarMatrix pEqn(pDDtEqn - fvm::laplacian(rhorAUf, p));
         
 #ifdef USE_DF_MATRIX
-        dfMatrix df_pEqn(pEqn);
+        dfMatrix df_pEqn(pEqn, regionPtr);
         auto& psi = const_cast<volScalarField&>(pEqn.psi());
         auto& source = pEqn.source();
         auto& internalCoeffs = pEqn.internalCoeffs();

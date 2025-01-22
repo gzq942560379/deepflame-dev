@@ -10,6 +10,8 @@ $(dfMatrix)/dfMatrix/dfMatrixSmoother.C
 
 $(dfMatrix)/dfMatrix/dfLduMatrix/dfLduMatrix.C
 $(dfMatrix)/dfMatrix/dfCSRMatrix/dfCSRMatrix.C
+$(dfMatrix)/dfMatrix/dfBlockMatrix/dfBlockMatrix.C
+$(dfMatrix)/dfMatrix/dfBlockMatrix/dfCSRSubMatrix/dfCSRSubMatrix.C
 
 $(dfMatrix)/preconditioners/dfNoPreconditioner/dfNoPreconditioner.C
 $(dfMatrix)/preconditioners/dfDILUPreconditioner/dfDILUPreconditioner.C

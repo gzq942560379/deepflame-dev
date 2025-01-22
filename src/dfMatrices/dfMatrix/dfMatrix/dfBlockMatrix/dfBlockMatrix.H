@@ -1,32 +1,29 @@
 #pragma once
 #include "dfInnerMatrix.H"
+#include "dfBlockSubMatrix.H"
+#include "dfCSRSubMatrix.H"
 #include <vector>
 
+#define bid2d(rbid, cbid) (rbid * rowBlockCount_ + cbid)
 
 namespace Foam{
 
-class dfCSRMatrix : public dfInnerMatrix{
+class dfBlockMatrix : public dfInnerMatrix{
 private:
 
-    labelList rowPtr_;
-    labelList colIdx_;
-    scalarList values_;
+    label rowBlockCount_;
+    labelList rowBlockPtr_;
+    std::vector<std::unique_ptr<dfBlockSubMatrix>> blocks_;
 
-    const labelList& rowPtr() const {return rowPtr_;};
-    const labelList& colIdx() const {return colIdx_;};
-    const scalarList& values() const {return values_;};
-
-    labelList& rowPtr() {return rowPtr_;};
-    labelList& colIdx() {return colIdx_;};
-    scalarList& values() {return values_;};
+    label maxBlockSize_;
 
 public:
-    dfCSRMatrix(const lduMatrix& ldu);
+    dfBlockMatrix(const lduMatrix& ldu, const labelList& rowBlockPtr);
 
-    ~dfCSRMatrix(){};
+    ~dfBlockMatrix(){};
 
-    InnerMatrixFormat getFormat() const {return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_CSR;};
-    const std::string getFormatName() const {return "CSR";};
+    InnerMatrixFormat getFormat() const {return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR;};
+    const std::string getFormatName() const {return "BLOCK_CSR";};
 
     void SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const __restrict__ psiPtr) const;
     
@@ -39,7 +36,6 @@ public:
 
     void calcDICReciprocalD(scalar* const __restrict__ rDPtr) const;
     void DICPrecondition(scalar* const __restrict__ wAPtr, const scalar* const __restrict__ rAPtr, const scalar* const __restrict__ rDPtr) const;
-    
 };
 
 }

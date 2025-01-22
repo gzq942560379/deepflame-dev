@@ -24,9 +24,9 @@ void XBlock2DPartitionStructuredMeshSchedule::buildXBlock2DPartitionStructuredMe
 XBlock2DPartitionStructuredMeshSchedule::XBlock2DPartitionStructuredMeshSchedule(const fvMesh& mesh):StructuredMeshSchedule(mesh){
     Info << "XBlock2DPartitionStructuredMeshSchedule::XBlock2DPartitionStructuredMeshSchedule start" << endl;
 #ifdef _OPENMP
-    partition_count_ = env_get_int("MESH_PARTITION_COUNT", omp_get_max_threads());
+    partition_count_ = env::get_int_default("MESH_PARTITION_COUNT", omp_get_max_threads());
 #else
-    partition_count_ = env_get_int("MESH_PARTITION_COUNT", 1);
+    partition_count_ = env::get_int_default("MESH_PARTITION_COUNT", 1);
 #endif
 
     if(partition_count_ == 1){

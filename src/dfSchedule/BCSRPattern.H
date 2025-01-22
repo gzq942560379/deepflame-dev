@@ -8,7 +8,7 @@
 
 namespace Foam{
 
-class BCSR{
+class BCSRPattern{
 private:
     
     label n_;
@@ -16,15 +16,18 @@ private:
     label rowBlockCount_;
     labelList rowBlockPtr_;
 
+
+    std::vector<std::vector<std::pair<label, label>>> blocks_;
     
 
 
 public:
 
-    BCSR(const csrPattern csr, const labelList& regionPtr);
+    BCSRPattern(const csrPattern csr, const labelList& regionPtr);
 
-    ~BCSR(){};
+    ~BCSRPattern(){};
 
+    void show() const;
 
 };
 

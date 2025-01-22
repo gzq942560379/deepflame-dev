@@ -32,7 +32,7 @@ Info << "Enter EEqn" << endl;
     start1 = MPI_Wtime();
 
 #ifdef USE_DF_MATRIX
-    dfMatrix df_EEqn(EEqn);
+    dfMatrix df_EEqn(EEqn, regionPtr);
     auto& psi = const_cast<volScalarField&>(EEqn.psi());
     auto& source = EEqn.source();
     auto& internalCoeffs = EEqn.internalCoeffs();
