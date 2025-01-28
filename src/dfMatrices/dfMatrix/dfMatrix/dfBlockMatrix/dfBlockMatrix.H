@@ -15,12 +15,16 @@ private:
     labelList rowBlockPtr_;
     std::vector<std::unique_ptr<dfBlockSubMatrix>> blocks_;
 
-    label maxBlockSize_;
+    void buildBlocks(const lduMatrix& ldu);
 
 public:
     dfBlockMatrix(const lduMatrix& ldu, const labelList& rowBlockPtr);
 
+    dfBlockMatrix(const lduMatrix& courseLduMatrix, const labelList& fineRowBlockPtr, const labelList& fineToCoarse);
+
     ~dfBlockMatrix(){};
+
+    const labelList& rowBlockPtr() const {return rowBlockPtr_;};
 
     InnerMatrixFormat getFormat() const {return InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR;};
     const std::string getFormatName() const {return "BLOCK_CSR";};

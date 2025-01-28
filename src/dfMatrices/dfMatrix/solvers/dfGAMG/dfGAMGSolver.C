@@ -369,6 +369,17 @@ const Foam::lduMatrix& Foam::dfGAMGSolver::matrixLevel(const label i) const
     }
 }
 
+const Foam::dfMatrix& Foam::dfGAMGSolver::dfMatrixLevel(const label i) const
+{
+    if (i == 0)
+    {
+        return matrix_;
+    }
+    else
+    {
+        return dfMatrixLevels_[i - 1];
+    }
+}
 
 const Foam::lduInterfaceFieldPtrsList& Foam::dfGAMGSolver::interfaceLevel
 (

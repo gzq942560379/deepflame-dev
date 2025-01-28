@@ -437,23 +437,31 @@ int main(int argc, char *argv[])
         Info<< "rhoEqn pre                   = " << time_monitor_rhoEqn_pre << " s" << endl;
         Info<< "rhoEqn convert               = " << time_monitor_rhoEqn_convert << " s" << endl;
         Info<< "rhoEqn solve                 = " << time_monitor_rhoEqn_solve << " s" << endl;
-
+        
+        Info<< "============================================"<< endl;
+        
         Info<< "UEqn Time                    = " << time_monitor_UEqn << " s" << endl;
         Info<< "UEqn pre                     = " << time_monitor_UEqn_pre << " s" << endl;
         Info<< "UEqn convert                 = " << time_monitor_UEqn_convert << " s" << endl;
         Info<< "UEqn solve                   = " << time_monitor_UEqn_solve << " s" << endl;
         Info<< "UEqn post                    = " << time_monitor_UEqn_post << " s" << endl;
-
+        
+        Info<< "============================================"<< endl;
+        
         Info<< "YEqn Time                    = " << time_monitor_YEqn << " s" << endl;
         Info<< "YEqn pre                     = " << time_monitor_YEqn_pre << " s" << endl;
         Info<< "YEqn convert                 = " << time_monitor_YEqn_convert << " s" << endl;
         Info<< "YEqn solve                   = " << time_monitor_YEqn_solve << " s" << endl;
         Info<< "YEqn post                    = " << time_monitor_YEqn_post << " s" << endl;
-
+        
+        Info<< "============================================"<< endl;
+        
         Info<< "EEqn Time                    = " << time_monitor_EEqn << " s" << endl;
         Info<< "EEqn pre                     = " << time_monitor_EEqn_pre << " s" << endl;
         Info<< "EEqn convert                 = " << time_monitor_EEqn_convert << " s" << endl;
         Info<< "EEqn solve                   = " << time_monitor_EEqn_solve << " s" << endl;
+
+        Info<< "============================================"<< endl;
 
         Info<< "pEqn Time                    = " << time_monitor_pEqn << " s" << endl;
         Info<< "pEqn pre                     = " << time_monitor_pEqn_pre << " s" << endl;
@@ -461,7 +469,7 @@ int main(int argc, char *argv[])
         Info<< "pEqn solve                   = " << time_monitor_pEqn_solve << " s" << endl;
         Info<< "pEqn post                    = " << time_monitor_pEqn_post << " s" << endl;
 
-        Info<< "============================================"<<nl<< endl;
+        Info<< "============================================"<< endl;
 
         // Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
         //     << "  ClockTime = " << runTime.elapsedClockTime() << " s" << endl;

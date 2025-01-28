@@ -6,6 +6,7 @@ namespace Foam{
 
 dfCSRMatrix::dfCSRMatrix(const lduMatrix& ldu):dfInnerMatrix(ldu){
     // Pout << "Enter dfCSRMatrix::dfCSRMatrix(lduMatrix& ldu)" << endl << flush;
+    Info << "Building CSRMatrix n_ : " << n_ << endl;
     this->rowPtr_.resize(n_ + 1);
     
     // off_diagonal_nnz_ = 0;

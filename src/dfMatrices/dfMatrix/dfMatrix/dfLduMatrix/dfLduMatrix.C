@@ -4,6 +4,7 @@
 namespace Foam{
 
 dfLduMatrix::dfLduMatrix(const lduMatrix& ldu):dfInnerMatrix(ldu){
+    Info << "Building LduMatrix n_ : " << n_ << endl;
     lowerAddr_ = ldu.lduAddr().lowerAddr();
     upperAddr_ = ldu.lduAddr().upperAddr();
     ownerStartAddr_ = ldu.lduAddr().ownerStartAddr();

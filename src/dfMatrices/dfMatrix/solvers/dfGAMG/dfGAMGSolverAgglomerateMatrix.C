@@ -27,6 +27,7 @@ License
 #include "dfGAMGInterfaceField.H"
 #include "processorLduInterfaceField.H"
 #include "processordfGAMGInterfaceField.H"
+#include "dfBlockMatrix.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -39,6 +40,7 @@ void Foam::dfGAMGSolver::agglomerateMatrix
 {
     // Get fine matrix
     const lduMatrix& fineMatrix = matrixLevel(fineLevelIndex);
+    const dfMatrix& fineDFMatrix = dfMatrixLevel(fineLevelIndex);
 
     if (UPstream::myProcNo(fineMatrix.mesh().comm()) != -1)
     {
@@ -190,13 +192,22 @@ void Foam::dfGAMGSolver::agglomerateMatrix
             }
         }
 
-        // Set the coarse level matrix
-        dfMatrixLevels_.set
-        (
-            fineLevelIndex,
-            new dfMatrix(coarseMatrix)
-        );
-
+        if(fineDFMatrix.getFormat() == InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR){
+            const dfBlockMatrix& fineBlockMatrix = dynamic_cast<const dfBlockMatrix&>(fineDFMatrix.innerMatrix());
+            const labelList& fineRowBlockPtr = fineBlockMatrix.rowBlockPtr();
+            const labelList& fineToCoarse = agglomeration_.restrictAddressing(fineLevelIndex);
+            dfMatrixLevels_.set
+            (
+                fineLevelIndex,
+                new dfMatrix(coarseMatrix, fineRowBlockPtr, fineToCoarse)
+            );
+        }else{
+            dfMatrixLevels_.set
+            (
+                fineLevelIndex,
+                new dfMatrix(coarseMatrix)
+            );
+        }
     }
 }
 

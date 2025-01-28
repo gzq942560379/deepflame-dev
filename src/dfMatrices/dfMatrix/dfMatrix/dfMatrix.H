@@ -42,6 +42,8 @@ public:
 
     dfMatrix(const lduMatrix& lduMatrix, const labelList& regionPtr);
 
+    dfMatrix(const lduMatrix& courseLduMatrix, const labelList& fineRowBlockPtr, const labelList& fineToCoarse);
+
     // Copy constructor
     dfMatrix(const dfMatrix& other) = delete;
 
@@ -62,6 +64,8 @@ public:
     const lduSchedule& patchSchedule() const {return lduAddr().patchSchedule();}
 
     // Access to coefficients
+
+    const dfInnerMatrix& innerMatrix() const {return *innerMatrixPtr_;};
 
     scalarField& diag() {return innerMatrixPtr_->diag();};
 

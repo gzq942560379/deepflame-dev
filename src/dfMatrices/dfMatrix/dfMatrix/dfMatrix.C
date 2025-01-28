@@ -110,6 +110,30 @@ Foam::dfMatrix::dfMatrix(const lduMatrix& ldu, const labelList& regionPtr):lduMa
     }
 }
 
+Foam::dfMatrix::dfMatrix(const lduMatrix& courseLduMatrix, const labelList& fineRowBlockPtr, const labelList& fineToCoarse):lduMatrix_(courseLduMatrix)
+{
+    // innerMatrixPtr_ = new dfLduMatrix(ldu);
+    InnerMatrixFormat format = getInnerMatrixTypeFromEnv();
+    switch(format){
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_LDU:
+            Info << "Building LDU matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfLduMatrix>(courseLduMatrix);
+            break;
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_CSR:
+            Info << "Building CSR matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfCSRMatrix>(courseLduMatrix);
+            break;
+        case InnerMatrixFormat::DFMATRIX_INNERMATRIX_FORMAT_BLOCK_CSR:
+            Info << "Building Block CSR matrix" << endl;
+            innerMatrixPtr_ = std::make_unique<dfBlockMatrix>(courseLduMatrix, fineRowBlockPtr, fineToCoarse);
+            break;
+        default:
+            // error:
+            SeriousError << "Invalid InnerMatrixFormat: " << format << endl << flush;
+            std::exit(1);
+    }
+}
+
 // Foam::scalarField& Foam::dfMatrix::lower()
 // {
 //     if (!lowerPtr_)
