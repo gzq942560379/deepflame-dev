@@ -146,8 +146,10 @@ void dfBlockMatrix::SpMV(scalar* const __restrict__ ApsiPtr, const scalar* const
         label rowOffset = rowBlockPtr_[rbid];
         label rowLen = rowBlockPtr_[rbid + 1] - rowBlockPtr_[rbid];
         scalar* const __restrict__ ApsiPtr_offset = ApsiPtr + rowOffset;
+        const scalar* const __restrict__ diagPtr_offset = diagPtr + rowOffset;
+        const scalar* const __restrict__ psiPtr_rowOffset = psiPtr + rowOffset;
         for(label r = 0; r < rowLen; ++r){
-            ApsiPtr_offset[r] = diagPtr[r] * psiPtr[r];
+            ApsiPtr_offset[r] = diagPtr_offset[r] * psiPtr_rowOffset[r];
         }
         for(label cbid = 0; cbid < rowBlockCount_; ++cbid){
             label bid = bid2d(rbid, cbid);

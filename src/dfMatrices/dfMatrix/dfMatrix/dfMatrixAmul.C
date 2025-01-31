@@ -43,46 +43,46 @@ void Foam::dfMatrix::Amul
     const direction cmpt
 ) const
 {
-    lduMatrix_.Amul(Apsi, psi, interfaceBouCoeffs, interfaces, cmpt);
-    // double Amul_start, Amul_end;
-    // double Amul_Communication_init_start, Amul_Communication_init_end;
-    // double Amul_Communication_update_start, Amul_Communication_update_end;
-    // double Amul_Compute_start, Amul_Compute_end;
+    // lduMatrix_.Amul(Apsi, psi, interfaceBouCoeffs, interfaces, cmpt);
+    double Amul_start, Amul_end;
+    double Amul_Communication_init_start, Amul_Communication_init_end;
+    double Amul_Communication_update_start, Amul_Communication_update_end;
+    double Amul_Compute_start, Amul_Compute_end;
 
-    // Amul_start = MPI_Wtime();
-    // // Initialise the update of interfaced interfaces
+    Amul_start = MPI_Wtime();
+    // Initialise the update of interfaced interfaces
 
-    // Amul_Communication_init_start = MPI_Wtime();
-    // initMatrixInterfaces
-    // (
-    //     interfaceBouCoeffs,
-    //     interfaces,
-    //     psi,
-    //     Apsi,
-    //     cmpt
-    // );
-    // Amul_Communication_init_end = MPI_Wtime();
-    // Amul_Communication_init_time_ += Amul_Communication_init_end - Amul_Communication_init_start;
+    Amul_Communication_init_start = MPI_Wtime();
+    initMatrixInterfaces
+    (
+        interfaceBouCoeffs,
+        interfaces,
+        psi,
+        Apsi,
+        cmpt
+    );
+    Amul_Communication_init_end = MPI_Wtime();
+    Amul_Communication_init_time_ += Amul_Communication_init_end - Amul_Communication_init_start;
 
-    // Amul_Compute_start = MPI_Wtime();
-    // SpMV(Apsi, psi);
-    // Amul_Compute_end = MPI_Wtime();
-    // Amul_Compute_time_ += Amul_Compute_end - Amul_Compute_start;
+    Amul_Compute_start = MPI_Wtime();
+    SpMV(Apsi, psi);
+    Amul_Compute_end = MPI_Wtime();
+    Amul_Compute_time_ += Amul_Compute_end - Amul_Compute_start;
 
-    // // Update interface interfaces
-    // Amul_Communication_update_start = MPI_Wtime();
-    // updateMatrixInterfaces
-    // (
-    //     interfaceBouCoeffs,
-    //     interfaces,
-    //     psi,
-    //     Apsi,
-    //     cmpt
-    // );
-    // Amul_Communication_update_end = MPI_Wtime();
-    // Amul_Communication_update_time_ += Amul_Communication_update_end - Amul_Communication_update_start;
-    // Amul_end = MPI_Wtime();
-    // Amul_time_ += Amul_end - Amul_start;
+    // Update interface interfaces
+    Amul_Communication_update_start = MPI_Wtime();
+    updateMatrixInterfaces
+    (
+        interfaceBouCoeffs,
+        interfaces,
+        psi,
+        Apsi,
+        cmpt
+    );
+    Amul_Communication_update_end = MPI_Wtime();
+    Amul_Communication_update_time_ += Amul_Communication_update_end - Amul_Communication_update_start;
+    Amul_end = MPI_Wtime();
+    Amul_time_ += Amul_end - Amul_start;
 }
 
 void Foam::dfMatrix::Amul
@@ -94,9 +94,9 @@ void Foam::dfMatrix::Amul
     const direction cmpt
 ) const
 {
-    lduMatrix_.Amul(Apsi, tpsi(), interfaceBouCoeffs, interfaces, cmpt);
-    // Amul(Apsi, tpsi(), interfaceBouCoeffs, interfaces, cmpt);
-    // tpsi.clear();
+    // lduMatrix_.Amul(Apsi, tpsi(), interfaceBouCoeffs, interfaces, cmpt);
+    Amul(Apsi, tpsi(), interfaceBouCoeffs, interfaces, cmpt);
+    tpsi.clear();
 }
 
 
